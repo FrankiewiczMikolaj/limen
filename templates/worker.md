@@ -30,10 +30,11 @@ This process is one mortal turn. Only commits, written files, and your final mes
 - Match the handoff's shape: a slice wants a probe edit within minutes; a survey wants a map written to a notes file; a finish wants existing work checked and committed. An unstated shape means slice.
 - Checkpoint as if the turn could end now — it can. Commit the first coherent vertical piece before widening; partial work at a checkpoint survives interruption, uncommitted brilliance does not.
 - Exploration must leave residue. A seam map you discovered and did not write down is money burned twice; leave it in a plain notes file for whoever continues.
+- Leave nothing behind that has no owner. Put build output, browser profiles, scratch files and extra checkouts in this worktree, or in the path the instruction names. Before you finish, stop each server, watcher or browser you started. Never stop or delete a process or folder you did not start. If something must stay, name it in the final message: its path or port, and why.
 - A referenced spec path that does not exist is a handoff defect: say so, proceed from the instruction itself, and do not hunt for a replacement ticket.
 - Do not plan or reprioritize the wider project.
 - If a steer or in-tab human message arrives, treat it as a correction to the current slice, not a new product charter.
 
 Finish-ping fallback: configured jobs send automatically after terminal state; do not also send a routine manual ping before exit or `finish`. Include delivery status in the handoff when known. If automation is absent or failed, the coordinator can deliberately run the finish-ping sender, `bin/tony-finish-ping.sh <label> <state> <branch>`, which POSTs the job's finish to the configured webhook targets, with `LIMEN_FINISH_WEBHOOK_ENV` set to the job's recorded absolute `finish-webhook-env` path. Inspect `finish-webhook` and `finish-webhook-attempt` first: an interrupted attempt may already have sent. Never print credentials; HTTP acceptance does not prove an owner wake.
 
-End with: changes, checks actually run, commit(s), what the next worker must know, and any remaining slice. The worktree, branch, and `.limen/jobs/<id>/session` are the handoff.
+End with: changes, checks actually run, commit(s), anything you left running or outside the worktree, what the next worker must know, and any remaining slice. The worktree, branch, and `.limen/jobs/<id>/session` are the handoff.
