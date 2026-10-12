@@ -20,7 +20,8 @@ Not a problem: the steering hook (500 ms `readdir` of one inbox per job), the ho
 
 ## Method
 
-- Process starts: `tmp/evidence/audit/sample.py` (in the audit worktree) samples `/bin/ps -Ao pid=,ppid=,args=` every 30 ms and counts new pids per parent and command.
+- Scripts: `.limen/jobs/2026-10-12-audit-timers-and-process-starts-3a70dd26/evidence/` in the limen checkout. The `.mts` files import `../../../hook` and `../../../src`, so copy them to `<checkout>/tmp/evidence/audit/` first. That folder is gitignored, but the structure test reads every `.ts` file below the checkout, so do not leave copied `.ts` files there during `npm run check`.
+- Process starts: `sample.py` samples `/bin/ps -Ao pid=,ppid=,args=` every 30 ms and counts new pids per parent and command.
 - CPU: `/bin/ps -o cputime=` 30 s apart. The job shell's `ps` is a builtin that prints wrong times.
-- Finding 1: `hook-cpu.mts` loads the real `hook/wake.ts` against a copy of alice's job records (no session or log files) with `LIMEN_HOME` set to a scratch folder and `LIMEN_HERDR=0`, then reads `process.cpuUsage()` over 20 s. Under `--cpu-prof`, finishSweep is 23.5% of samples and observe is 13.7%. Child process CPU is not counted.
+- Finding 1: make the copy with `rsync -a --exclude 'session/' --exclude log --exclude '*.jsonl' --exclude result <alice>/.limen/jobs <copy>/.limen/`, then copy `spec/` and create `<copy>/.agents/limen/`. Run `env -u LIMEN_JOB LIMEN_HOME=<scratch> LIMEN_HERDR=0 node hook-cpu.mts <copy> 20`. It loads the real `hook/wake.ts` and reads `process.cpuUsage()` over 20 s; child process CPU is not counted. Under `--cpu-prof`, finishSweep is 23.5% of samples and observe is 13.7%. After the Ruby fix (F943) landed, the hook still measures 24%.
 - Finding 2: `watch-rate.mjs` counts watch events that pass the wake filter in 50 ms windows. A throwaway plant job streamed 150 deltas in 3 s: 153 activity writes before the fix, 4 after.
