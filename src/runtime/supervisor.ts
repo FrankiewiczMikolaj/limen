@@ -281,7 +281,7 @@ async function sampleToolStall(
 	let child: boolean | undefined;
 	if (owned && binding && activity === "tool") {
 		const tool = `${await textFile(`${jobDir}/tool-calls`)}:${await textFile(`${jobDir}/tool-detail`)}`;
-		child = (await observeToolStall(toolWatch, binding.pid, tool)) === "uncertain";
+		child = (await observeToolStall(toolWatch, binding, tool)) === "uncertain";
 	} else {
 		toolWatch.tool = "";
 		toolWatch.previous = undefined;

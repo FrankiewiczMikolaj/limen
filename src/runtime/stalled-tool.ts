@@ -54,11 +54,8 @@ function processRows(): Promise<Row[]> {
 	return promise;
 }
 
+/** The caller confirmed `pid` has `born` just before; the same birth after the scan proves every row is that process's own. */
 async function sampleTree(pid: number, born: string): Promise<Sample | undefined> {
-	const before = await processInfo(pid);
-	if (before.kind !== "present" || before.process.born !== born) {
-		return;
-	}
 	const rows = await processRows();
 	const root = rows.find((row) => row.pid === pid && !row.state.startsWith("Z"));
 	if (!root) {
@@ -106,10 +103,11 @@ export type ToolStallWatch = {
 	lastSampleAt?: number;
 	previous?: Sample | undefined;
 };
-/** A pending tool needs an observed child and unchanged cumulative CPU time; a vanished child stays evidence after its exit. */
+/** A pending tool needs an observed child and unchanged cumulative CPU time; a vanished child stays evidence after its exit.
+ * The caller confirmed the engine's birth just before. */
 export async function observeToolStall(
 	watch: ToolStallWatch,
-	pid: number,
+	engine: { readonly pid: number; readonly born: string },
 	tool: string,
 	now = Date.now(),
 	windowMs = toolStallMs(),
@@ -120,22 +118,16 @@ export async function observeToolStall(
 		watch.hadChild = false;
 		return;
 	}
-	const identity = await processInfo(pid);
-	if (identity.kind !== "present") {
-		watch.previous = undefined;
-		watch.started = now;
-		return "uncertain";
-	}
-	if (watch.tool !== tool || watch.born !== identity.process.born) {
+	if (watch.tool !== tool || watch.born !== engine.born) {
 		watch.tool = tool;
-		watch.born = identity.process.born;
+		watch.born = engine.born;
 		watch.started = now;
 		watch.previous = undefined;
 		watch.hadChild = false;
 	}
 	let current: Sample | undefined;
 	try {
-		current = await sampleTree(pid, watch.born);
+		current = await sampleTree(engine.pid, watch.born);
 	} catch {
 		watch.previous = undefined;
 		watch.started = now;
@@ -166,7 +158,7 @@ export async function observeToolStall(
 	}
 }
 
-/** Capture only descendants still connected to the verified root, with individual birth identities. */
+/** Capture only descendants still connected to the root whose birth the caller just confirmed, with individual birth identities. */
 export async function ownedToolDescendants(pid: number, born: string): Promise<JobProcess[] | undefined> {
 	const sample = await sampleTree(pid, born).catch(() => undefined);
 	if (!sample) {
