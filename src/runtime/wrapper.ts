@@ -216,7 +216,7 @@ export async function runInternalJob(): Promise<void> {
 			await warnUncertain("detached engine ownership unavailable");
 			return;
 		}
-		const result = await observeToolStall(stallWatch, pid, `${tools}:${seen.tool}:${seen.progress}`);
+		const result = await observeToolStall(stallWatch, identity.process, `${tools}:${seen.tool}:${seen.progress}`);
 		if (result === "uncertain") {
 			await warnUncertain("CPU or process identity unavailable");
 			return;
@@ -244,7 +244,7 @@ export async function runInternalJob(): Promise<void> {
 		}
 		if (
 			seen.activity !== "tool" ||
-			(await observeToolStall(stallWatch, pid, `${tools}:${seen.tool}:${seen.progress}`)) !== "stalled"
+			(await observeToolStall(stallWatch, engine.process, `${tools}:${seen.tool}:${seen.progress}`)) !== "stalled"
 		) {
 			return;
 		}
