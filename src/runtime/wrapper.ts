@@ -16,6 +16,8 @@ import { createStreamParser, type StreamEvent } from "./stream.ts";
 import { readWorkerExtensions } from "./worker-extensions.ts";
 
 const STOP_GRACE_MS = 5_000;
+// Coordinators and the picture watch the job folder; a streamed delta must not rewrite the same word many times a second.
+const ACTIVITY_REFRESH_MS = 1_000;
 const HOOK = fileURLToPath(new URL("../../hook", import.meta.url));
 // A job is one short turn. These bounds stop a silent runaway from burning a session; they are not a review gate.
 const DEFAULT_TIMEOUT_MS = 90 * 60_000;
@@ -144,7 +146,7 @@ export async function runInternalJob(): Promise<void> {
 		}
 	}
 	const parser = createStreamParser();
-	const seen = { activity: "", assistant: "", stop: "", tool: "", progress: 0 };
+	const seen = { activity: "", activityAt: 0, assistant: "", stop: "", tool: "", progress: 0 };
 	const failLog = (error: unknown) =>
 		appendLimenLog(jobDir, `log write failed: ${error instanceof Error ? error.message : String(error)}`).catch(
 			() => {},
@@ -310,7 +312,7 @@ async function recordEvents(
 	jobDir: string,
 	events: readonly StreamEvent[],
 	nextCount: () => number,
-	seen: { activity: string; assistant: string; stop: string; tool: string; progress: number },
+	seen: { activity: string; activityAt: number; assistant: string; stop: string; tool: string; progress: number },
 ): Promise<void> {
 	for (const event of events) {
 		if (event.kind === "tool") {
@@ -318,10 +320,15 @@ async function recordEvents(
 			seen.tool = event.detail ? `${event.name} ${event.detail}` : event.name;
 			await atomicWrite(`${jobDir}/last-tool`, `${event.name}\n`);
 			await atomicWrite(`${jobDir}/activity`, "tool\n");
+			seen.activityAt = Date.now();
 			await atomicWrite(`${jobDir}/tool-calls`, `${nextCount()}\n`);
 			await appendFile(`${jobDir}/log`, event.detail ? `${event.name} ${event.detail}\n` : `${event.name}\n`);
 		} else if (event.kind === "activity") {
-			await atomicWrite(`${jobDir}/activity`, `${event.name}\n`);
+			// Every streamed delta reports activity; an unchanged one refreshes the file at most once a second.
+			if (seen.activity !== event.name || Date.now() - seen.activityAt >= ACTIVITY_REFRESH_MS) {
+				await atomicWrite(`${jobDir}/activity`, `${event.name}\n`);
+				seen.activityAt = Date.now();
+			}
 			if (seen.activity !== event.name) {
 				seen.activity = event.name;
 				await appendFile(`${jobDir}/log`, `${event.name}\n`);
