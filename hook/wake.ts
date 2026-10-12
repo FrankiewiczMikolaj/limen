@@ -927,7 +927,8 @@ export function progressFilename(filename: string | null): boolean {
 	if (!filename) {
 		return false;
 	}
-	return /^[^/]+\/(activity|last-tool)$/.test(filename.replaceAll("\\", "/"));
+	// atomicWrite renames a temp sibling into place; the temp name is the same progress write.
+	return /^[^/]+\/(activity|last-tool)(?:\.\d+\.[0-9a-f]+\.tmp)?$/.test(filename.replaceAll("\\", "/"));
 }
 /** The job line: each running job with its pulse, then each finished job with its state, until it lands or closes. */
 async function jobDisplay(
