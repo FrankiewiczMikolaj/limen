@@ -1,6 +1,6 @@
 # Team 4 · Proof and cold review
 
-Route: Opus (`anthropic/claude-opus-5-5`). On a 429, continue on Sol (`openai-codex/gpt-6-sol`) and publish the switch.
+Route: Opus (`pi-claude/claude-opus-5-5`). On a 429, continue on Sol (`openai-codex/gpt-6-sol`) and publish the switch.
 
 Shape: proof. You change no product file. Fixes go to the owning team as a publish with the exact patch or repro.
 

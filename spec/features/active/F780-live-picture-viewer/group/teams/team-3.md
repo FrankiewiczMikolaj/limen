@@ -1,6 +1,6 @@
 # Team 3 · Merged layout renderer
 
-Route: Opus (`anthropic/claude-opus-5-5`). On a 429, switch to Sol and publish it.
+Route: Opus (`pi-claude/claude-opus-5-5`). On a 429, switch to Sol and publish it.
 
 Hypothesis: the reference page (`F775-picture-merge-broad-digdown/limen-picture-merged.html`) can become the real viewer almost line for line. Its renderer already works from one data object; replace the hand data with the builder model and keep the layout, the spacing, and the routes.
 

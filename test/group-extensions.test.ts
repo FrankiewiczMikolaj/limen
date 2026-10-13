@@ -10,19 +10,8 @@ import { git, jobDir, LIMEN, limen, plant, type RunOptions, TICKET, waitJob } fr
 
 const lead = { PI_SESSION_ID: "extension-lead" };
 const route = ["--engine", "pi", "--provider", "fixture", "--model", "fixture", "--thinking", "high"];
-const settings = [
-	"--teams",
-	"2",
-	"--workers-per-team",
-	"3",
-	"--timeout",
-	"30m",
-	"--worker-timeout",
-	"20m",
-	...route,
-	"--worker-thinking",
-	"high",
-];
+const limits = ["--teams", "2", "--workers-per-team", "3", "--timeout", "30m", "--worker-timeout", "20m"];
+const settings = [...limits, ...route, "--worker-thinking", "high"];
 // Exercise the hosted supervisor and its real launch argv without a GUI or provider.
 const herdr = `#!/usr/bin/env node
 const fs = require('node:fs');

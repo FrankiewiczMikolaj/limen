@@ -33,7 +33,7 @@ Each team starts from one area (see its team note). A team may report a finding 
 - Each proposed change obeys the styleguide. Do not propose `utils.ts`, `types.ts`, barrels, enums, helper bags, classes, new runtime dependencies, new workflow state, or a rewrite to match a model's taste.
 - Publish key findings with `limen group publish` as you find them. Read peer findings before you write a new one. If a peer already owns a finding, add your evidence to it in your result and reference the peer. Do not file a duplicate.
 - The team coordinator owns `group/teams/team-N-result.md` and commits it on its own job branch. A worker commits its notes on its own branch. The coordinator reads them with `git show` and merges them into the result.
-- Do not land. Do not push. Use only `anthropic/claude-opus-5-5`. Never use Cursor cloud agents.
+- Do not land. Do not push. Use only `pi-claude/claude-opus-5-5`. Never use Cursor cloud agents.
 - Plain technical English (about 80% of ASD-STE100). Short sentences, one idea each, active voice.
 
 ## Deliverable per team

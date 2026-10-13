@@ -1,6 +1,6 @@
 # Team 1 · Value audit
 
-Route: Opus (`anthropic/claude-opus-5-5`) for the coordinator and the worker.
+Route: Opus (`pi-claude/claude-opus-5-5`) for the coordinator and the worker.
 
 Shape: survey. Deliverable: `group/teams/team-1-scores.md` committed on your branch.
 

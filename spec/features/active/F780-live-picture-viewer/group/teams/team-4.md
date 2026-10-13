@@ -1,6 +1,6 @@
 # Team 4 · Stacked layers and context switch
 
-Route: Opus (`anthropic/claude-opus-5-5`). On a 429, switch to Sol and publish it.
+Route: Opus (`pi-claude/claude-opus-5-5`). On a 429, switch to Sol and publish it.
 
 Hypothesis: a layer is a larger view of one important item (a Needs Adam item, a place, a feature, a day) that opens over the page. A second item opened inside it stacks one more layer. A thin stack trail at the top of the layers names each layer, so Adam can jump to any depth. Esc and browser Back close one layer. The page behind never moves. The URL holds the whole stack, so a link or a reload restores it.
 
