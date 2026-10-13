@@ -1,6 +1,6 @@
 # Team 3 · Spec keeper
 
-Route: Opus (`anthropic/claude-opus-5-5`). On a 429, continue on Sol (`openai-codex/gpt-6-sol`) and publish the switch. The keeper job itself runs on Sol with a short timeout.
+Route: Opus (`pi-claude/claude-opus-5-5`). On a 429, continue on Sol (`openai-codex/gpt-6-sol`) and publish the switch. The keeper job itself runs on Sol with a short timeout.
 
 Shape: slice. Deliverable: commits on your branch.
 

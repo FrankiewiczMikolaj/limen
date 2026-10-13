@@ -1,6 +1,6 @@
 # Team 2 · From scratch
 
-Route: Opus (`anthropic/claude-opus-5-5`) for the coordinator and the worker.
+Route: Opus (`pi-claude/claude-opus-5-5`) for the coordinator and the worker.
 
 Shape: design. Deliverable: `group/teams/team-2-design.md` committed on your branch.
 

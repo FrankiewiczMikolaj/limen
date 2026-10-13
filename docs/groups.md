@@ -26,7 +26,7 @@ limen group start spec/features/active/FNNN-name \
   --thinking xhigh --worker-thinking high --detached
 ```
 
-All machine settings and limits are required and recorded. `--provider` and `--model` are the default for every team; repeat `--team-model team-N=provider/model` to give a team its own model, for example `--team-model team-2=anthropic/claude-opus-5-5`. The engine and the two reasoning levels stay shared. `--detached` forces background members; `--tab` requires Herdr; omit both for the existing environment-dependent default. The final output line is the group ID. Activation selects the root from the feature and working directory, not an inherited `LIMEN_CONTEXT_ROOT`.
+All machine settings and limits are required and recorded. `--provider` and `--model` are the default for every team; repeat `--team-model team-N=provider/model` to give a team its own model, for example `--team-model team-2=pi-claude/claude-opus-5-5`. The engine and the two reasoning levels stay shared. `--detached` forces background members; `--tab` requires Herdr; omit both for the existing environment-dependent default. The final output line is the group ID. Activation selects the root from the feature and working directory, not an inherited `LIMEN_CONTEXT_ROOT`.
 
 For Pi groups, repeat `--extension PATH` for trusted local extensions shared by every team, or `--team-extension team-N=PATH` for team-only additions. Common paths come first. Paths use the lead command's directory/home, resolve symlinks and deduplicate in first-seen order. Quote the whole `team-N=PATH` argument when it contains spaces; paths may contain `=`. All selections are checked before activation. OMP refuses these options. See [path rules and trust limits](commands.md#start-and-continue-jobs).
 

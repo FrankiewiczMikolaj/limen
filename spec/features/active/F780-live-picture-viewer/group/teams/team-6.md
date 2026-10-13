@@ -1,6 +1,6 @@
 # Team 6 · Cold-reader polish and contrast
 
-Route: Opus (`anthropic/claude-opus-5-5`). On a 429, switch to Sol and publish it.
+Route: Opus (`pi-claude/claude-opus-5-5`). On a 429, switch to Sol and publish it.
 
 Hypothesis: Adam does not read code. The page is good when a cold reader understands each row from its words alone, can read every text at full contrast, and never sees the layout crowd or jump at 1440, 1240, or 900 px.
 

@@ -117,7 +117,7 @@ Two exceptions apply:
 2. `LIMEN_WORKER_MODEL` (or `LIMEN_REVIEWER_MODEL` for `--review`)
 3. the built-in `openai-codex/gpt-6-astra:high`
 
-**`pi-claude` on OMP.** On OMP, `--model pi-claude/<model>` (without `--provider`) loads the local bridge at `~/.omp/local/pi-claude-bridge` explicitly. This is necessary because jobs otherwise start with `--no-extensions`. `--provider pi-claude` is not an OMP provider.
+**`pi-claude` on OMP.** Name a Claude model on the local bridge as `--model pi-claude/<model>`, for example `--model pi-claude/claude-opus-5-5`. That id loads the bridge at `~/.omp/local/pi-claude-bridge` explicitly, because jobs otherwise start with `--no-extensions`. OMP has no `pi-claude` provider. A command that requires `--provider` takes `--provider pi-claude`; Limen keeps it in the job record and off the OMP command line. `--provider pi-claude --model claude-opus-5-5` runs the same route. `spawn`, `continue` and `group start` refuse a `pi-claude` provider with another provider's model, or a missing bridge, before any job exists.
 
 **Auth.** Pi and OMP keep separate auth stores (`~/.pi` and `~/.omp`). Authenticate each engine you use. Limen does not change the settings or credentials of either engine. One wrapper and one stream parser serve both engines.
 

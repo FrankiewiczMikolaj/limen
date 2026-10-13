@@ -1,6 +1,6 @@
 # Team 1 · What agents see
 
-Route: Opus (`anthropic/claude-opus-5-5`). On a 429, continue on Sol (`openai-codex/gpt-6-sol`) and publish the switch.
+Route: Opus (`pi-claude/claude-opus-5-5`). On a 429, continue on Sol (`openai-codex/gpt-6-sol`) and publish the switch.
 
 Shape: survey. You change no product file. Your deliverables are two notes files, committed on your branch.
 
