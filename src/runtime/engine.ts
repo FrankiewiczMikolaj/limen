@@ -77,6 +77,16 @@ export function defaultModel(review: boolean): string {
 	return process.env[review ? "LIMEN_REVIEWER_MODEL" : "LIMEN_WORKER_MODEL"]?.trim() || "openai-codex/gpt-6-astra:high";
 }
 export function preflightEngine(profile: EngineProfile, model?: string, provider?: string): void {
+	const route = engineRoute(profile, provider, model);
+	if (profile.id === "omp" && provider === BRIDGE && !route.bridged) {
+		const name = model?.split("/").at(-1) || "<model>";
+		throw new Error(
+			`OMP cannot serve --provider ${BRIDGE} --model ${model ?? "<none>"}; pass --model ${BRIDGE}/${name}`,
+		);
+	}
+	if (route.bridged && bridgeExtensions().length === 0) {
+		throw new Error(`--model ${route.model} needs the OMP bridge at ~/.omp/local/pi-claude-bridge, which is missing`);
+	}
 	if (!(process.env.PATH ?? "").split(":").some((dir) => dir && existsSync(`${dir}/${profile.binaryDefault}`))) {
 		throw new Error(
 			`${profile.binaryDefault} is not on PATH; install it, or pass --engine ${profile.id === "omp" ? "pi" : "omp"}`,
@@ -219,12 +229,10 @@ export function argvFor(profile: EngineProfile, slots: EngineArgv): string[] {
 		args.push("--config", slots.skillConfig);
 	}
 	args.push("--append-system-prompt", slots.preamble);
-	// OMP serves `pi-claude/…` models from a local bridge extension. The model id alone selects it:
-	// OMP rejects `--provider pi-claude`, so the provider stays in the job record but not on argv.
-	const bridged = profile.id === "omp" && !!slots.model?.startsWith("pi-claude/");
+	const route = engineRoute(profile, slots.provider, slots.model);
 	const named = [
 		...slots.extensions,
-		...(bridged ? bridgeExtensions() : []),
+		...(route.bridged ? bridgeExtensions() : []),
 		...(slots.jsonMode ? [] : herdrStateExtensions(profile)),
 	];
 	const seen = new Set<string>();
@@ -236,11 +244,11 @@ export function argvFor(profile: EngineProfile, slots: EngineArgv): string[] {
 		seen.add(key);
 		args.push("--extension", path);
 	}
-	if (slots.provider && !bridged) {
-		args.push("--provider", slots.provider);
+	if (route.provider) {
+		args.push("--provider", route.provider);
 	}
-	if (slots.model) {
-		args.push("--model", slots.model);
+	if (route.model) {
+		args.push("--model", route.model);
 	}
 	if (slots.thinking) {
 		args.push("--thinking", slots.thinking);
@@ -251,6 +259,24 @@ export function argvFor(profile: EngineProfile, slots: EngineArgv): string[] {
 		args.push(`@${slots.taskFile}`);
 	}
 	return args;
+}
+
+const BRIDGE = "pi-claude";
+
+// OMP has no `pi-claude` provider: a local bridge extension serves `pi-claude/…` ids, chosen by the model id alone.
+// So `--provider pi-claude --model claude-opus-5-5` means `--model pi-claude/claude-opus-5-5`, and a bridged
+// provider stays in the job record but not on argv.
+export function engineRoute(
+	profile: EngineProfile,
+	provider: string | undefined,
+	model: string | undefined,
+): { readonly provider: string | undefined; readonly model: string | undefined; readonly bridged: boolean } {
+	if (profile.id !== "omp") {
+		return { provider, model, bridged: false };
+	}
+	const full = provider === BRIDGE && model && !model.includes("/") ? `${BRIDGE}/${model}` : model;
+	const bridged = !!full?.startsWith(`${BRIDGE}/`);
+	return { provider: bridged ? undefined : provider, model: full, bridged };
 }
 
 // `--no-extensions` hides the bridge. Name it explicitly so the model resolves while other user

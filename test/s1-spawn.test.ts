@@ -50,6 +50,7 @@ test("each spawn refusal exits 1, names its cause and leaves no job, worktree or
 		[["--engine", "pi", "--extension", "npm:package", "work"], "npm:package"],
 		[["--engine", "pi", "--extension", "missing.ts", "work"], "missing.ts"],
 		[["--engine", "omp", "--extension", "README.md", "work"], "--extension"],
+		[["--provider", "pi-claude", "--model", "anthropic/claude-opus-5-5", "work"], "pi-claude/claude-opus-5-5"],
 	];
 	for (const [args, cause, env] of refusals) {
 		const run = limen(p, ["spawn", ...args], env ? { env } : {});

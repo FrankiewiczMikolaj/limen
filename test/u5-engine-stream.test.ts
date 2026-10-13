@@ -1,8 +1,16 @@
-// U5: the engine's JSON stream decides done versus failed. Lines split across chunks still parse once; only an
-// assistant stop reason of error or aborted marks a failed turn.
+// U5: the engine's launch argv and JSON stream. A bridged model reaches OMP in one form. Lines split across chunks
+// still parse once; only an assistant stop reason of error or aborted marks a failed turn.
 import assert from "node:assert/strict";
 import test from "node:test";
+import { argvFor, ENGINES } from "../src/runtime/engine.ts";
 import { createStreamParser } from "../src/runtime/stream.ts";
+
+test("an OMP job under --provider pi-claude gets the argv of its pi-claude/<model> id", () => {
+	const slots = { jsonMode: true, jobDir: "/j", label: "l", preamble: "p", extensions: [], taskFile: "/j/task.md" };
+	const long = argvFor(ENGINES.omp, { ...slots, model: "pi-claude/claude-opus-5-5" });
+	assert.deepEqual(argvFor(ENGINES.omp, { ...slots, provider: "pi-claude", model: "claude-opus-5-5" }), long);
+	assert.deepEqual(argvFor(ENGINES.omp, { ...slots, provider: "pi-claude", model: "pi-claude/claude-opus-5-5" }), long);
+});
 
 const end = (message: object) => JSON.stringify({ type: "message_end", message });
 
