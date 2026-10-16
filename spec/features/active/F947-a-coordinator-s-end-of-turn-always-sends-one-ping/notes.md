@@ -30,3 +30,5 @@
 - Coordinator ping folders are never pruned. They are small, like job receipts.
 - A registration from before this change with `events/coordinator.exited` is swept again and sends one more
   `coordinator.exited`. None existed on Adam's Mac on 16 Oct.
+- [INFERENCE] OMP runs each subagent in its own session, so a subagent's `agent_end` does not reach the
+  coordinator's hook instance and cannot end its turn early. Not proven live; the live proof used no subagent.
