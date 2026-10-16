@@ -191,11 +191,8 @@ test("no secret or target URL leaves the request header, and nothing names the q
 });
 
 test("each coordinator turn end pings once with its last message and ticket, also after a normal exit", async () => {
-	const url = "https://hooks.s7.test/coordinator";
-	await writeFile(
-		join(p.root, ".limen/finish-webhook.env"),
-		`LIMEN_FINISH_WEBHOOK_URL='${url}'\nLIMEN_FINISH_WEBHOOK_AUTH='${SECRETS[0]}'\n`,
-	);
+	const config = `LIMEN_FINISH_WEBHOOK_URL='${URLS[0]}'\nLIMEN_FINISH_WEBHOOK_AUTH='${SECRETS[0]}'\n`;
+	await writeFile(join(p.root, ".limen/finish-webhook.env"), config);
 	// The hook runs here as inside an engine; its deliverers inherit the plant's fetch sink.
 	process.env = { ...p.env, LIMEN_COORDINATOR: "1" };
 	const session = "s7-coordinator";
@@ -210,11 +207,12 @@ test("each coordinator turn end pings once with its last message and ticket, als
 	await writeFile(join(p.root, ".limen/coordinators", session, "pid"), `${spawnSync("true").pid}\n`);
 	await sweepCoordinators(p.root);
 	assert.equal(existsSync(join(p.root, ".limen/coordinators", session)), false);
-	await until(p.parent, () => requests(p).filter((request) => request.url === url).length === 2);
-	const sent = payloads().filter((ping) => ping.url === url);
-	assert.deepEqual(sent.map((ping) => `${ping.body.event} ${ping.body.title}: ${ping.body.reason}`).sort(), [
-		"coordinator.idle coordinator s7-coordinator · F003: turn ended; last message: Landed; nothing left.",
-		"coordinator.idle coordinator s7-coordinator · F003: turn ended; last message: Report written; F003 waits on you.",
+	const sent = () => payloads().filter((ping) => ping.body.event === "coordinator.idle");
+	await until(p.parent, () => sent().length === 2);
+	const pings = sent().map((ping) => `${ping.body.title}: ${ping.body.reason}`);
+	assert.deepEqual(pings.sort(), [
+		"coordinator s7-coordinator · F003: turn ended; last message: Landed; nothing left.",
+		"coordinator s7-coordinator · F003: turn ended; last message: Report written; F003 waits on you.",
 	]);
 	assert.equal(readdirSync(join(p.root, ".limen/coordinator-events", session)).length, 2);
 });

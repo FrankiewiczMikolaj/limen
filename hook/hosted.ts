@@ -18,19 +18,6 @@ type PiApi = {
 	): void;
 	on(event: "tool_execution_end", handler: (event: unknown, context: unknown) => void): void;
 	on(event: "turn_start" | "turn_end", handler: (event: unknown, context: unknown) => void): void;
-	registerTool?(tool: {
-		readonly name: string;
-		readonly label: string;
-		readonly description: string;
-		readonly parameters: object;
-		execute(
-			toolCallId: string,
-			params: { readonly handoff?: string },
-			signal: unknown,
-			onUpdate: unknown,
-			ctx: { shutdown(): void },
-		): Promise<{ content: Array<{ type: "text"; text: string }>; details: object }>;
-	}): void;
 };
 
 // Herdr drops pane metadata after its TTL; an unchanged label is re-sent well before then.
@@ -118,25 +105,6 @@ export default function limenHosted(pi: PiApi): void {
 			// Advisory.
 		}
 	};
-	pi.registerTool?.({
-		name: "finish",
-		label: "Finish",
-		description: "End this hosted job. Pass the handoff text; the job is recorded done and the session exits.",
-		parameters: {
-			type: "object",
-			properties: { handoff: { type: "string", description: "Handoff for the coordinator" } },
-			required: ["handoff"],
-		},
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			const handoff = typeof params?.handoff === "string" ? params.handoff.trim() : "";
-			if (handoff) {
-				write("result", handoff);
-			}
-			write("session-ended", new Date().toISOString());
-			ctx.shutdown();
-			return { content: [{ type: "text", text: "done" }], details: {} };
-		},
-	});
 	pi.on("session_start", async (_event, context) => {
 		mkdirSync(join(jobDir, "session"), { recursive: true });
 		let pane = process.env.HERDR_PANE_ID?.trim() || "";
