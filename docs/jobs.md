@@ -145,6 +145,8 @@ Limen copies the saved session into a new linked job. The new job keeps the work
 
 **Only committed branch contents come back.** Uncommitted files that prune removed are lost. Recovery is not possible without the branch or the transcript. Limen does not take over a branch that is checked out in a different place.
 
+**Every job can call `finish`.** A detached continuation of a hosted job keeps the hosted transcript, so the worker may call `finish` again; OMP shows it as `xd://finish`. The handoff becomes the job result, and the job ends `done` when the engine exits. A later reply does not replace that handoff.
+
 ### Limits
 
 | Limit | Detached job | Hosted job |
