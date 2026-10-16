@@ -21,39 +21,45 @@ export type CoordinatorSession = {
 };
 
 const HANDOFF: Record<Kind, string> = {
-	"coordinator.idle": "Coordinator is idle with work left. Next step: read its pane, then steer it or decide.",
+	"coordinator.idle": "Coordinator turn ended. Next step: read its last message, then answer, steer or decide.",
 	"coordinator.blocked": "Coordinator is blocked. Next step: answer it or remove the blocker.",
 	"coordinator.goal-done": "Coordinator goal done. Next step: review the result, then land or close it.",
 	"coordinator.exited":
 		"Coordinator process exited. Next step: restart it in its pane, then check unfinished work such as a land in progress.",
 };
 const OPEN: Record<string, true> = { pending: true, in_progress: true };
-/** One settled turn: the latest todo list, whether it closed this turn, the goal, the last stop reason, and owned running jobs. */
+const FEATURE = /\bF\d{3,5}\b/;
+/**
+ * One ended turn: the latest todo list, whether it closed this turn, the goal, the last stop reason, owned running
+ * jobs, and the first line of the turn's last assistant message.
+ */
 export type CoordinatorTurn = {
 	readonly todos: readonly Todo[];
 	readonly todosClosed: boolean;
 	readonly goal?: Goal;
 	readonly stop: string;
 	readonly ownedRunning: number;
+	readonly said: string;
 };
 
 /**
- * What a settled coordinator turn means for the shepherd. A blocker always counts. Idle and done count only when no
- * running job owned by this coordinator will wake it again; an aborted turn means the owner is at the pane.
+ * What an ended coordinator turn means for the shepherd. A blocker always counts. Any other turn end counts only when
+ * no running job owned by this coordinator will wake it again; an aborted turn means the owner is at the pane.
  */
 export function turnSignal(turn: CoordinatorTurn): CoordinatorSignal | undefined {
 	if (turn.stop === "aborted") {
 		return;
 	}
+	const said = turn.said ? `; last message: ${turn.said}` : "";
 	const blocked = turn.todos.find((todo) => todo.status === "blocked");
 	if (blocked) {
 		return {
 			kind: "coordinator.blocked",
-			reason: `todo blocked: ${blocked.content}${blocked.blocker ? ` (${blocked.blocker})` : ""}`,
+			reason: `todo blocked: ${blocked.content}${blocked.blocker ? ` (${blocked.blocker})` : ""}${said}`,
 		};
 	}
 	if (turn.goal?.status === "budget-limited") {
-		return { kind: "coordinator.blocked", reason: `goal token budget reached: ${turn.goal.objective}` };
+		return { kind: "coordinator.blocked", reason: `goal token budget reached: ${turn.goal.objective}${said}` };
 	}
 	if (turn.ownedRunning > 0) {
 		return;
@@ -64,27 +70,26 @@ export function turnSignal(turn: CoordinatorTurn): CoordinatorSignal | undefined
 		const done = turn.todos.filter((todo) => todo.status === "completed");
 		return {
 			kind: "coordinator.goal-done",
-			reason: `all ${turn.todos.length} todos closed; last done: ${done.at(-1)?.content ?? "none"}`,
+			reason: `all ${turn.todos.length} todos closed; last done: ${done.at(-1)?.content ?? "none"}${said}`,
 		};
 	}
 	const next = open.find((todo) => todo.status === "in_progress") ?? open[0];
 	const work = next
-		? `${open.length} open todo${open.length === 1 ? "" : "s"}; next: ${next.content}`
+		? ` with ${open.length} open todo${open.length === 1 ? "" : "s"}; next: ${next.content}`
 		: goalOpen
-			? `goal ${turn.goal?.status}: ${turn.goal?.objective}`
+			? ` with goal ${turn.goal?.status}: ${turn.goal?.objective}`
 			: "";
-	if (turn.stop === "error") {
-		return { kind: "coordinator.idle", reason: `last turn failed${work ? `; ${work}` : ""}` };
-	}
-	if (work) {
-		return { kind: "coordinator.idle", reason: `turn ended with ${work}` };
-	}
+	return {
+		kind: "coordinator.idle",
+		reason: `${turn.stop === "error" ? "last turn failed" : "turn ended"}${work}${said}`,
+	};
 }
 
 /**
  * Coordinator milestones from the wake hook. The coordinator registers under `.limen/coordinators/<session>` so the
- * sweep can find its process exit later, when no code runs in the dead process. `askMs` is how long an `ask` waits
- * before it counts as blocked.
+ * sweep can find its process exit later, when no code runs in the dead process. Its pings queue under
+ * `.limen/coordinator-events/<session>`, which outlives the registration. `askMs` is how long an `ask` waits before
+ * it counts as blocked.
  */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: split pending: factory, handlers share its state
 export function coordinatorSignals(askMs = 60_000) {
@@ -98,6 +103,10 @@ export function coordinatorSignals(askMs = 60_000) {
 	let goal: Goal | undefined;
 	let goalDone = false;
 	let stop = "";
+	// An assistant message opens a turn; the first turn end closes it, so a repeated end event sends nothing.
+	let turnOpen = false;
+	let said = "";
+	let ticket = "";
 	let ask: NodeJS.Timeout | undefined;
 	const tools = new Map<string, string>();
 	const write = (name: string, value: string) => {
@@ -110,9 +119,12 @@ export function coordinatorSignals(askMs = 60_000) {
 			// The registration is advisory; a missing file only weakens a later exit reason.
 		}
 	};
-	const title = () =>
-		session?.sessionManager.getSessionName?.()?.trim() ||
-		`coordinator ${pane || session?.sessionManager.getSessionId()}`;
+	const title = () => {
+		const name =
+			session?.sessionManager.getSessionName?.()?.trim() ||
+			`coordinator ${pane || session?.sessionManager.getSessionId()}`;
+		return ticket && !name.includes(ticket) ? `${name} · ${ticket}` : name;
+	};
 	// The start time tells the sweep a reused pid from this process. A loaded machine can miss the 1s query; a later turn end retries.
 	const recordBorn = () => {
 		if (!dir || existsSync(join(dir, "born"))) {
@@ -130,7 +142,8 @@ export function coordinatorSignals(askMs = 60_000) {
 		if (!dir || !session) {
 			return;
 		}
-		const events = join(dir, "events");
+		// Pings live outside the registration, which a normal exit or a resumed session removes.
+		const events = join(root, ".limen", "coordinator-events", session.sessionManager.getSessionId());
 		try {
 			const config = finishWebhookEnv(root, root);
 			if (!config) {
@@ -274,15 +287,27 @@ export function coordinatorSignals(askMs = 60_000) {
 			goalDone = true;
 			signal("coordinator.goal-done", `goal complete: ${goal.objective}`, goal.id.replace(/[^A-Za-z0-9._-]/g, "_"));
 		},
-		messageEnd(stopReason: string | undefined): void {
-			if (stopReason && stopReason !== "toolUse") {
-				stop = stopReason;
+		messageEnd(stopReason: string | undefined, text = ""): void {
+			turnOpen = true;
+			if (!stopReason || stopReason === "toolUse") {
+				return;
+			}
+			stop = stopReason;
+			// The first text line, without Markdown markers, is the answer a coordinator leads with.
+			const head = text
+				.split("\n")
+				.map((line) => line.replace(/^[\s#>*-]+/, "").trim())
+				.find(Boolean);
+			if (head) {
+				said = head.slice(0, 200);
+				ticket = FEATURE.exec(text)?.[0] ?? ticket;
 			}
 		},
 		settled(): void {
-			if (!dir || !session) {
+			if (!dir || !session || !turnOpen) {
 				return;
 			}
+			turnOpen = false;
 			write("title", title());
 			recordBorn();
 			const turn = {
@@ -291,25 +316,19 @@ export function coordinatorSignals(askMs = 60_000) {
 				...(goal ? { goal } : {}),
 				stop,
 				ownedRunning: ownedRunning(root, session.sessionManager.getSessionId(), pane),
+				said,
 			};
 			todosClosed = false;
 			stop = "";
+			said = "";
 			if (goalDone) {
 				goalDone = false;
 				return;
 			}
 			const next = turnSignal(turn);
-			const key = next ? `${next.kind} ${next.reason}` : "";
-			// The same standing state at the next turn end is not a new event.
-			if (key === readOptional(join(dir, "last-signal"))) {
-				return;
+			if (next) {
+				signal(next.kind, next.reason);
 			}
-			if (!next) {
-				rmSync(join(dir, "last-signal"), { force: true });
-				return;
-			}
-			write("last-signal", key);
-			signal(next.kind, next.reason);
 		},
 		shutdown(): void {
 			clearTimeout(ask);
@@ -320,14 +339,14 @@ export function coordinatorSignals(askMs = 60_000) {
 	};
 }
 
-/** The sweep finds a coordinator process that died without a normal exit. Its registration and session file are the only evidence. */
+/**
+ * The sweep finds a coordinator process that died and removes its registration. A death without a normal exit first
+ * queues one `coordinator.exited`. Its registration and session file are the only evidence.
+ */
 export async function sweepCoordinators(root: string): Promise<void> {
 	const base = join(root, ".limen", "coordinators");
 	for (const name of await readdir(base).catch(() => [] as string[])) {
 		const dir = join(base, name);
-		if (existsSync(join(dir, "events", "coordinator.exited"))) {
-			continue;
-		}
 		const pid = Number(await textFile(join(dir, "pid")));
 		if (!Number.isSafeInteger(pid) || pid <= 0) {
 			continue;
@@ -360,12 +379,14 @@ export async function sweepCoordinators(root: string): Promise<void> {
 			plant: basename(root),
 			handoff: HANDOFF["coordinator.exited"],
 		};
+		// The claim names the pid: a resumed session in a new process can exit again.
 		await deliverEventWebhook(
-			join(dir, "events", "coordinator.exited"),
+			join(root, ".limen", "coordinator-events", name, `coordinator.exited.${pid}`),
 			finishWebhookEnv(root, root),
 			event,
 			join(root, ".limen"),
 		);
+		await rm(dir, { recursive: true, force: true });
 	}
 }
 

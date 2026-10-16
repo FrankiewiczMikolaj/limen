@@ -2,7 +2,14 @@ import { spawn } from "node:child_process";
 import { appendFile, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { jobMembership } from "../job/group-cabinet.ts";
-import { appendLimenLog, atomicWrite, finalizeJob, isFailedStopReason, writeHandshake } from "../job/record.ts";
+import {
+	appendLimenLog,
+	atomicWrite,
+	finalizeJob,
+	isFailedStopReason,
+	textFile,
+	writeHandshake,
+} from "../job/record.ts";
 import {
 	containEscapedDescendants,
 	discoverEscapedDescendants,
@@ -116,6 +123,7 @@ export async function runInternalJob(): Promise<void> {
 		label,
 		preamble,
 		extensions: [
+			`${HOOK}/finish.ts`,
 			`${HOOK}/steering.ts`,
 			`${HOOK}/communication.ts`,
 			...((await jobMembership(jobDir)) ? [`${HOOK}/group-peer.ts`] : []),
@@ -292,7 +300,8 @@ export async function runInternalJob(): Promise<void> {
 	} else if (result.error) {
 		await finalizeJob(jobDir, "failed", result.error.message);
 	} else if (result.code === 0) {
-		if (seen.assistant) {
+		// A `finish` handoff already in `result` outranks the words the model wrote after it.
+		if (seen.assistant && !(await textFile(`${jobDir}/result`))) {
 			await atomicWrite(`${jobDir}/result`, `${seen.assistant}\n`).catch(() => {});
 		}
 		const failedReason = isFailedStopReason(seen.stop) ? seen.stop : "";

@@ -1,11 +1,13 @@
 // S7 · Webhooks. One plant: a job spawned before any config sends nothing; then two targets and an author map route
-// each terminal ping, through the real sender helper, to the target of the ticket's author, with the secret only in the
-// Authorization header; a slow, busy, refusing or crashed delivery still ends with every target answered for good.
+// each terminal ping, through the real sender helper, to the ticket author's target, the secret only in the header; a
+// slow, busy, refusing or crashed delivery still ends answered for good; each coordinator turn end pings once.
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
+import { coordinatorSignals, sweepCoordinators } from "../src/integrations/coordinator-signal.ts";
 import { git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
 
 const p = await plant();
@@ -186,4 +188,31 @@ test("no secret or target URL leaves the request header, and nothing names the q
 			}
 		}
 	}
+});
+
+test("each coordinator turn end pings once with its last message and ticket, also after a normal exit", async () => {
+	const config = `LIMEN_FINISH_WEBHOOK_URL='${URLS[0]}'\nLIMEN_FINISH_WEBHOOK_AUTH='${SECRETS[0]}'\n`;
+	await writeFile(join(p.root, ".limen/finish-webhook.env"), config);
+	// The hook runs here as inside an engine; its deliverers inherit the plant's fetch sink.
+	process.env = { ...p.env, LIMEN_COORDINATOR: "1" };
+	const session = "s7-coordinator";
+	const signals = coordinatorSignals();
+	signals.start(p.root, { cwd: p.root, sessionManager: { getSessionId: () => session } });
+	for (const text of ["## Report written; F003 waits on you.\nDetails below.", "Landed; nothing left."]) {
+		signals.messageEnd("stop", text);
+		signals.settled();
+		signals.settled(); // One more end without new work, as Pi's agent_settled after agent_end.
+	}
+	signals.shutdown(); // A normal exit; the sweep removes the registration while a ping may still be queued.
+	await writeFile(join(p.root, ".limen/coordinators", session, "pid"), `${spawnSync("true").pid}\n`);
+	await sweepCoordinators(p.root);
+	assert.equal(existsSync(join(p.root, ".limen/coordinators", session)), false);
+	const sent = () => payloads().filter((ping) => ping.body.event === "coordinator.idle");
+	await until(p.parent, () => sent().length === 2);
+	const pings = sent().map((ping) => `${ping.body.title}: ${ping.body.reason}`);
+	assert.deepEqual(pings.sort(), [
+		"coordinator s7-coordinator · F003: turn ended; last message: Landed; nothing left.",
+		"coordinator s7-coordinator · F003: turn ended; last message: Report written; F003 waits on you.",
+	]);
+	assert.equal(readdirSync(join(p.root, ".limen/coordinator-events", session)).length, 2);
 });

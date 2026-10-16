@@ -61,6 +61,7 @@ type PiApi = {
 			| "session_start"
 			| "session_shutdown"
 			| "agent_settled"
+			| "agent_end"
 			| "message_start"
 			| "message_end"
 			| "tool_execution_start"
@@ -832,7 +833,7 @@ export default function limenWake(pi: PiApi): void {
 		if (message?.role !== "assistant") {
 			return;
 		}
-		coordinator.messageEnd(message.stopReason);
+		coordinator.messageEnd(message.stopReason, message.content);
 		const failed = message.stopReason === "error" || message.stopReason === "aborted";
 		for (const claim of activeDeliveries) {
 			const pending = pendingDeliveries.get(claim);
@@ -855,6 +856,13 @@ export default function limenWake(pi: PiApi): void {
 		activeDeliveries.clear();
 		finishedCache = undefined;
 		sweep();
+	});
+	// omp ends a run with agent_end and never emits agent_settled; willContinue marks a run that goes on. Pi's agent_end
+	// carries no willContinue, and its agent_settled follows. The coordinator counts the first end of each turn.
+	pi.on("agent_end", (event) => {
+		if (event && typeof event === "object" && "willContinue" in event && event.willContinue !== true) {
+			coordinator.settled();
+		}
 	});
 	pi.on("session_shutdown", () => {
 		coordinator.shutdown();

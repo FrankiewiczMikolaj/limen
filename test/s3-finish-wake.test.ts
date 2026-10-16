@@ -85,7 +85,7 @@ after(async () => {
 test("a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session", async () => {
 	const second = coordinator("second", "coord", "block\n");
 	const ids = {
-		done: job("commit", "a done"),
+		done: job("commit\nfinish a done handoff", "a done"),
 		failed: job("fail 7", "a failed"),
 		provider: job("commit\nerror", "a provider error"),
 	};
@@ -95,6 +95,8 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	await release(second);
 	await until(second, () => engineEvents(second).some((event) => event.event === "exit"));
 	assert.deepEqual(states, { done: "done", failed: "failed", provider: "failed" });
+	// A detached job resumed from a hosted session calls finish too; its handoff, not the last words, is the result.
+	assert.equal(jobFile(p, ids.done, "result"), "a done handoff");
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
 	assert.notEqual(jobFile(p, ids.provider, "stop-reason"), "");
 	assert.notEqual(jobFile(p, ids.provider, "commits"), "");
