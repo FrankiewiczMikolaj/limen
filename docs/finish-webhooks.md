@@ -171,13 +171,12 @@ is `@login`). Standalone sends without that snapshot use fallback or skip, never
 Manual output identifies targets by their one-based list position only:
 `finish webhook: target 2 accepted (HTTP 204); owner wake unobserved`.
 Exit 0 requires HTTP acceptance from **all** targets. One failure yields exit 1
-after the other requests settle. No URLs, credentials or response bodies appear
-in output. Automatic records remain aggregate sender status and discard its
-output: `failed` can mean one bot accepted while another did not. There is no
-per-target automatic retry. A timeout retry resends the whole list and may wake
-a successful bot twice; after inspecting both receivers, an operator may
-deliberately select a separate private config containing only the failed route
-for a manual retry.
+after the other requests settle. No URLs or credentials appear in output, and no
+response body reaches stdout or stderr. Automatic delivery tracks each target
+separately. A target that accepted, or refused for good, never gets the ping
+again: each resend names those targets in `LIMEN_FINISH_WEBHOOK_SKIP`, and the
+sender drops them. Only targets with no answer, or a retryable answer, are tried
+again. See [the delivery queue](#delivery-queue).
 
 ### Prove wake, not just HTTP
 
@@ -281,6 +280,40 @@ Routine workers should omit a manual finish-ping before exit or `finish`:
 automation handles configured jobs. A coordinator uses the deliberate fallback
 in [Inspect failures and deliberately retry](#inspect-failures-and-deliberately-retry)
 after a failed or absent automatic send, never as a routine duplicate.
+
+### Delivery queue
+
+Every plant ping is queued on disk before any send. This covers a job finish
+(`job.done`, `job.failed`, `job.stopped`, `job.timed-out`, `job.stalled`), the
+`job.stalled` advisory while a job runs, `coordinator.idle`,
+`coordinator.blocked`, `coordinator.goal-done`, `coordinator.exited`, and
+`lead.step-done`. The queue entry is `finish-webhook-queue` (JSON) in the ping's
+receipt folder. An index file `.limen/outbox/<event-id>` names that folder.
+
+Finalization does not wait for HTTP. It queues the ping in milliseconds and
+returns, so the job's shutdown grace does not bound delivery. A detached
+deliverer, the internal command `limen webhook deliver <receipt-folder>`, holds
+`finish-webhook-lease` (its pid) and runs the sender once per try. One try may
+take up to 30 seconds. The sender keeps its own 10-second limit per request.
+
+A target is tried again when it gives no answer (timeout, network error, or a
+killed sender) or answers 408, 429 or 5xx. The backoff starts at 5 seconds and
+grows three times each try, to at most 10 minutes. `LIMEN_WEBHOOK_RETRY_MS`
+sets the base. The deliverer sleeps through a backoff of at most 2 minutes.
+After a longer backoff it exits. Then the next `limen` command run in the plant,
+`limen sweep`, or the coordinator's wake hook (every 30 seconds) starts a
+deliverer for each due entry whose lease holder is dead. A deliverer killed
+mid-try is replaced the same way. After 24 hours the queue gives up and records
+`failed: gave up after N tries in 24 h; last: …`.
+
+Any other answer (3xx or another 4xx) is final for that target. The target gets
+the ping once and the receipt records
+`failed: target N HTTP 404 "<body>"; not retried`.
+
+Each request carries the payload's `finishEvent` as the header
+`Idempotency-Key`. It is stable per job and event. A repeat can happen only when
+a deliverer is killed after the receiver accepted but before the receipt was
+written. The receiver can drop that repeat by its key.
 
 ## Lead group steps
 
@@ -389,23 +422,25 @@ exits 0 only when all are accepted. Redirects are not
 followed. Network errors print `request failed`; a stalled request is forcibly
 bounded to 10 seconds and prints `request timed out after 10000ms`. Git lookup
 has a separate two-second limit. Config/usage errors exit 1 before transport.
-No response body is read, so even a server that echoes credentials cannot put
-them in a handoff.
+The response body never goes to stdout or stderr. For a refusal, the private
+receipt pipe records up to 160 printable characters of the body, with the
+target's token replaced by `[auth]` and its URL by `[url]`.
 
 `limen jobs <id>` (compact and human views) separates:
 
 - **Configured:** whether the job recorded a selection; not a validity check.
   Inspection never opens the selected env file.
-- **Transport:** accepted for HTTP 2xx, rejected for other HTTP categories,
-  unknown for a network error, a timeout, or an attempt without a result.
-  No per-target evidence, including older aggregate-only jobs, means unknown.
+- **Transport:** each target's standing. An acceptance holds; otherwise the
+  newest receipt shows: accepted for HTTP 2xx, rejected for other codes, unknown
+  for a network error, a timeout, or a try without a result. No per-target
+  evidence, including older aggregate-only jobs, means unknown.
 - **Bot-turn:** observed only for a correlated completed-turn export from the
   operator-selected source described below; otherwise unobserved. Each target
   is independent of HTTP and the aggregate. HTTP success, run IDs, local flags
   and response-body claims cannot promote this field. Observed means a matching
   trusted export was inspected, not that Limen authenticated its origin.
 
-The aggregate receipt is shown separately, including its retry guidance.
+The aggregate receipt is shown separately, including its manual-send guidance.
 Do not substitute `notify/delivered/*/accepted`: those are native Pi injection
 records, not HTTP receipts or external Grok Bot acknowledgements. Multiple
 native delivery slots may simply be different subscribed coordinators.
@@ -419,32 +454,35 @@ must not hide a failed ping.
 | `finish-webhook-author` | Captured `@login` and creation commit, or `unavailable` and a short reason. Continuations inherit it. |
 | `finish-webhook-route` | Send-time selection reason and original ordinals (`fan-out`, `mapped @login -> …`, `fallback * -> …`, skip, or invalid map). No URLs or tokens. |
 | `tip` | Worktree HEAD at finalize; informational, not a delivery claim. |
-| `finish-webhook-attempt` | Flushed final state and timestamp claiming this job's one automatic delivery decision, including a skip; never reclaimed and not proof of a transport attempt. |
-| `finish-webhook` | Timestamped `skipped`, `attempting`, `accepted`, or `failed`; after a timeout, records both attempts or why the retry did not start, plus manual retry guidance. |
-| `finish-webhook-targets` | Mode-600 JSON lines: target ordinal, timestamp, transport (`pending`, `accepted`, `rejected`, `unknown`), HTTP category or `none`. |
+| `finish-webhook-attempt` | Flushed final state and timestamp claiming this job's one finish delivery decision, including a skip; never reclaimed. The queue still retries after the claim, so the claim does not mean "never retried". |
+| `finish-webhook-queue` | The queued ping (JSON) that the deliverer sends. `.limen/outbox/<event-id>` names this folder. |
+| `finish-webhook-lease` | The pid of the deliverer that owns the queue entry. A dead pid lets the next sweep start a new deliverer. |
+| `finish-webhook` | First line: `queued <iso>`, then `queued: try N <result>; next try <iso>`, then a final `accepted: every target accepted after N tries (owner wake unobserved)`, `failed: …`, or `skipped: …`. Following lines: one per try (`try N: <result> <iso>`), the last 20. A failed job finish adds one manual-send line. |
+| `finish-webhook-targets` | Mode-600 JSON lines: target ordinal, timestamp, transport (`pending`, `accepted`, `rejected`, `unknown`), exact HTTP status (`503`) or `none`; older lines keep `2xx`/`4xx`. A refusal line adds `body` (redacted, at most 160 characters). |
 | `state` / `finished-at` | Job outcome and completion time, independent of delivery success. |
 
-`accepted: sender exited 0 (owner wake unobserved)` means the canonical sender
-reported HTTP success for all selected targets, not an observed bot wake. `failed` identifies a nonzero
-exit, launch failure, deadline, or invalid recorded path without exposing sender
-output. After the finalizer is gone, a remaining `attempting` or a claim without
-a result is ambiguous: the endpoint may already have accepted the request.
-Repeated or concurrent finalization never reclaims an attempt and never retries.
-A `skipped` aggregate means no sender ran for that decision, even though the
-claim exists. A terminal job without a claim can also mean the finalizer died
-before deciding delivery; wait for finalization to settle before deciding it
-needs a manual fallback.
+`accepted: every target accepted after N tries (owner wake unobserved)` means
+the canonical sender reported HTTP success for all selected targets, not an
+observed bot wake. A `queued:` line means delivery is still in progress: wait
+for its next try. A final `failed:` line names the cause without exposing sender
+output: 24 hours of retryable failures, a final refusal, a launch failure, or an
+invalid recorded path. Repeated or concurrent finalization never reclaims the
+claim and never queues a second ping. A `skipped` aggregate means no sender ran
+for that decision, even though the claim exists. A terminal job without a claim
+can also mean the finalizer died before deciding delivery; wait for
+finalization to settle before deciding it needs a manual send.
 
 To inspect without printing config, set `job` to the absolute job directory:
 
 ```sh
 job=/absolute/project/.limen/jobs/JOB_ID
-for record in state finished-at finish-webhook-author finish-webhook-route finish-webhook-attempt finish-webhook finish-webhook-targets; do
+for record in state finished-at finish-webhook-author finish-webhook-route finish-webhook-attempt finish-webhook-queue finish-webhook-lease finish-webhook finish-webhook-targets; do
   if [ -f "$job/$record" ]; then printf '%s: ' "$record"; cat "$job/$record"; fi
 done
 ```
 
-After deliberately deciding to retry, run this from the installed Limen package.
+Send manually only after the receipt's final line is `failed:`. While it says
+`queued`, the queue still owns delivery. Run this from the installed Limen package.
 It uses the recorded path and original fields, never a home fallback or a
 replacement `done` state for a failed job:
 
@@ -458,7 +496,7 @@ result=$?
 printf 'finish sender exit=%s\n' "$result"
 ```
 
-A manual retry does not rewrite the automatic receipt. Record its sanitized
+A manual send does not rewrite the automatic receipt. Record its sanitized
 stdout/stderr and exit status in the handoff, not the private config. If the job
 never opted in, the operator must explicitly authorize a project-specific config
 before using the fallback; do not select a home destination on its behalf.
@@ -471,11 +509,11 @@ result=$?
 printf 'finish sender exit=%s\n' "$result"
 ```
 
-There is no automatic retry or idempotency guarantee in this helper. A timeout
-can happen after the server accepted the request; a deliberate retry may produce
-a duplicate. HTTP acceptance and each observed bot wake must be recorded as
-separate facts. Do not delete a claim to trigger automatic retries: there is no
-queue or retry daemon.
+The manual helper does not retry and has no queue. A timeout can happen after
+the server accepted the request, so a manual send may produce a duplicate; it
+carries the same `Idempotency-Key` when `LIMEN_FINISH_EVENT` is set. HTTP
+acceptance and each observed bot wake must be recorded as separate facts. Do
+not delete a claim or a queue entry to force a resend.
 
 ## Diagnose `[unauthenticated]` without changing the wrong credential
 
@@ -491,8 +529,8 @@ notification title alone does not identify which request failed.
 | Helper reports HTTP 401 or 403 | Receiver ingress rejected the request. Its operator must verify the selected route, current webhook credential and receiver access policy. Syntax validation cannot prove a key is current. |
 | Helper reports HTTP 2xx; the matching routine later reports `[unauthenticated]` | HTTP accepted, routine failed downstream. Inspect the failing receiver step and its account/provider/integration authentication. Do not assume rotating the ingress webhook key repairs routine credentials. |
 | HTTP 2xx with no matching completed turn | Wake unobserved, not delivered. Verify receiver routing and inspect the intended bot's session, not just a run ID. |
-| `request failed`, timeout, or automatic deadline | Transport/budget failure; acceptance may be unknown. Inspect the receiver before deciding to retry. |
-| One indexed target rejected while another accepted | Partial fan-out. Inspect both receivers; retry only the failed authorized route if needed, not the whole list. |
+| `request failed`, timeout, or HTTP 408/429/5xx | Transport failure; acceptance may be unknown. The queue retries it with backoff. Act only after a final `failed: gave up after …` line, and inspect the receiver first. |
+| One indexed target rejected while another accepted | Partial fan-out. The accepted target is never sent again. A 3xx or other 4xx is final; read its redacted `body` in `finish-webhook-targets`, fix that route, then send manually to it only. |
 | Exit 127 | Launcher/runtime failure, not an HTTP status. Check executable paths and Node availability in the caller's actual noninteractive environment. |
 | Automatic `sender exited 1` only | Aggregate failure, insufficient to diagnose auth. It may be config, HTTP rejection, network failure or partial fan-out. Do not infer 401 from it. |
 
@@ -628,8 +666,9 @@ how Limen selects a file, sends, and records the result.
      `~/.overment/tony-finish-webhook.env` fallback. Git errors other than “not
      a git repository” fail instead of selecting a different destination.
 - **Finalization:** the step that ends a job. Both hosted supervisors and
-  detached wrappers invoke the package's canonical `bin/tony-finish-ping.sh`
-  after writing durable terminal state. The label, state and branch pass
+  detached wrappers queue the ping after writing durable terminal state; a
+  detached deliverer then runs the package's canonical `bin/tony-finish-ping.sh`.
+  The label, state and branch pass
   unchanged as three arguments; only the outgoing `done` payload uses
   `status: "waiting"`. The handoff note in the job view does not change
   transport receipts, routing, or the job state. The caller prepends the
@@ -637,32 +676,30 @@ how Limen selects a file, sends, and records the result.
   noninteractive environment missing that directory can still launch the
   sender. Manual launchers still need Node.js 24+ on `PATH`.
 - **Delivery claim:** the job's `finish-webhook-attempt` file. It records the
-  terminal state and claims the one automatic delivery decision. The claim is
-  never reclaimed: a crash after HTTP acceptance may already have sent. A later
-  result edit or a repeated finalization does not re-arm sending. Older
+  terminal state and claims the one finish delivery decision. The claim is
+  never reclaimed, and a later result edit or a repeated finalization does not
+  queue a second ping. The queue retries after the claim. Older
   `.limen/finish-webhook-tips/<sha>` markers are ignored and no new tip markers
   are written.
-- **Delivery deadline:** the time budget of an automatic send. Each sender is
-  capped at three seconds and the whole delivery at four seconds. A timeout
-  (`acceptance unknown`) gets exactly one retry using only the remaining
-  delivery and shutdown time; a second timeout or any other failure does not
-  retry. The job's `finish-webhook` receipt and log record both attempts, or
-  that the retry could not start before the deadline. The retry can ring twice
-  if the first request was accepted just before the sender was killed. During
-  detached stop/exhaustion the deadline also reserves 500ms of the wrapper's
-  five-second termination grace for recording the result; with no time left it
-  records `not sent`. No retry extends job shutdown.
+- **Delivery queue:** the disk record that owns delivery after a ping is
+  queued: `finish-webhook-queue`, `finish-webhook-lease`, and the index
+  `.limen/outbox/<event-id>`. One try may take up to 30 seconds. Backoff starts
+  at 5 seconds, grows three times each try to at most 10 minutes, and stops
+  after 24 hours. Job shutdown never waits for it.
 - **Fan-out:** sending to several targets at once. Every request starts before
   the sender waits for results, so a failed or stalled first bot does not
   suppress delivery to the second. The standalone bound remains 10 seconds per
   request, concurrent rather than multiplied by recipient count. A killed
-  request may already have been accepted.
+  request may already have been accepted; the `Idempotency-Key` header lets the
+  receiver drop a repeat.
 - **Transport acceptance:** an HTTP 2xx response from a target. It proves only
   that the endpoint took the request, not that a bot woke.
 - **Receipt pipe:** a private channel from the sender to Limen. Automatic
   delivery discards sender stdout/stderr. The pipe records only allowlisted
-  target ordinals (1–64), UTC timestamps, transport states and HTTP categories,
-  never URLs, auth, labels from config, or response bodies. Selections larger
+  target ordinals (1–64), UTC timestamps, transport states, exact HTTP status
+  codes, and for a refusal up to 160 printable characters of the body with the
+  token replaced by `[auth]` and the URL by `[url]`. It never records raw URLs,
+  auth, or labels from config. Selections larger
   than 64 targets fail validation before any request. Each validated target is
   recorded as pending before concurrent requests start; each result is flushed
   independently. The parent consumes at most 32 KiB and keeps at most a start
@@ -672,11 +709,12 @@ how Limen selects a file, sends, and records the result.
   `job` (the label) and `branch`, map a completed job to `status: "waiting"`
   plus `jobState: "done"`, and add `finishEvent`: `limen-finish-` plus the
   lowercase SHA-256 of the job directory's basename (the job ID). This identity
-  is stable across paths and seats; it is not an authentication token or a
-  receiver idempotency guarantee. All configured targets get the same identity.
+  is stable across paths and seats; it is not an authentication token. Each
+  request also sends it as the `Idempotency-Key` header, so a receiver can drop
+  a repeat. All configured targets get the same identity.
   Continuations have new job IDs and therefore new events. Manual sends omit
   correlation unless `LIMEN_FINISH_EVENT` is supplied in this format; the
-  job-based retry example above preserves it.
+  job-based manual-send example above preserves it.
 - **Lead step claim:** the record that makes a lead step send once. The hook
   compares the synthesis file and the run's `closed` flag at each turn end.
   Each step is claimed once under
