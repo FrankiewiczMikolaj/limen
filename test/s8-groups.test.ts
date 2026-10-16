@@ -248,8 +248,10 @@ test("close refuses a member with uncommitted work until it is clean; each lead 
 	const closed = limen(p, ["group", "close", group], { env: LEAD });
 	assert.equal(closed.status, 0, closed.stderr);
 	assert.equal(JSON.parse(readFileSync(join(cabinet(), "run.json"), "utf8")).closed, true);
-	// The lead's next turn after close is its last: one close ping, and still one synthesis ping.
+	// The lead's next turn after close is its last: one close ping, and still one synthesis ping. The ping is queued at
+	// that turn and its own deliverer sends it, so it can land just after the session exits.
 	await release(lead);
 	await once(session, "exit");
+	await until(p.parent, () => pings("close").length > 0);
 	assert.deepEqual([pings("synthesis").length, pings("close").length], [1, 1]);
 });

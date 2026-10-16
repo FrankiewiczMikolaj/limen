@@ -10,11 +10,14 @@ export const GITHUB_LOGIN = "[a-z\\d](?:[a-z\\d-]{0,37}[a-z\\d])?";
 export const GITHUB_NOREPLY = new RegExp(`^(?:\\d+\\+)?(${GITHUB_LOGIN})@users\\.noreply\\.github\\.com$`, "i");
 /** The most bytes Limen reads from the sender's receipt channel and from `finish-webhook-targets`. */
 export const RECEIPT_MAX_BYTES = 32_768;
-type FinishReceipt = {
-	target: number;
-	at: string;
-	transport: "pending" | "accepted" | "rejected" | "unknown";
-	http: "none" | "1xx" | "2xx" | "3xx" | "4xx" | "5xx";
+export type FinishReceipt = {
+	readonly target: number;
+	readonly at: string;
+	readonly transport: "pending" | "accepted" | "rejected" | "unknown";
+	/** The exact status code; records before F946 hold only its class, such as `4xx`. */
+	readonly http: string;
+	/** A refusal's response body: one short printable line without the target's URL or token. */
+	readonly body?: string;
 };
 const FINISH_SELECTION = new RegExp(
 	`^(fan-out|mapped @${GITHUB_LOGIN} -> \\d+(?:, \\d+)*|fallback \\* -> \\d+(?:, \\d+)*|not sent: no author route|invalid author map)$`,
@@ -45,15 +48,16 @@ export function parseFinishSelection(line: string): string | undefined {
 	}
 }
 export function parseFinishReceipt(line: string): FinishReceipt | undefined {
-	if (line.length > 256) {
+	if (line.length > 512) {
 		return;
 	}
 	try {
 		const value = JSON.parse(line);
-		if (!value || Object.keys(value).sort().join() !== "at,http,target,transport") {
+		const keys = value ? Object.keys(value).sort().join() : "";
+		if (keys !== "at,http,target,transport" && keys !== "at,body,http,target,transport") {
 			return;
 		}
-		const { target, at, transport, http } = value;
+		const { target, at, transport, http, body } = value;
 		if (
 			!Number.isInteger(target) ||
 			target < 1 ||
@@ -64,25 +68,38 @@ export function parseFinishReceipt(line: string): FinishReceipt | undefined {
 		) {
 			return;
 		}
+		if (typeof http !== "string" || !/^(none|[1-5](xx|\d\d))$/.test(http)) {
+			return;
+		}
+		const answered = transport === "accepted" || transport === "rejected";
 		if (
 			!["pending", "accepted", "rejected", "unknown"].includes(transport) ||
-			!["none", "1xx", "2xx", "3xx", "4xx", "5xx"].includes(http)
+			answered === (http === "none") ||
+			(transport === "accepted") !== http.startsWith("2")
 		) {
 			return;
 		}
 		if (
-			transport === "accepted"
-				? http !== "2xx"
-				: transport === "rejected"
-					? !["1xx", "3xx", "4xx", "5xx"].includes(http)
-					: http !== "none"
+			body !== undefined &&
+			(transport !== "rejected" || typeof body !== "string" || !/^[\x20-\x7e]{1,160}$/.test(body))
 		) {
 			return;
 		}
-		return { target, at, transport, http };
+		return { target, at, transport, http, ...(body === undefined ? {} : { body }) };
 	} catch {
 		return;
 	}
+}
+/** Each target's standing from `finish-webhook-targets`: an acceptance holds; otherwise the newest receipt counts. */
+export function finalReceipts(text: string): Map<number, FinishReceipt> {
+	const targets = new Map<number, FinishReceipt>();
+	for (const line of text.split("\n")) {
+		const receipt = parseFinishReceipt(line);
+		if (receipt && targets.get(receipt.target)?.transport !== "accepted") {
+			targets.set(receipt.target, receipt);
+		}
+	}
+	return targets;
 }
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: split pending: finish webhook receipt check
 export async function inspectFinishWebhook(jobDir: string): Promise<string> {
@@ -115,22 +132,18 @@ export async function inspectFinishWebhook(jobDir: string): Promise<string> {
 	if (route && FINISH_SELECTION.test(route)) {
 		lines.push(`route: ${route} (how Limen chose the targets)`);
 	}
-	const targets = new Map<number, FinishReceipt>();
+	let text = "";
 	const handle = await open(`${jobDir}/finish-webhook-targets`, "r").catch(() => undefined);
 	if (handle) {
 		try {
 			const buffer = Buffer.alloc(RECEIPT_MAX_BYTES);
 			const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-			for (const line of buffer.toString("utf8", 0, bytesRead).split("\n").slice(0, -1)) {
-				const receipt = parseFinishReceipt(line);
-				if (receipt && (!targets.has(receipt.target) || targets.get(receipt.target)?.transport === "pending")) {
-					targets.set(receipt.target, receipt);
-				}
-			}
+			text = buffer.toString("utf8", 0, bytesRead).split("\n").slice(0, -1).join("\n");
 		} finally {
 			await handle.close();
 		}
 	}
+	const targets = finalReceipts(text);
 	if (!targets.size) {
 		lines.push("transport: unknown (no record that Limen sent the webhook to any target)");
 	}
@@ -138,7 +151,7 @@ export async function inspectFinishWebhook(jobDir: string): Promise<string> {
 	for (const ordinal of [...new Set([...targets.keys(), ...turns.keys()])].sort((a, b) => a - b)) {
 		const target = targets.get(ordinal);
 		const transport = target
-			? `${target.transport === "pending" ? "unknown (attempt started; no result)" : target.transport} · HTTP ${target.http} · ${target.at}`
+			? `${target.transport === "pending" ? "unknown (attempt started; no result)" : target.transport} · HTTP ${target.http}${target.body ? ` · body ${JSON.stringify(target.body)}` : ""} · ${target.at}`
 			: "unknown (no record that Limen sent the webhook to this target)";
 		lines.push(`target ${ordinal}: transport ${transport} · bot-turn ${turns.get(ordinal) ?? "unobserved"}`);
 	}

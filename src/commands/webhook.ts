@@ -1,10 +1,16 @@
+import { isAbsolute } from "node:path";
 import { finishWebhookEnv, sendTestPing } from "../integrations/finish-webhook.ts";
+import { deliverQueued } from "../integrations/webhook-queue.ts";
 import { limenRoot } from "../project/git.ts";
 
 /** `limen webhook test` sends one `webhook.test` event to the plant's finish webhook targets through the real sender. */
 export async function webhookCommand(args: readonly string[], cwd: string): Promise<void> {
-	if (args.length !== 1 || args[0] !== "test") {
-		throw new Error("webhook accepts only: test");
+	const [action, dir] = args;
+	if (action === "deliver" && args.length === 2 && dir && isAbsolute(dir)) {
+		return deliverQueued(dir);
+	}
+	if (args.length !== 1 || action !== "test") {
+		throw new Error("webhook accepts only: test, or deliver <absolute receipt folder>");
 	}
 	const root = limenRoot(cwd);
 	const config = finishWebhookEnv(root, cwd);

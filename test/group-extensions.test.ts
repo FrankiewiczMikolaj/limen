@@ -1,12 +1,11 @@
 // Group extension selections: one plant per test, the fake engine as `pi` (it records the argv it got), real bin/limen.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { type GroupRun, groupPath, readRun, saveJson } from "../src/job/group-cabinet.ts";
-import { git, jobDir, LIMEN, limen, plant, type RunOptions, TICKET, waitJob } from "./plant.ts";
+import { git, jobDir, limen, plant, type RunOptions, TICKET, waitJob } from "./plant.ts";
 
 const lead = { PI_SESSION_ID: "extension-lead" };
 const route = ["--engine", "pi", "--provider", "fixture", "--model", "fixture", "--thinking", "high"];
@@ -183,34 +182,13 @@ test("invalid group selections never activate or consume jobs, including later t
 	assert.equal(git(f.root, "worktree", "list", "--porcelain"), trees);
 });
 
-test("concurrent and repeated starts keep the original selections, even after a path disappears", async (context) => {
+// Two concurrent starts ending in one run is s8's first test; here a repeated start must keep the first selections.
+test("a repeated start keeps the original selections, even after a path disappears", async (context) => {
 	const f = await fixture();
 	context.after(f.cleanup);
-	const start = (path: string) =>
-		new Promise<string>((resolve, reject) => {
-			const child = spawn(
-				process.execPath,
-				[LIMEN, "group", "start", f.feature, ...settings, f.mode, "--team-extension", `team-2=${path}`],
-				{
-					cwd: f.root,
-					env: { ...f.env, ...lead },
-					stdio: ["ignore", "pipe", "pipe"],
-				},
-			);
-			let output = "",
-				errors = "";
-			child.stdout.on("data", (data) => {
-				output += data;
-			});
-			child.stderr.on("data", (data) => {
-				errors += data;
-			});
-			child.on("error", reject);
-			child.on("close", (code) => (code === 0 ? resolve(lastLine(output)) : reject(new Error(errors))));
-		});
-	const ids = await Promise.all([start(f.common), start(f.privatePath)]);
-	assert.equal(ids[0], ids[1]);
-	const run = await readRun(f.root, ids[0] ?? "");
+	const started = f.start("--team-extension", `team-2=${f.privatePath}`);
+	assert.equal(started.status, 0, started.stderr);
+	const run = await readRun(f.root, lastLine(started.stdout));
 	assert.equal(run.members.length, 2);
 	assert.deepEqual(run.teamExtensions?.["team-1"], []);
 	for (const member of run.members) {

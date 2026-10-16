@@ -68,18 +68,16 @@ export async function finalizeJob(
 		}
 	}
 	// The Herdr prompt is the coordinator's wake; the finish webhook is an opt-in side channel and never stands in for it.
-	// They run side by side so neither spends the other's share of a shutdown grace. A group member's wake decides there whether group events carry it.
+	// Queuing the finish ping takes milliseconds; a detached deliverer sends it outside this shutdown grace. A group
+	// member's wake decides there whether group events carry it.
 	await Promise.all([
 		promptCoordinator(jobDir, shutdownDeadline).catch(() =>
 			appendLimenLog(jobDir, "coordinator wake via Herdr: could not be recorded; inspect notify/herdr-prompt").catch(
 				() => {},
 			),
 		),
-		deliverFinishWebhook(jobDir, shutdownDeadline, detail).catch(() =>
-			appendLimenLog(
-				jobDir,
-				"finish webhook: delivery could not be recorded; inspect finish-webhook-attempt before manual retry",
-			).catch(() => {}),
+		deliverFinishWebhook(jobDir, detail).catch(() =>
+			appendLimenLog(jobDir, "finish webhook: could not be queued; inspect finish-webhook-attempt").catch(() => {}),
 		),
 	]);
 	await settleJobTab(jobDir);

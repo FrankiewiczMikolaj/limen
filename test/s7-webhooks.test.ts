@@ -1,12 +1,12 @@
 // S7 · Webhooks. One plant: a job spawned before any config sends nothing; then two targets and an author map route
 // each terminal ping, through the real sender helper, to the target of the ticket's author, with the secret only in the
-// Authorization header.
+// Authorization header; a slow, busy, refusing or crashed delivery still ends with every target answered for good.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
-import { git, jobDir, jobFile, limen, plant, type Run, requests, until } from "./plant.ts";
+import { git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
 
 const p = await plant();
 after(p.cleanup);
@@ -79,20 +79,6 @@ test("a done job pings only the target its ticket author maps to", async () => {
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
 
-test("a failed job with an empty result still sends one ping with kind, plant, id and reason", async () => {
-	const id = spawn(`Ticket: ${bob}\nsay\nfail 3`, "S7 bob");
-	assert.equal(wait(id), "failed");
-	assert.equal(jobFile(p, id, "result"), "");
-	await settled(id);
-	const sent = payloads().filter((ping) => ping.body.jobId === id);
-	assert.equal(sent.length, 1);
-	assert.equal(sent[0]?.url, URLS[1]);
-	assert.equal(sent[0]?.body.event, "job.failed");
-	assert.equal(sent[0]?.body.plant, "repo");
-	assert.ok(sent[0]?.body.reason);
-	assert.equal(requests(p).at(-1)?.headers.authorization, SECRETS[1]);
-});
-
 test("a continuation from a subdirectory keeps the parent's config and author route", async () => {
 	const parent = ids[1] ?? "";
 	const id = run(["continue", parent, "say continued"], join(p.root, "spec"));
@@ -110,8 +96,67 @@ test("a continuation from a subdirectory keeps the parent's config and author ro
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
 
+test("a failed job's ping reaches each target until it answers for good, and never twice after it accepted", async () => {
+	const urls = ["slow", "busy", "gone"].map((name) => `https://hooks.s7.test/${name}`);
+	const targets = urls.map((url) => ({ url, auth: SECRETS[0] }));
+	await writeFile(
+		join(p.root, ".limen/finish-webhook.env"),
+		`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(targets)}'\n`,
+	);
+	// Slower than the old 3 s budget; busy twice; a refusal that echoes the request, which no retry changes.
+	await respond(p, [
+		{ match: "/slow", delayMs: 5_000, body: {} },
+		{ match: "/busy", status: 503, upTo: 2, body: { error: "busy" } },
+		{ match: "/gone", status: 404, body: { error: `no automation for s7-secret-one at ${urls[2]}` } },
+	]);
+	const id = spawn(`Ticket: ${bob}\nsay\nfail 3`, "S7 bob");
+	assert.equal(wait(id), "failed");
+	assert.equal(jobFile(p, id, "result"), "");
+	await settled(id);
+	const ping = payloads().find((sent) => sent.body.jobId === id)?.body;
+	assert.deepEqual([ping?.event, ping?.plant, Boolean(ping?.reason)], ["job.failed", "repo", true]);
+	assert.match(jobFile(p, id, "finish-webhook"), /^failed: target 3 HTTP 404 .*; not retried/);
+	const receipts = jobFile(p, id, "finish-webhook-targets")
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	const answers = (target: number) =>
+		receipts.filter((r) => r.target === target && r.transport !== "pending").map((r) => `${r.http} ${r.body ?? ""}`);
+	assert.deepEqual(
+		[answers(1), answers(2), answers(3)],
+		[
+			["200 "],
+			['503 {"error":"busy"}', '503 {"error":"busy"}', "200 "],
+			['404 {"error":"no automation for [auth] at [url]"}'],
+		],
+	);
+	// A resend of the settled ping is what the next limen command, sweep or wake hook would run; it sends nothing.
+	run(["webhook", "deliver", jobDir(p, id)]);
+	assert.deepEqual(
+		urls.map((url) => requests(p).filter((request) => request.url === url).length),
+		[1, 3, 1],
+	);
+});
+
+test("a ping whose deliverer was killed mid-send goes out with the next limen command", async () => {
+	const url = "https://hooks.s7.test/later";
+	await writeFile(
+		join(p.root, ".limen/finish-webhook.env"),
+		`LIMEN_FINISH_WEBHOOK_TARGETS='[{"url":"${url}","auth":"${SECRETS[1]}"}]'\n`,
+	);
+	await respond(p, [{ match: "/later", delayMs: 5_000, upTo: 1, body: {} }]);
+	const id = spawn("commit", "S7 crashed");
+	assert.equal(wait(id), "done");
+	await until(p.parent, () => requests(p).some((request) => request.url === url));
+	process.kill(Number(jobFile(p, id, "finish-webhook-lease")), "SIGKILL");
+	run(["jobs"]);
+	await settled(id);
+	assert.match(jobFile(p, id, "finish-webhook"), /^accepted: every target accepted after 1 try/);
+	run(["webhook", "deliver", jobDir(p, id)]);
+	assert.equal(requests(p).filter((request) => request.url === url).length, 2);
+});
+
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {
-	assert.equal(requests(p).length, 3);
+	assert.equal(requests(p).length, 9);
 	assert.ok(
 		requests(p).every(
 			(request) =>

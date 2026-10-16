@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { sweepCoordinators } from "../integrations/coordinator-signal.ts";
+import { resendQueuedPings } from "../integrations/webhook-queue.ts";
 import { isTerminal } from "../job/job.ts";
 import { noteKind } from "../job/view.ts";
 import { receiptFamily } from "../job/wake-delivery.ts";
@@ -48,6 +49,9 @@ async function sweepProject(root: string): Promise<void> {
 	// Exit detection runs every pass: a dead coordinator pane is news now, not after the seat ring threshold.
 	await sweepCoordinators(root).catch((error: unknown) =>
 		console.error(`coordinator sweep failed for ${root}: ${error instanceof Error ? error.message : String(error)}`),
+	);
+	await resendQueuedPings(join(root, ".limen")).catch((error: unknown) =>
+		console.error(`webhook resend failed for ${root}: ${error instanceof Error ? error.message : String(error)}`),
 	);
 	if (Date.now() - modified(join(root, ".limen", "last-sweep")) < threshold) {
 		return;
