@@ -80,6 +80,7 @@ export async function plant(): Promise<Plant> {
 		LIMEN_HUNK: "0",
 		GIT_CONFIG_GLOBAL: "/dev/null",
 		GIT_CONFIG_NOSYSTEM: "1",
+		LIMEN_WEBHOOK_RETRY_MS: "100",
 		NODE_NO_WARNINGS: "1",
 		NODE_OPTIONS: `--import=${join(parent, "sink.mjs")}`,
 	};
@@ -208,9 +209,10 @@ export function requests(plant: Plant): Array<{
 	const path = join(plant.parent, "fetch.jsonl");
 	return existsSync(path) ? JSON.parse(`[${readFileSync(path, "utf8").trim().split("\n").join(",")}]`) : [];
 }
+/** A row answers after `delayMs`, and only the first `upTo` requests to its URL; later ones fall to the next row or 200. */
 export async function respond(
 	plant: Plant,
-	rows: ReadonlyArray<{ readonly match: string; readonly status?: number; readonly body: unknown }>,
+	rows: ReadonlyArray<{ match: string; status?: number; body: unknown; delayMs?: number; upTo?: number }>,
 ): Promise<void> {
 	await writeFile(join(plant.parent, "fetch-responses.json"), JSON.stringify(rows));
 }
@@ -228,9 +230,12 @@ function sinkSource(parent: string): string {
 globalThis.fetch = async (input, init = {}) => {
 	const url = String(input instanceof Request ? input.url : input);
 	const body = typeof init.body === "string" ? init.body : init.body ? String(init.body) : "";
-	appendFileSync(${JSON.stringify(join(parent, "fetch.jsonl"))}, JSON.stringify({ url, method: init.method ?? "GET", headers: Object.fromEntries(new Headers(init.headers)), body }) + "\\n");
+	const log = ${JSON.stringify(join(parent, "fetch.jsonl"))};
+	appendFileSync(log, JSON.stringify({ url, method: init.method ?? "GET", headers: Object.fromEntries(new Headers(init.headers)), body }) + "\\n");
 	const file = ${JSON.stringify(join(parent, "fetch-responses.json"))};
-	const row = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).find((candidate) => url.includes(candidate.match)) : undefined;
+	const count = readFileSync(log, "utf8").split("\\n").filter((line) => line.includes(JSON.stringify(url))).length;
+	const row = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).find((candidate) => url.includes(candidate.match) && count <= (candidate.upTo ?? count)) : undefined;
+	await new Promise((resolve) => setTimeout(resolve, row?.delayMs ?? 0));
 	return new Response(JSON.stringify(row?.body ?? {}), { status: row?.status ?? 200, headers: { "content-type": "application/json" } });
 };
 `;

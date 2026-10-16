@@ -1,8 +1,8 @@
-// S6 · Spec keeper. One plant: ticket numbers, place ids, the ticket check, the keeper's start rules, picture bytes and
-// ticket-author path resolution, all through the real CLI.
+// S6 · Spec keeper. One plant: ticket numbers, place ids, the keeper's start rules, picture bytes and ticket-author path
+// resolution, all through the real CLI. The strict ticket gate is s5's land refusal and u1's diagnostics.
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { git, jobDir, jobFile, limen, plant, release, spawnJob, TICKET, waitJob } from "./plant.ts";
@@ -31,34 +31,6 @@ test("ticket new refuses an unknown place id before any file exists", () => {
 	assert.equal(refused.status, 1);
 	assert.match(refused.stderr, /nope/);
 	assert.deepEqual(lane("planned"), before);
-});
-
-test("ticket check names the file, the line and a fix for each fault", async () => {
-	const tree = join(p.parent, "check");
-	git(p.root, "worktree", "add", "-q", "-b", "check", tree);
-	const path = "spec/features/active/F020-bad/ticket.md";
-	await mkdir(join(tree, "spec/features/active/F020-bad"), { recursive: true });
-	await writeFile(
-		join(tree, path),
-		"---\ntouches:\n  - demo.place\nopened: 2026-13-45\ncolour: red\n---\n\n# F020 · Bad\n\n## Outcome\n\nBad.\n",
-	);
-	git(tree, "add", ".");
-	git(tree, "commit", "-q", "-m", "bad ticket");
-	const check = limen(p, ["ticket", "check", "check"]);
-	assert.equal(check.status, 1);
-	const errors = check.stderr.split("\n").filter((line) => line.startsWith("error "));
-	const faults = errors.map((line) => /^error (\S+):(\d+): (.+); fix: (.+)$/.exec(line)?.slice(1, 3) ?? line);
-	assert.deepEqual(faults.sort(), [
-		[path, "4"],
-		[path, "5"],
-	]);
-	assert.ok(
-		check.stderr
-			.split("\n")
-			.includes(
-				`fix: limen keeper ${path} --job <id> --engine <engine> --provider <provider> --model <model> --thinking <level>`,
-			),
-	);
 });
 
 test("keeper refuses a running job, then starts on a new branch at the candidate tip", async () => {
