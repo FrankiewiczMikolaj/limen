@@ -12,6 +12,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { coordinatorSignals } from "../src/integrations/coordinator-signal.ts";
 import { herdrBinary } from "../src/integrations/herdr.ts";
+import { resendQueuedPings } from "../src/integrations/webhook-queue.ts";
 import { closedFeatures, closedJobFeatures, derivePulse, isTerminal, type Pulse, SESSION_ID } from "../src/job/job.ts";
 import {
 	CLAIM_STALE_MS,
@@ -648,6 +649,8 @@ export default function limenWake(pi: PiApi): void {
 		} catch {
 			// F043 treats an absent or stale stamp as no listener; never claim liveness we could not write.
 		}
+		// A ping whose deliverer died or slept past its backoff goes out again while this coordinator listens.
+		void resendQueuedPings(limenDir).catch(() => {});
 	};
 	const sweep = () => {
 		if (!active || !session || !jobsDir || sweeping) {

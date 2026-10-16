@@ -73,13 +73,18 @@ for (const [index, target] of targets.entries()) {
 
 // Automatic finalization supplies a stable job-derived identity and fd 3.
 const event = /^limen-finish-[a-f0-9]{64}$/.test(process.env.LIMEN_FINISH_EVENT ?? '') ? process.env.LIMEN_FINISH_EVENT : undefined;
-function receipt(index, transport, http = 'none') {
+function receipt(index, transport, http = 'none', body = '') {
   if (!event) return;
   try {
-    writeSync(3, JSON.stringify({ target: index + 1, at: new Date().toISOString(), transport, http }) + '\n');
+    writeSync(3, JSON.stringify({ target: index + 1, at: new Date().toISOString(), transport, http, ...(body ? { body } : {}) }) + '\n');
   } catch {
     // Manual invocation may carry correlation without the private receipt channel.
   }
+}
+// A refusal's body names its cause. Keep one short printable line without this target's URL or token.
+function excerpt(text, target) {
+  return text.split(target.auth.slice('Bearer '.length)).join('[auth]').split(target.url.href).join('[url]')
+    .replace(/[^\x20-\x7e]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
 }
 function emitSelection(selection) {
   if (!event) return;
@@ -116,6 +121,9 @@ if (mapRaw !== undefined) {
   chosen = ordinals.map(n => n - 1);
   selection = author && map[author] ? `mapped ${author} -> ${ordinals.join(', ')}` : `fallback * -> ${ordinals.join(', ')}`;
 }
+// A resend names the targets that already took this event or refused it for good; they never get it again.
+const skip = /^\d+(,\d+)*$/.test(process.env.LIMEN_FINISH_WEBHOOK_SKIP ?? '') ? process.env.LIMEN_FINISH_WEBHOOK_SKIP.split(',').map(Number) : [];
+chosen = chosen.filter(index => !skip.includes(index + 1));
 emitSelection(selection);
 for (const index of chosen) receipt(index, 'pending');
 const labeled = multi || mapRaw !== undefined;
@@ -132,12 +140,12 @@ function send(target, index) {
   return new Promise(resolve => {
     const controller = new AbortController();
     let settled = false;
-    const finish = (accepted, message, http = 'none') => {
+    const finish = (accepted, message, http = 'none', body = '') => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      controller.abort(); // Do not read or print a possibly sensitive response body.
-      receipt(index, accepted ? 'accepted' : http === 'none' ? 'unknown' : 'rejected', http);
+      controller.abort();
+      receipt(index, accepted ? 'accepted' : http === 'none' ? 'unknown' : 'rejected', http, body);
       const line = labeled ? `target ${index + 1} ${message}; owner wake unobserved` : message;
       console[accepted || labeled ? 'log' : 'error'](`finish webhook: ${line}`);
       resolve(accepted);
@@ -145,7 +153,7 @@ function send(target, index) {
     const timer = setTimeout(() => finish(false, 'request timed out after 10000ms'), 10000);
     fetch(target.url, {
       method: 'POST', redirect: 'manual', signal: controller.signal,
-      headers: { Authorization: target.auth, 'Content-Type': 'application/json' },
+      headers: { Authorization: target.auth, 'Content-Type': 'application/json', ...(event ? { 'Idempotency-Key': event } : {}) },
       body: JSON.stringify({
         job: args[0], status: args[1] === 'done' ? 'waiting' : args[1], branch: args[2],
         ...(args[1] === 'done' ? { jobState: 'done' } : {}),
@@ -158,9 +166,11 @@ function send(target, index) {
             : 'Unrecognized job status; inspect the job record before proceeding'),
         ...Object.fromEntries(fields),
       }),
-    }).then(response => {
+    }).then(async response => {
       const accepted = response.status >= 200 && response.status < 300;
-      finish(accepted, accepted ? `accepted (HTTP ${response.status})` : `HTTP ${response.status} rejected`, `${Math.floor(response.status / 100)}xx`);
+      // The body goes only to the private receipt channel, never to stdout or stderr.
+      const body = accepted || !event ? '' : excerpt(await response.text().catch(() => ''), target);
+      finish(accepted, accepted ? `accepted (HTTP ${response.status})` : `HTTP ${response.status} rejected`, String(response.status), body);
     }, () => finish(false, 'request failed'));
   });
 }

@@ -1,27 +1,16 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
-import { basename, delimiter, dirname, isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join, resolve } from "node:path";
 import { isTerminal, type TerminalState } from "../job/job.ts";
-import { appendLimenLog, atomicWrite, textFile } from "../job/record.ts";
+import { textFile } from "../job/record.ts";
 import { currentBranch, listWorktrees, ticketAuthor, workspaceRoot } from "../project/git.ts";
 import { ticketPointers } from "../project/planning.ts";
-import {
-	finishEvent,
-	GITHUB_AUTHOR,
-	GITHUB_NOREPLY,
-	parseFinishReceipt,
-	parseFinishSelection,
-	RECEIPT_MAX_BYTES,
-} from "./finish-receipt.ts";
+import { finishEvent, GITHUB_AUTHOR, GITHUB_NOREPLY } from "./finish-receipt.ts";
+import { queuePing, SENDER, senderEnvironment } from "./webhook-queue.ts";
 
-const SENDER = fileURLToPath(new URL("../../bin/tony-finish-ping.sh", import.meta.url));
-// Leave time inside the detached wrapper's 5s termination grace to record the outcome.
-const SEND_MS = 3_000;
-const DELIVERY_MS = 4_000;
 /** One plant webhook: what happened (`kind`), to what (`title`, `id`), where (`plant`), and why (`reason`). `status` is the sender's state argument. */
 export type PlantEvent = {
 	readonly kind: string;
@@ -67,23 +56,8 @@ const AUTHOR_LOOKUP_REASONS = [
 	["must be a file inside", "ticket path outside repository"],
 	["no creation author", "no creation author"],
 ] as const;
-function senderResult(selection: string, code: number | null, signal: NodeJS.Signals | null): string {
-	if (selection === "not sent: no author route") {
-		return "skipped: not sent: no author route";
-	}
-	if (selection === "invalid author map") {
-		return "failed: invalid author map; not sent";
-	}
-	if (code === 0) {
-		return "accepted: sender exited 0 (owner wake unobserved)";
-	}
-	return `failed: sender ${signal ? "interrupted" : `exited ${code ?? "unknown"}`}`;
-}
-export async function deliverFinishWebhook(
-	jobDir: string,
-	shutdownDeadline = Number.POSITIVE_INFINITY,
-	detail = "",
-): Promise<void> {
+/** A terminal job claims its one finish ping, then the queue sends it until every target answers for good. */
+export async function deliverFinishWebhook(jobDir: string, detail = ""): Promise<void> {
 	const config = await textFile(`${jobDir}/finish-webhook-env`);
 	if (!config) {
 		return;
@@ -93,7 +67,6 @@ export async function deliverFinishWebhook(
 		return;
 	}
 	try {
-		// Never reclaim: a crash after HTTP acceptance but before recording it is ambiguous.
 		await writeFile(`${jobDir}/finish-webhook-attempt`, `${state} ${new Date().toISOString()}\n`, {
 			flag: "wx",
 			mode: 0o600,
@@ -105,14 +78,6 @@ export async function deliverFinishWebhook(
 		}
 		throw error;
 	}
-	const manual =
-		"Manual finish-ping retry: inspect finish-webhook-attempt and finish-webhook; use bin/tony-finish-ping.sh with this job's finish-webhook-env, label, state and branch. Acceptance is not proof of owner wake; an interrupted attempt may already have sent.";
-	await atomicWrite(`${jobDir}/finish-webhook`, `attempting ${new Date().toISOString()}\n${manual}\n`);
-	await appendLimenLog(
-		jobDir,
-		"finish webhook: attempting; inspect finish-webhook for status and manual finish-ping retry",
-	);
-	const deadline = Math.min(shutdownDeadline, Date.now() + DELIVERY_MS);
 	// A done job's reason is its handoff's first text line, without Markdown markers; every other end names the finish detail, which is the failed gate.
 	const summary =
 		state === "done"
@@ -127,41 +92,7 @@ export async function deliverFinishWebhook(
 		status: state,
 		reason: summary || detail || state,
 	};
-	const timeoutMs = Math.min(SEND_MS, deadline - Date.now());
-	let result = !isAbsolute(config)
-		? "failed: config path is not absolute"
-		: timeoutMs <= 0
-			? "failed: no shutdown time remains; not sent"
-			: await send(jobDir, config, event, finishEvent(jobDir), timeoutMs);
-	const attempts: string[] = [];
-	if (result.startsWith("failed: sender exceeded ")) {
-		attempts.push(`attempt 1: ${result} ${new Date().toISOString()}`);
-		await appendLimenLog(jobDir, `finish webhook: ${attempts[0]}`);
-		if (deadline > Date.now()) {
-			await atomicWrite(
-				`${jobDir}/finish-webhook`,
-				`attempting retry ${new Date().toISOString()}\n${attempts.join("\n")}\n${manual}\n`,
-			);
-			await appendLimenLog(jobDir, "finish webhook: attempting retry");
-		}
-		const remaining = Math.min(SEND_MS, deadline - Date.now());
-		if (remaining > 0) {
-			result = await send(jobDir, config, event, finishEvent(jobDir), remaining);
-			attempts.push(`attempt 2: ${result} ${new Date().toISOString()}`);
-			await appendLimenLog(jobDir, `finish webhook: ${attempts[1]}`);
-		} else {
-			attempts.push("retry: not retried; shutdown deadline reached");
-			await appendLimenLog(jobDir, `finish webhook: ${attempts[1]}`);
-		}
-	}
-	await atomicWrite(
-		`${jobDir}/finish-webhook`,
-		`${result} ${new Date().toISOString()}\n${attempts.length ? `${attempts.join("\n")}\n` : ""}${result.startsWith("skipped:") ? "" : `${manual}\n`}`,
-	);
-	await appendLimenLog(
-		jobDir,
-		`finish webhook: ${result}${result.startsWith("skipped:") ? "" : "; inspect finish-webhook for manual finish-ping retry"}`,
-	);
+	await queuePing(resolve(jobDir, "../.."), jobDir, config, event, finishEvent(jobDir), jobDir);
 }
 /** Timeouts and stalled tools end a job as failed; the webhook names the gate that ended it. */
 function terminalKind(state: TerminalState, detail: string): string {
@@ -195,19 +126,29 @@ export async function deliverJobStall(jobDir: string, line: string): Promise<voi
 		return;
 	}
 	const handoff = "Job stalled while running. Next step: read the job, then steer it, stop it, or wait.";
-	const result = await deliverEventWebhook(`${jobDir}/events/job.stalled.${Date.now()}`, config, {
+	const event: PlantEvent = {
 		...(await jobFields(jobDir)),
 		kind: "job.stalled",
 		status: "stalled",
 		reason: line,
 		handoff,
-	});
-	if (result) {
-		await appendLimenLog(jobDir, `stall webhook: ${result}`);
-	}
+	};
+	await deliverEventWebhook(
+		`${jobDir}/events/job.stalled.${Date.now()}`,
+		config,
+		event,
+		resolve(jobDir, "../.."),
+		jobDir,
+	);
 }
 /** A non-terminal event is claimed once by creating `dir`; its receipt stays beside the claim. Without config the claim records the skip. */
-export async function deliverEventWebhook(dir: string, config: string, event: PlantEvent): Promise<string | undefined> {
+export async function deliverEventWebhook(
+	dir: string,
+	config: string,
+	event: PlantEvent,
+	limen: string,
+	log = "",
+): Promise<void> {
 	await mkdir(dirname(dir), { recursive: true });
 	try {
 		await mkdir(dir);
@@ -217,14 +158,14 @@ export async function deliverEventWebhook(dir: string, config: string, event: Pl
 		}
 		throw error;
 	}
-	const id = `limen-finish-${createHash("sha256").update(dir).digest("hex")}`;
-	const result = !config
-		? "skipped: no finish webhook config; not sent"
-		: isAbsolute(config)
-			? await send(dir, config, event, id, SEND_MS)
-			: "failed: config path is not absolute";
-	await atomicWrite(`${dir}/finish-webhook`, `${event.kind} ${result} ${new Date().toISOString()}\n`);
-	return result;
+	if (!config) {
+		await writeFile(
+			`${dir}/finish-webhook`,
+			`skipped: no finish webhook config; not sent ${new Date().toISOString()}\n`,
+		);
+		return;
+	}
+	await queuePing(limen, dir, config, event, `limen-finish-${createHash("sha256").update(dir).digest("hex")}`, log);
 }
 /** `limen webhook test`: one synthetic event through the real sender, with its per-target lines on this terminal. */
 export function sendTestPing(root: string, config: string): number {
@@ -294,83 +235,5 @@ export async function deliverLeadStepWebhook(
 		author: login.startsWith("@") ? login : "",
 		handoff,
 	};
-	const result = isAbsolute(config)
-		? await send(stepDir, config, event, finishEvent(stepDir), SEND_MS)
-		: "failed: config path is not absolute";
-	await atomicWrite(`${stepDir}/finish-webhook`, `${result} ${new Date().toISOString()}\n`);
-}
-function senderEnvironment(config: string, event: PlantEvent): NodeJS.ProcessEnv {
-	return {
-		...process.env,
-		PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`,
-		LIMEN_FINISH_WEBHOOK_ENV: config,
-		LIMEN_FINISH_WEBHOOK_AUTHOR: event.author ?? "",
-		// Undefined drops any inherited override, so a terminal job always sends the job handoff.
-		LIMEN_FINISH_HANDOFF: event.handoff,
-		LIMEN_FINISH_KIND: event.kind,
-		LIMEN_FINISH_PLANT: event.plant,
-		LIMEN_FINISH_ID: event.id,
-		LIMEN_FINISH_REASON: event.reason,
-	};
-}
-function send(receiptDir: string, config: string, event: PlantEvent, id: string, timeoutMs: number): Promise<string> {
-	return new Promise((resolve) => {
-		const child = spawn(SENDER, [event.title, event.status, event.branch], {
-			env: { ...senderEnvironment(config, event), LIMEN_FINISH_EVENT: id },
-			stdio: ["ignore", "ignore", "ignore", "pipe"],
-			detached: true,
-		});
-		// Dedicated channel: never retain sender stdout/stderr or unvalidated bytes.
-		let pending = "";
-		let bytes = 0;
-		let selection = "";
-		const seen = new Map<number, string>();
-		child.stdio[3]?.on("data", (chunk: Buffer) => {
-			bytes += chunk.length;
-			if (bytes > RECEIPT_MAX_BYTES) {
-				return;
-			}
-			pending += chunk.toString("utf8");
-			const lines = pending.split("\n");
-			pending = lines.pop() ?? "";
-			for (const line of lines) {
-				const routed = parseFinishSelection(line);
-				if (routed && !selection) {
-					selection = routed;
-					writeFileSync(`${receiptDir}/finish-webhook-route`, `${routed}\n`, { mode: 0o600, flush: true });
-					continue;
-				}
-				const receipt = parseFinishReceipt(line);
-				if (
-					!receipt ||
-					(seen.has(receipt.target) && (seen.get(receipt.target) !== "pending" || receipt.transport === "pending"))
-				) {
-					continue;
-				}
-				seen.set(receipt.target, receipt.transport);
-				appendFileSync(`${receiptDir}/finish-webhook-targets`, `${JSON.stringify(receipt)}\n`, {
-					mode: 0o600,
-					flush: true,
-				});
-			}
-		});
-		const timer = setTimeout(() => {
-			if (child.pid) {
-				try {
-					process.kill(-child.pid, "SIGKILL");
-				} catch (error) {
-					if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
-						child.kill("SIGKILL");
-					}
-				}
-			}
-			finish(`failed: sender exceeded ${timeoutMs}ms; acceptance unknown`);
-		}, timeoutMs);
-		const finish = (result: string) => {
-			clearTimeout(timer);
-			resolve(result);
-		};
-		child.once("error", () => finish("failed: sender could not start"));
-		child.once("close", (code, signal) => finish(senderResult(selection, code, signal)));
-	});
+	await queuePing(join(root, ".limen"), stepDir, config, event, finishEvent(stepDir));
 }

@@ -146,7 +146,7 @@ export function coordinatorSignals(askMs = 60_000) {
 				plant: basename(root),
 				handoff: HANDOFF[kind],
 			};
-			void deliverEventWebhook(join(events, `${kind}.${claim}`), config, event).catch(() => {});
+			void deliverEventWebhook(join(events, `${kind}.${claim}`), config, event, join(root, ".limen")).catch(() => {});
 		} catch {
 			// A webhook is a side channel; it never disturbs the coordinator's turn.
 		}
@@ -360,7 +360,12 @@ export async function sweepCoordinators(root: string): Promise<void> {
 			plant: basename(root),
 			handoff: HANDOFF["coordinator.exited"],
 		};
-		await deliverEventWebhook(join(dir, "events", "coordinator.exited"), finishWebhookEnv(root, root), event);
+		await deliverEventWebhook(
+			join(dir, "events", "coordinator.exited"),
+			finishWebhookEnv(root, root),
+			event,
+			join(root, ".limen"),
+		);
 	}
 }
 

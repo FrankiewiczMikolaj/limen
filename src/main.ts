@@ -22,6 +22,7 @@ import { ticketAuthorCommand } from "./commands/ticket-author.ts";
 import { waitCommand } from "./commands/wait.ts";
 import { unwatchCommand, watchCommand } from "./commands/watch.ts";
 import { webhookCommand } from "./commands/webhook.ts";
+import { resendNearbyPings } from "./integrations/webhook-queue.ts";
 import { runHostedSupervisor } from "./runtime/supervisor.ts";
 import { failInternalJob, runInternalJob } from "./runtime/wrapper.ts";
 
@@ -120,6 +121,7 @@ usage:
   limen ticket check [BRANCH]                    # land gate on demand: tickets BRANCH adds or changes; run before a hand git merge
   limen sweep [--install|--uninstall]
   limen webhook test                             # send one test ping to this plant's finish webhook targets
+  limen webhook deliver <receipt-folder>         # internal: send one queued ping, retrying with backoff
   limen linear [on [--team T --project P]|off|status]   # Linear mirror toggle — renames spec/linear.md ↔ .off; --team/--project write a fresh config
   limen github connect|disconnect|status|doctor  # bind projects and diagnose seat safety
   limen github ensure [registered-root]       # require a live registered Herdr coordinator
@@ -155,6 +157,10 @@ export async function main(args: readonly string[], cwd = process.cwd()): Promis
 		if (flags.includes("--help") || flags.includes("-h")) {
 			console.log(commandHelp(name));
 			return;
+		}
+		// A webhook is a side channel: a bad queue entry never stops the command the human asked for.
+		if (!(name === "webhook" && rest[0] === "deliver")) {
+			await resendNearbyPings(cwd).catch(() => {});
 		}
 		await COMMANDS[name as keyof typeof COMMANDS](rest, cwd);
 	} catch (error) {
