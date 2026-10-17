@@ -23,11 +23,12 @@ import {
 
 const PACKAGE = fileURLToPath(new URL("..", import.meta.url));
 const FLAGS = ["--engine", "pi", "--detached"];
-// One marker per guidance source; the checks never read product wording.
+// One marker per project guidance source; the package capability frame and its cue are read from their own file.
 const STYLE = "style-marker-s4";
 const REGISTER = "register-marker-s4";
 const VISION = "vision-marker-s4";
 const BOARD = "board-body-marker-s4";
+const [, FRAME = "", CUE = ""] = readFileSync(`${PACKAGE}templates/capability.md`, "utf8").split(/\s*## \w+\s*|\s+$/);
 
 let p: Plant;
 let parent = "";
@@ -87,10 +88,8 @@ test("a second init removes old hook copies, so a coordinator gets each guidance
 	child.once("exit", resolve);
 	assert.equal(await promise, 0);
 	const system = readFileSync(join(coord, "fake-system.txt"), "utf8");
-	assert.equal(count(system, STYLE), 1, "styleguide");
-	assert.equal(count(system, REGISTER), 1, "register");
-	assert.equal(count(system, VISION), 1, "vision");
-	assert.equal(count(system, BOARD), 1, "board");
+	const seen = [STYLE, REGISTER, VISION, BOARD, FRAME].map((marker) => count(system, marker));
+	assert.deepEqual(seen, [1, 1, 1, 1, 1], "styleguide, register, vision, board, capability frame");
 	assert.deepEqual(readdirSync(join(p.root, ".pi/extensions")), ["limen.ts"]);
 	assert.deepEqual(readdirSync(join(p.root, ".omp/extensions")), ["limen.ts"]);
 });
@@ -119,8 +118,9 @@ test("a running worker gets each steer once and in order; an ended one refuses a
 test("a worker prompt carries register and styleguide once, vision and board pointers, and no board body", () => {
 	const system = jobFile(p, parent, "fake-system.txt");
 	const context = jobFile(p, parent, "fake-context.txt");
-	assert.equal(count(system, STYLE), 1, "styleguide");
-	assert.equal(count(system, REGISTER), 1, "register");
+	const seen = [STYLE, REGISTER, FRAME].map((marker) => count(system, marker));
+	assert.deepEqual(seen, [1, 1, 1], "styleguide, register, capability frame");
+	assert.equal(count(context, CUE), 1, "capability cue");
 	assert.ok(context.includes("`spec/vision.md`"), "vision pointer");
 	assert.ok(context.includes("`spec/build.md`"), "board pointer");
 	assert.equal(count(system + context, VISION), 0, "a worker reads the vision itself");

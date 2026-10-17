@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { formatDrift, inheritFile, listDrift, readOptional } from "../src/project/inherit.ts";
+import { formatDrift, inheritFile, listDrift, packageRoot, readOptional } from "../src/project/inherit.ts";
 import {
 	planningSource,
 	privatePlanningGuidance,
@@ -10,6 +10,7 @@ import {
 import { assistantStopReason } from "../src/runtime/stream.ts";
 
 const CONTEXT_TYPE = "limen-project-context";
+const CAPABILITY_FILE = "templates/capability.md";
 const MAX_CONTEXT_LINES = 1000;
 const BOARD_ADVISORY_LINES = 120;
 const STYLE_FILE = ".agents/limen/styleguide.md";
@@ -92,6 +93,10 @@ function isWakePrompt(prompt: string | undefined): boolean {
 
 function guidancePrompt(cwd: string, job: boolean): string {
 	const parts: string[] = [];
+	const frame = capabilitySection("Frame");
+	if (frame) {
+		parts.push(boundText(frame, `limen/${CAPABILITY_FILE}`, "Capability"));
+	}
 	if (privatePlanning(cwd, job)) {
 		parts.push(privatePlanningGuidance(cwd));
 	}
@@ -147,7 +152,11 @@ function turnCue(
 	lastTouch: string | undefined,
 	failed: string | undefined,
 ): string {
-	const lines = [registerCue(cwd, "Shared"), registerCue(cwd, job ? "Agent" : "Human")].filter(Boolean);
+	const lines = [
+		capabilitySection("Cue"),
+		registerCue(cwd, "Shared"),
+		registerCue(cwd, job ? "Agent" : "Human"),
+	].filter(Boolean);
 	if (failed) {
 		lines.push(registerCue(cwd, "Failure").replaceAll("{{failure}}", failed));
 	}
@@ -213,6 +222,12 @@ function registerCue(cwd: string, heading: string): string {
 		`Cue: ${heading}`,
 	);
 	return section.split("\n").slice(1).join("\n").trim();
+}
+
+/** The capability frame describes Limen itself, not project speech, so a project register never replaces it. */
+function capabilitySection(heading: string): string {
+	const text = readOptional(join(packageRoot(), CAPABILITY_FILE)) ?? "";
+	return markdownSection(text, heading).split("\n").slice(1).join("\n").trim();
 }
 
 function readInheritedAgents(cwd: string): string {
