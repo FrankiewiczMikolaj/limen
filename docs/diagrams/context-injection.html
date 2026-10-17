@@ -372,25 +372,23 @@ Inspect the job record, branch diff and commits, log/session, and relevant check
 
 <section class="sheet" id="ab">
 	<h1>Does the frame change judgment?</h1>
-	<p class="lead g">The F948 A/B. One turn, no tools. C5 is the shipped frame; C6 is C5 with an identity opening.</p>
+	<p class="lead g">The F948 A/B. One turn, no tools. The goal: the agent makes the engineering call itself and stays inside the asked outcome. D5 is the shipped frame; C5 was the first one.</p>
 
-	<h2>Samples that sized the hook/wake.ts split at two hours or less</h2>
+	<h2>Answers that decided, of 10 (grok 4, Haiku 4, Opus 2)</h2>
 	<table>
-		<tr><th>Variant</th><th>grok</th><th>Haiku</th><th>Opus</th></tr>
-		<tr><td>No frame</td><td>0/5</td><td>0/5</td><td>0/1</td></tr>
-		<tr><td>C5, system and cue</td><td>4/5</td><td>2/5</td><td>1/1</td></tr>
-		<tr><td>C5, system only</td><td>2/5</td><td>2/5</td><td class="g">—</td></tr>
-		<tr><td>C5, cue only</td><td>0/5</td><td>0/5</td><td class="g">—</td></tr>
-		<tr><td>C6, system and cue</td><td>0/5</td><td>3/5</td><td>1/1</td></tr>
+		<tr><th>Variant</th><th>Shared fix, not patch</th><th>No survey or ask</th><th>Owner told what happens</th></tr>
+		<tr><td>No frame</td><td>0</td><td>5</td><td>5</td></tr>
+		<tr><td>C5</td><td>0</td><td>8</td><td>3</td></tr>
+		<tr><td>D5</td><td>10</td><td>10</td><td>10</td></tr>
 	</table>
 
 	<ul class="find">
-		<li>The frame works from the system prompt. The cue alone scored the same as no frame.</li>
-		<li>C5 was chosen over C6: grok 4/5 against 0/5, Haiku 2/5 against 3/5.</li>
-		<li>C2 was dropped: it made a product change that nobody asked for.</li>
+		<li>Without “choose the proper design over the patch”, grok patched in every sample.</li>
+		<li>The old worker seam rule made Opus and Haiku patch and file a follow-up. The seam is now a start, not a fence.</li>
+		<li>Scope: one handoff in five changed a display width under D5; none without a frame.</li>
 		<li>Every variant retired the 14 wording tests. The frame adds no test bloat.</li>
 	</ul>
-	<p class="g">Limits: single-turn answers, small samples, read by eye. Decay over a long session was not measured.</p>
+	<p class="g">Limits: single-turn answers, small samples, scored by regex and read by eye. Decay over a long session was not measured.</p>
 </section>
 
 </body>
