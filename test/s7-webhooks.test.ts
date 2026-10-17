@@ -90,11 +90,8 @@ test("a continuation from a subdirectory keeps the parent's config and author ro
 	assert.equal(jobFile(p, id, "finish-webhook-env"), jobFile(p, parent, "finish-webhook-env"));
 	assert.equal(jobFile(p, id, "finish-webhook-author"), jobFile(p, parent, "finish-webhook-author"));
 	await settled(id);
-	const sent = payloads().filter((ping) => ping.body.jobId === id);
-	assert.deepEqual(
-		sent.map((ping) => ping.url),
-		[URLS[0]],
-	);
+	const urls = payloads().flatMap((ping) => (ping.body.jobId === id ? [ping.url] : []));
+	assert.deepEqual(urls, [URLS[0]]);
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
 
@@ -105,11 +102,11 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 		join(p.root, ".limen/finish-webhook.env"),
 		`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(targets)}'\n`,
 	);
-	// Slower than the old 3 s budget; busy twice; a refusal that echoes the request, which no retry changes.
+	// Slower than the old 3 s budget; busy twice; a refused key that echoes the request, which no retry changes.
 	await respond(p, [
 		{ match: "/slow", delayMs: 5_000, body: {} },
 		{ match: "/busy", status: 503, upTo: 2, body: { error: "busy" } },
-		{ match: "/gone", status: 404, body: { error: `no automation for s7-secret-one at ${urls[2]}` } },
+		{ match: "/gone", status: 401, body: { error: `no automation for s7-secret-one at ${urls[2]}` } },
 	]);
 	const id = spawn(`Ticket: ${bob}\nsay\nfail 3`, "S7 bob");
 	assert.equal(wait(id), "failed");
@@ -117,7 +114,7 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 	await settled(id);
 	const ping = payloads().find((sent) => sent.body.jobId === id)?.body;
 	assert.deepEqual([ping?.event, ping?.plant, Boolean(ping?.reason)], ["job.failed", "repo", true]);
-	assert.match(jobFile(p, id, "finish-webhook"), /^failed: target 3 HTTP 404 .*; not retried/);
+	assert.match(jobFile(p, id, "finish-webhook"), /^failed: target 3 HTTP 401 .*; not retried/);
 	const receipts = jobFile(p, id, "finish-webhook-targets")
 		.split("\n")
 		.map((line) => JSON.parse(line));
@@ -128,9 +125,10 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 		[
 			["200 "],
 			['503 {"error":"busy"}', '503 {"error":"busy"}', "200 "],
-			['404 {"error":"no automation for [auth] at [url]"}'],
+			['401 {"error":"no automation for [auth] at [url]"}'],
 		],
 	);
+	assert.match(limen(p, ["status"]).stdout, /^Finish webhook rejects: invalid key \(target 3 HTTP 401 for job.failed/m);
 	// A resend of the settled ping is what the next limen command, sweep or wake hook would run; it sends nothing.
 	run(["webhook", "deliver", jobDir(p, id)]);
 	assert.deepEqual(
@@ -155,6 +153,7 @@ test("a ping whose deliverer was killed mid-send goes out with the next limen co
 	assert.match(jobFile(p, id, "finish-webhook"), /^accepted: every target accepted after 1 try/);
 	run(["webhook", "deliver", jobDir(p, id)]);
 	assert.equal(requests(p).filter((request) => request.url === url).length, 2);
+	assert.doesNotMatch(limen(p, ["status"]).stdout, /Finish webhook rejects/); // Every target accepted a later ping.
 });
 
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {

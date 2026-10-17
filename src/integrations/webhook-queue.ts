@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { appendLimenLog, atomicWrite, textFile } from "../job/record.ts";
@@ -161,6 +161,7 @@ async function tryOnce(dir: string, queued: Queued): Promise<void> {
 		await atomicWrite(`${dir}/finish-webhook-queue`, `${JSON.stringify({ ...tried, next })}\n`);
 		return record(dir, tried, `queued: try ${tries} ${sent.result}; next try ${next}`);
 	}
+	await noteKeyRefusal(dir, queued, after);
 	const refused = after
 		.filter((receipt) => receipt.transport !== "accepted")
 		.map(({ target, http, body }) => `target ${target} HTTP ${http}${body ? ` ${JSON.stringify(body)}` : ""}`);
@@ -171,6 +172,25 @@ async function tryOnce(dir: string, queued: Queued): Promise<void> {
 			? `failed: ${refused.join(", ")}; not retried`
 			: `accepted: every target accepted after ${tries} ${tries === 1 ? "try" : "tries"} (owner wake unobserved)`,
 	);
+}
+/**
+ * A 401 or 403 means a receiver refused the key. `.limen/webhook-rejected` names the newest such refusal of any ping,
+ * also a coordinator's, until a later ping that every target accepts removes it; `limen status` shows it first.
+ */
+async function noteKeyRefusal(dir: string, queued: Queued, receipts: readonly FinishReceipt[]): Promise<void> {
+	const marker = join(queued.limen, "webhook-rejected");
+	const denied = receipts.find((receipt) => receipt.transport === "rejected" && /^40[13]$/.test(receipt.http));
+	if (denied) {
+		const receipt = relative(dirname(queued.limen), dir);
+		const at = new Date().toISOString();
+		return atomicWrite(
+			marker,
+			`target ${denied.target} HTTP ${denied.http} for ${queued.event.kind} at ${at}; ${receipt}\n`,
+		);
+	}
+	if (receipts.every((receipt) => receipt.transport === "accepted")) {
+		await rm(marker, { force: true });
+	}
 }
 /** Not answered yet, or answered with a code a later try can change: 408, 429 or 5xx. */
 function open(receipt: FinishReceipt): boolean {
