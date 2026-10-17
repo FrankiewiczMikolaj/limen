@@ -47,7 +47,7 @@ The decision is (c): the frame goes once in the system prompt, and the one-sente
 
 ## A/B
 
-Method: a single turn with no tools. The system prompt is `templates/worker.md`, or a shop-manual excerpt (`templates/agents.md` lines 140 to 189) plus the vision. The user message carries a `limen-project-context` cue, then the question. The models are `xai-oauth/grok-4.7` (OMP), `anthropic/claude-haiku-5-5` and `anthropic/claude-opus-5-5` (Pi, `--no-tools --no-mcp`). The first Haiku pass went through the OMP `pi-claude` bridge. That bridge keeps the host's MCP tools, and the model called the VMPal VM. Those answers were discarded and rerun on Pi. The harness and all raw answers were in the worktree's `.scratch/ab/`, which is not committed.
+Method: a single turn with no tools. The system prompt is `templates/worker.md`, or a shop-manual excerpt (`templates/agents.md` lines 140 to 189) plus the vision. The user message carries a `limen-project-context` cue, then the question. The models are `xai-oauth/grok-4.7` (OMP), `anthropic/claude-haiku-5-5` and `anthropic/claude-opus-5-5` (Pi, `--no-tools --no-mcp`). The first Haiku pass went through the OMP `pi-claude` bridge. That bridge keeps the host's MCP tools, and the model called the VMPal VM. Those answers were discarded and rerun on Pi. The harness (`harness.py`) and every raw answer (`<model>-<prompt>-<variant>[-sN].txt`) are outside Git, in `.limen/jobs/2026-10-17-capability-awareness-framing-5fb4772d/ab/` under the plant root.
 
 Prompts:
 
@@ -77,3 +77,5 @@ Results:
 Why C5 won over C6: grok recalibrated in 4 of 5 samples with C5 against 0 of 5 with C6, and Haiku was close (2 against 3). "The asked thing" is a fence against scope creep. "Never on making more" names bloat directly.
 
 Limits: the answers are single-turn, the samples are small, and the reading is by eye. Attention decay over a long coordinator session was not measured. The per-turn recall is there for that case, and a live coordinator session is the check.
+
+Live check of the shipped hook: `pi` (Haiku) and `omp` (grok) each loaded `hook/communication.ts` with `LIMEN_PACKAGE` set to this branch. Each quoted the first frame sentence from its system prompt and the cue as the first line of its `limen-project-context` note.
