@@ -28,6 +28,11 @@ const STYLE = "style-marker-s4";
 const REGISTER = "register-marker-s4";
 const VISION = "vision-marker-s4";
 const BOARD = "board-body-marker-s4";
+// The frame and its cue come from the package even though this project replaces the register.
+const [FRAME = "", CUE = ""] = readFileSync(join(PACKAGE, "templates/capability.md"), "utf8")
+	.split(/^## \w+$/m)
+	.slice(1)
+	.map((part) => part.trim());
 
 let p: Plant;
 let parent = "";
@@ -91,6 +96,8 @@ test("a second init removes old hook copies, so a coordinator gets each guidance
 	assert.equal(count(system, REGISTER), 1, "register");
 	assert.equal(count(system, VISION), 1, "vision");
 	assert.equal(count(system, BOARD), 1, "board");
+	assert.equal(count(system, FRAME), 1, "capability frame");
+	assert.equal(count(readFileSync(join(coord, "fake-context.txt"), "utf8"), CUE), 1, "capability cue");
 	assert.deepEqual(readdirSync(join(p.root, ".pi/extensions")), ["limen.ts"]);
 	assert.deepEqual(readdirSync(join(p.root, ".omp/extensions")), ["limen.ts"]);
 });
@@ -121,6 +128,8 @@ test("a worker prompt carries register and styleguide once, vision and board poi
 	const context = jobFile(p, parent, "fake-context.txt");
 	assert.equal(count(system, STYLE), 1, "styleguide");
 	assert.equal(count(system, REGISTER), 1, "register");
+	assert.equal(count(system, FRAME), 1, "capability frame");
+	assert.equal(count(context, CUE), 1, "capability cue");
 	assert.ok(context.includes("`spec/vision.md`"), "vision pointer");
 	assert.ok(context.includes("`spec/build.md`"), "board pointer");
 	assert.equal(count(system + context, VISION), 0, "a worker reads the vision itself");
