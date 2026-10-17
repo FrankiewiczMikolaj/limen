@@ -18,6 +18,8 @@ heading. Both lists cover the last seven days; `Older: N records` counts the
 rest, and `limen status --all` lists them under the same headings.
 Open groups appear once with their member-branch count and `limen group status <id>`;
 the lead decides what lands. Closed groups leave the inbox.
+A finish webhook key that a receiver refused (HTTP 401 or 403) shows first, as
+`Finish webhook rejects: invalid key`, with the receipt folder of the refused ping.
 The status command also lists agent tabs whose working directory is the plant or one of its
 repositories. If global Herdr agent discovery fails, `status` checks recent
 recorded origin tabs directly and labels them incomplete: a visible tab is not

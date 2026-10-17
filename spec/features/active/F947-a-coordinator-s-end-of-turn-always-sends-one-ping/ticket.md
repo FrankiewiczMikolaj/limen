@@ -13,7 +13,7 @@ opened: 2026-10-16
 When a coordinator finishes its turn, the owner's phone gets one ping with what it said, the ticket it names, and
 its state. Today an OMP coordinator never sends a turn-end ping, and a Pi coordinator sends one only when todos or a
 goal stay open. Every job can also call `finish`, also a detached job resumed from a hosted session, and Limen keeps
-its handoff.
+its handoff. A webhook key that a receiver refuses shows at once in `limen status`.
 
 ## Scope
 
@@ -21,6 +21,7 @@ its handoff.
 - No ping while a job the coordinator owns still runs; a blocker still pings.
 - A queued coordinator ping survives the coordinator's exit or resume.
 - `finish` for every job, hosted or detached; its handoff is the job result.
+- A 401 or 403 refusal of any ping leaves one plant-level record that `limen status` shows.
 
 ## Out of scope
 
@@ -35,6 +36,9 @@ its handoff.
 - A detached OMP job that calls `finish` ends `done`, and its result is the handoff.
 - A live OMP and Pi coordinator and a detached OMP worker reach a local receiver.
 - `npm run check` passes and `test/` stays at or under 3,500 lines.
+- A ping that a target refuses with HTTP 401 or 403 makes `limen status` show `Finish webhook rejects: invalid key`
+  with its receipt folder.
+- A later ping that every target accepts, or a passing `limen webhook test`, removes that line.
 
 ## Notes
 
@@ -51,3 +55,13 @@ Root cause, from the alice plant on Adam's Mac, 16 Oct:
   detached continuation of a hosted session that had called `xd://finish`; OMP mounts hook tools as `xd://` devices,
   and no hook registered `finish`, so the call failed. Limen still recorded the job `done` when OMP exited 0; only the
   worker's result text says otherwise, so its state needs no repair.
+
+Regression report, alice plant, 17 Oct: "no turn-end ping on OMP since F947". The hook was not at fault:
+
+- A live probe in a Herdr pane (omp 18.4.4 fresh and `--resume`, Pi 1.2.0, local receiver) sent one ping per turn end.
+  omp's `agent_end` holds the key `willContinue` with the value `undefined` at a final end, and JSON logs drop it.
+  Pi's `agent_end` has no such key; its `agent_settled` follows. The handler stays as it is.
+- The alice coordinators did queue a ping at each turn end with no owned job running (10:23, 10:33, 10:55). Each
+  receiver answered HTTP 401 `Invalid API key`, as did every job ping since; the last accepted ping was 16 Oct 22:54.
+  A 401 is final, so the outbox stayed empty. The two other turn ends had an owned job running, so they sent nothing.
+- The receipts lived only in `.limen/coordinator-events/`, which nobody looked at, so the dead key went unseen.

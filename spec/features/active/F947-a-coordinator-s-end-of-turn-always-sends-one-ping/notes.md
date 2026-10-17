@@ -13,6 +13,10 @@
 - Finish: `hook/finish.ts`, loaded by `src/runtime/wrapper.ts` (detached) and `src/runtime/supervisor.ts` (hosted).
   It writes `result` and `session-ended`, then `ctx.shutdown()`. In print mode both engines finish the turn, then
   exit 0. The wrapper writes the last assistant text to `result` only when `result` is still empty.
+- Key refusal: `src/integrations/webhook-queue.ts` `noteKeyRefusal` runs when a queued ping settles. A 401 or 403
+  receipt writes `.limen/webhook-rejected` (target, event, time, receipt folder); a ping that every target accepts
+  removes it. `src/commands/status.ts` prints it after the plant line; `limen webhook test` removes it on exit 0.
+  The test ping does not write it: the operator reads that refusal on the terminal.
 
 ## Checks
 
@@ -21,6 +25,10 @@
 - `test/s3-finish-wake.test.ts` first test: a detached job's result is its `finish` handoff; it fails without the
   hook (`fake engine done`).
 - Live proof: `.limen/jobs/2026-10-16-coordinator-end-of-turn-ping-1acbb879/evidence/proof.md` in the limen checkout.
+- `test/s7-webhooks.test.ts`: the refusing target now answers 401; `limen status` names it, and the next test's
+  accepted ping clears it. Each half fails when its line in `noteKeyRefusal` is removed.
+- 17 Oct regression probe (OMP fresh and `--resume`, Pi, Herdr pane, local receiver):
+  `.limen/jobs/2026-10-17-coordinator-turn-end-ping-regres-094d39c1/evidence/` in the limen checkout.
 
 ## Open questions
 
