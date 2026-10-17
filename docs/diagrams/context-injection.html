@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>How context enters a Limen agent turn</title>
 <style>
-	:root { --ink: #000; --gray: #8a8a8a; }
+	:root { --ink: #000; --gray: #8a8a8a; --soft: #f2f2f2; }
 	* { box-sizing: border-box; }
 	body { margin: 0; background: #fff; color: var(--ink); font: 17px/1.5 Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
 	.sheet { max-width: 1440px; min-height: 900px; margin: 0 auto; padding: 44px 72px; }
@@ -22,14 +22,14 @@
 	.cell h3 { font-size: 18px; font-weight: 600; margin: 0 0 10px; }
 	.cell ul { list-style: none; margin: 0; padding: 0; }
 	.cell li { margin: 0 0 4px; }
-	.cell li[title] { cursor: help; }
 	.cols { columns: 2; column-gap: 24px; }
 	.marks { display: grid; grid-template-columns: 2fr 1fr 1fr; margin-top: 10px; }
 	.mark { padding-top: 8px; }
 	.mark.cached { border-top: 3px solid var(--ink); }
 	.mark.after { border-top: 3px dashed var(--ink); }
 
-	.loop { display: grid; grid-template-columns: 1fr 460px; gap: 56px; align-items: center; }
+	.loop { display: grid; grid-template-columns: 500px 1fr; gap: 56px; align-items: start; }
+	.loop .pin { position: sticky; top: 24px; }
 	svg { display: block; width: 100%; }
 	svg text { font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 18px; fill: var(--ink); }
 	svg .g { fill: var(--gray); font-size: 15px; }
@@ -37,10 +37,25 @@
 	svg .ln { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 	svg .dot { fill: var(--ink); }
 	svg .num { fill: #fff; font-size: 13px; font-weight: 600; }
-	ol.legend { list-style: none; margin: 0; padding: 0; }
-	ol.legend li { display: flex; align-items: center; gap: 14px; margin: 0 0 18px; }
 	.n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff;
 		font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+	.k { flex: none; width: 22px; height: 22px; border: 1.5px solid var(--ink); border-radius: 4px; margin-right: 8px;
+		font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+	.cell li .k { width: 20px; height: 20px; font-size: 11px; }
+
+	.cards { display: grid; gap: 20px; }
+	.cards.two { grid-template-columns: 1fr 1fr; align-items: start; margin-top: 28px; }
+	.card { border: 1px solid var(--ink); padding: 18px 20px 16px; min-width: 0; }
+	.card.none { border-style: dashed; }
+	.card h3 { display: flex; align-items: center; gap: 2px; font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+	.card h3 .n { margin-right: 10px; }
+	.when { font-size: 15px; margin: 0; }
+	.if { font-size: 15px; margin: 14px 0 0; }
+	.note { font-size: 15px; margin: 10px 0 0; }
+	.q { margin: 8px 0 0; padding: 10px 14px; background: var(--soft);
+		font: 13px/1.55 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+	.src { margin: 10px 0 0; color: var(--gray); font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
+	.foot { font-size: 15px; margin: 24px 0 0; }
 
 	table { border-collapse: collapse; font-size: 19px; margin: 8px 0 12px; }
 	th, td { text-align: left; padding: 12px 56px 12px 0; border-bottom: 1px solid var(--ink); }
@@ -48,19 +63,13 @@
 	td + td, th + th { text-align: right; padding-right: 0; padding-left: 56px; }
 	ul.find { margin: 40px 0 0; padding-left: 20px; }
 	ul.find li { margin: 0 0 10px; }
-
-	details { max-width: 1440px; margin: 0 auto; padding: 24px 72px 56px; border-top: 1px solid var(--ink); font-size: 15px; }
-	summary { cursor: pointer; font-weight: 600; }
-	details h3 { font-size: 15px; font-weight: 600; margin: 20px 0 4px; }
-	details ul { margin: 0; padding-left: 18px; }
-	details p { margin: 0 0 4px; }
 </style>
 </head>
 <body>
 
 <section class="sheet">
 	<h1>How context enters a Limen agent turn</h1>
-	<p class="lead g">Same hooks on Pi and OMP.</p>
+	<p class="lead g">Same hooks on Pi and OMP. Gray boxes quote the real injected text, trimmed with “…”.</p>
 
 	<div class="part">
 		<h2>1&nbsp;&nbsp;One model call</h2>
@@ -68,28 +77,32 @@
 			<div class="cell">
 				<h3>System prompt</h3>
 				<ul class="cols">
-					<li title="Pi or OMP base prompt, plus the project AGENTS.md read by the engine">Engine prompt</li>
-					<li title="--append-system-prompt: .agents/limen/&lt;role&gt;.md or templates/&lt;role&gt;.md">Role file</li>
-					<li title="templates/capability.md · every role · ≈70 tokens">Capability frame</li>
-					<li title="communication.md, the text above the first “## Cue:”">Register</li>
-					<li title="spec/vision.md and .agents/limen/styleguide.md">Vision, styleguide</li>
-					<li title="NOW and NEXT of spec/build.md · coordinator · always last">Board digest, last</li>
+					<li><span class="k">A</span>Engine prompt</li>
+					<li><span class="k">B</span>Role file</li>
+					<li><span class="k">C</span>Capability frame</li>
+					<li><span class="k">D</span>Private planning</li>
+					<li><span class="k">E</span>Shop manual</li>
+					<li><span class="k">F</span>Register</li>
+					<li><span class="k">G</span>Search</li>
+					<li><span class="k">H</span>Vision</li>
+					<li><span class="k">I</span>Styleguide</li>
+					<li><span class="k">J</span>Board digest, last</li>
 				</ul>
 			</div>
 			<div class="cell">
 				<h3>History</h3>
 				<ul>
-					<li title="task.md is a job's first message">Task</li>
+					<li>Task <span class="g">(1)</span></li>
 					<li>Earlier turns</li>
-					<li>Tool calls and results</li>
-					<li>Steers and wakes</li>
+					<li>Tool calls and results <span class="g">(3)</span></li>
+					<li>Steers and wakes <span class="g">(4, 5)</span></li>
 				</ul>
 			</div>
 			<div class="cell">
 				<h3>This prompt</h3>
 				<ul>
 					<li>Human text, task, or wake</li>
-					<li title="“limen-project-context”, display: false · capability cue ≈32 tokens">Hidden note</li>
+					<li>Hidden note <span class="g">(2)</span></li>
 				</ul>
 			</div>
 		</div>
@@ -98,64 +111,261 @@
 			<div class="mark"></div>
 			<div class="mark after">Added after the history</div>
 		</div>
+
+		<div class="cards two">
+			<div class="card">
+				<h3><span class="k">A</span>Engine prompt</h3>
+				<p class="when">Every call · every role · cached</p>
+				<p class="note">The Pi or OMP base prompt. Limen does not write it. The engine also reads a project AGENTS.md here.</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">B</span>Role file</h3>
+				<p class="when">Every call · job only · cached · worker ≈1.8k tokens</p>
+				<pre class="q"># Implementation job
+
+You implement the coordinator's instruction in this isolated Git worktree. The instruction is the job; its ticket is the source of truth. …</pre>
+				<p class="note">One file per role: worker, reviewer, scout, keeper, researcher, …</p>
+				<p class="src">.agents/limen/&lt;role&gt;.md, else templates/&lt;role&gt;.md · --append-system-prompt</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">C</span>Capability frame</h3>
+				<p class="when">Every call · every role · cached · ≈70 tokens</p>
+				<pre class="q">## Capability (limen/templates/capability.md)
+In Limen, many strong agents work in parallel, so engineering time is abundant: writing, testing, reviewing, and redoing a change take minutes. The scarce things are the owner's attention and the clarity of the system. Spend the abundance on getting the asked thing right, complete, and proven, never on making more.</pre>
+				<p class="note">First in the Limen block. No project file replaces it.</p>
+				<p class="src">templates/capability.md, section Frame</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">D</span>Private planning</h3>
+				<p class="when">Only when the planning source is private · every role · cached</p>
+				<pre class="q">Planning source: private. Read canonical planning in &lt;root&gt;; do not copy, link, stage or commit it. …
+Vision (read-only): &lt;root&gt;/spec/vision.md
+Board (read-only): &lt;root&gt;/spec/build.md</pre>
+				<p class="src">src/project/planning.ts</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">E</span>Shop manual</h3>
+				<p class="when">Coordinator only, and only without a project AGENTS.md · cached · ≈11k tokens</p>
+				<pre class="q">## Shop manual (templates/agents.md)
+# Agent shop manual
+
+This repository uses plain specifications, Git, and `limen` to coordinate one human with several coding sessions. …
+
+## Coordinator
+
+The coordinator is a hosted session in Herdr for this plant (`LIMEN_COORDINATOR=1`), preferably OMP; …</pre>
+				<p class="src">templates/agents.md</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">F</span>Register</h3>
+				<p class="when">Every call · every role · cached · ≈3.5k tokens</p>
+				<pre class="q">## Communication (templates/communication.md)
+# Communication
+…
+Use the register the audience cue names. Switch only when this reply, or part of it, will be executed by another agent.
+
+Every reply is read cold. The reader was not in your tool calls, did not see the wake, …</pre>
+				<p class="note">Sections: Shared, Specs, Human, Agent, Before you send. The text stops at the first “## Cue:”; the cues go to 2 and 3.</p>
+				<p class="src">.agents/limen/communication.md, else templates/communication.md</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">G</span>Search</h3>
+				<p class="when">Only when jg is Jevgrep · every role · cached</p>
+				<pre class="q">`jg` (Jevgrep) is installed. Search source with `jg "question" [root]` instead of grep, ripgrep (`rg`), or a grep tool. …</pre>
+				<p class="src">communication.md, section Cue: Search</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">H</span>Vision</h3>
+				<p class="when">Coordinator only · cached · ≈1.2k tokens</p>
+				<pre class="q">## Vision (spec/vision.md)
+# Vision
+
+## Product principles
+
+- One human; many focused Pi sessions; one coordinator conversation.
+- Durable intent, job state, prompts, and decisions in ordinary files and Git.
+…</pre>
+				<p class="note">A job gets a one-line pointer in the hidden note instead (2).</p>
+				<p class="src">spec/vision.md</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">I</span>Styleguide</h3>
+				<p class="when">Every call · every role · cached · ≈700 tokens</p>
+				<pre class="q">## Styleguide (.agents/limen/styleguide.md)
+# Styleguide
+…
+## Shape
+
+- Small, direct TypeScript. Capability in `src/`; judgment in `templates/` and project Markdown.
+- One file, one job. …</pre>
+				<p class="src">.agents/limen/styleguide.md</p>
+			</div>
+			<div class="card">
+				<h3><span class="k">J</span>Board digest</h3>
+				<p class="when">Coordinator only · always last in the cached prefix · ≈650 tokens today</p>
+				<pre class="q">## Board digest (spec/build.md)
+## NOW
+- `F936-haiku-helpers-…` (🟠 ACTIVE): the Haiku steering page is filed …
+- `F926-fleet-leads-…` (🟠 ACTIVE): a starting review lists as starting, …
+…
+
+## NEXT</pre>
+				<p class="note">Only NOW and NEXT. Last, so a board change breaks only the end of the cache.</p>
+				<p class="src">spec/build.md</p>
+			</div>
+		</div>
+		<p class="foot g">C to J are the Limen block, set by the before_agent_start hook in this order (hook/communication.ts). Each file is capped at 1000 lines. ≈70 and ≈32 tokens come from the F948 study; other counts are estimates, characters ÷ 4, from today's files.</p>
 	</div>
 
 	<div class="part">
 		<h2>2&nbsp;&nbsp;The loop</h2>
 		<div class="loop">
-			<svg viewBox="0 0 900 350" role="img" aria-label="The agent loop and its four injection points">
-				<defs>
-					<marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
-						<path d="M0,0 L8,4 L0,8 z" fill="#000"/>
-					</marker>
-				</defs>
+			<div class="pin">
+				<svg viewBox="0 0 580 550" role="img" aria-label="The agent loop and its five injection points">
+					<defs>
+						<marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+							<path d="M0,0 L8,4 L0,8 z" fill="#000"/>
+						</marker>
+					</defs>
 
-				<text x="80" y="52" text-anchor="middle">Human or task</text>
-				<path class="ln" d="M80,64 V98" marker-end="url(#a)"/>
+					<text x="190" y="28" text-anchor="middle">Human or task</text>
+					<path class="ln" d="M190,40 V88" marker-end="url(#a)"/>
 
-				<g><title>before_agent_start · hook/communication.ts</title>
-					<rect class="box" x="0" y="100" width="160" height="60"/>
-					<text x="80" y="136" text-anchor="middle">Prompt</text>
-				</g>
-				<rect class="box" x="240" y="100" width="160" height="60"/>
-				<text x="320" y="136" text-anchor="middle">Model call</text>
-				<rect class="box" x="480" y="100" width="160" height="60"/>
-				<text x="560" y="136" text-anchor="middle">Tool call</text>
-				<g><title>tool_result · hook/communication.ts</title>
-					<rect class="box" x="720" y="100" width="160" height="60"/>
-					<text x="800" y="136" text-anchor="middle">Tool result</text>
-				</g>
-				<g><title>agent_end · finish tool or engine exit</title>
-					<rect class="box" x="240" y="260" width="160" height="60"/>
-					<text x="320" y="296" text-anchor="middle">Turn ends</text>
-				</g>
-				<g><title>hook/wake.ts sweeps .limen/jobs and sends “Limen job …”; a finish ping goes to the webhook</title>
-					<rect class="box" x="0" y="260" width="160" height="60"/>
-					<text x="80" y="296" text-anchor="middle">Wake</text>
-				</g>
+					<rect class="box" x="105" y="90" width="170" height="56"/>
+					<text x="190" y="124" text-anchor="middle">Prompt</text>
+					<rect class="box" x="105" y="220" width="170" height="56"/>
+					<text x="190" y="254" text-anchor="middle">Model call</text>
+					<rect class="box" x="105" y="350" width="170" height="56"/>
+					<text x="190" y="384" text-anchor="middle">Tool call</text>
+					<rect class="box" x="105" y="480" width="170" height="56"/>
+					<text x="190" y="514" text-anchor="middle">Tool result</text>
+					<rect class="box" x="380" y="220" width="170" height="56"/>
+					<text x="465" y="254" text-anchor="middle">Turn ends</text>
+					<rect class="box" x="380" y="90" width="170" height="56"/>
+					<text x="465" y="124" text-anchor="middle">Wake</text>
 
-				<path class="ln" d="M160,130 H238" marker-end="url(#a)"/>
-				<path class="ln" d="M400,130 H478" marker-end="url(#a)"/>
-				<path class="ln" d="M640,130 H718" marker-end="url(#a)"/>
-				<path class="ln" d="M800,100 V40 H320 V98" marker-end="url(#a)"/>
-				<text class="g" x="440" y="28" text-anchor="middle">next step</text>
-				<path class="ln" d="M320,160 V258" marker-end="url(#a)"/>
-				<text class="g" x="334" y="215">no tool call</text>
-				<path class="ln" d="M240,290 H162" marker-end="url(#a)"/>
-				<text class="g" x="200" y="345" text-anchor="middle">job done</text>
-				<path class="ln" d="M80,260 V162" marker-end="url(#a)"/>
+					<path class="ln" d="M190,146 V218" marker-end="url(#a)"/>
+					<path class="ln" d="M190,276 V348" marker-end="url(#a)"/>
+					<path class="ln" d="M190,406 V478" marker-end="url(#a)"/>
+					<path class="ln" d="M105,508 H50 V248 H103" marker-end="url(#a)"/>
+					<text class="g" transform="translate(30,300) rotate(-90)" text-anchor="middle">next step</text>
+					<path class="ln" d="M275,248 H378" marker-end="url(#a)"/>
+					<text class="g" x="326" y="238" text-anchor="middle">no tool call</text>
+					<path class="ln" d="M465,220 V148" marker-end="url(#a)"/>
+					<text class="g" x="485" y="189">job done</text>
+					<path class="ln" d="M380,118 H277" marker-end="url(#a)"/>
 
-				<circle class="dot" cx="200" cy="130" r="12"/><text class="num" x="200" y="135" text-anchor="middle">1</text>
-				<circle class="dot" cx="800" cy="70" r="12"/><text class="num" x="800" y="75" text-anchor="middle">2</text>
-				<circle class="dot" cx="560" cy="40" r="12"/><text class="num" x="560" y="45" text-anchor="middle">3</text>
-				<circle class="dot" cx="200" cy="290" r="12"/><text class="num" x="200" y="295" text-anchor="middle">4</text>
-			</svg>
-			<ol class="legend">
-				<li><span class="n">1</span>Each prompt: Limen block and hidden note</li>
-				<li><span class="n">2</span>Tool result: reminder after a few edits only</li>
-				<li><span class="n">3</span>Steer: arrives between tool calls</li>
-				<li><span class="n">4</span>Job done: a wake starts a coordinator turn</li>
-			</ol>
+					<circle class="dot" cx="190" cy="64" r="12"/><text class="num" x="190" y="69" text-anchor="middle">1</text>
+					<circle class="dot" cx="190" cy="182" r="12"/><text class="num" x="190" y="187" text-anchor="middle">2</text>
+					<circle class="dot" cx="190" cy="442" r="12"/><text class="num" x="190" y="447" text-anchor="middle">3</text>
+					<circle class="dot" cx="50" cy="390" r="12"/><text class="num" x="50" y="395" text-anchor="middle">4</text>
+					<circle class="dot" cx="465" cy="184" r="12"/><text class="num" x="465" y="189" text-anchor="middle">5</text>
+				</svg>
+			</div>
+
+			<div class="cards">
+				<div class="card">
+					<h3><span class="n">1</span>Task file</h3>
+					<p class="when">Job start · job only · the first user message, then history</p>
+					<pre class="q">&lt;file name="…/.limen/jobs/&lt;id&gt;/task.md"&gt;
+# Context graph: keep the clean layout, bring back the real details
+
+Adam on the cleaned docs/diagrams/context-injection.html: "now the graph is too simple, …"
+…
+Ticket: spec/features/active/F…/ticket.md
+&lt;/file&gt;</pre>
+					<p class="note">The coordinator writes it. The hidden note takes its first “Ticket:” line; the wake quotes its first sentence. A coordinator's first prompt is the human's text.</p>
+					<p class="src">src/runtime/engine.ts passes @.limen/jobs/&lt;id&gt;/task.md</p>
+				</div>
+
+				<div class="card">
+					<h3><span class="n">2</span>Hidden note</h3>
+					<p class="when">Every prompt: coordinator on each human turn or wake, job once with the task · every role · after the history, not cached · ≈32 tokens for the capability cue</p>
+					<pre class="q">&lt;limen-project-context&gt;
+
+Engineering time is abundant here; the owner's attention and a clear system are scarce: spend effort on the right, proven change, not on more.
+
+First line is the answer. Not `F048 is active now.` — `The change that makes spawn return in seconds (F048) is being implemented now.` Never open a reply with a feature number. Size the reply to the question.
+
+Write in plain technical English (about 80% of ASD-STE100). Short sentences. One idea each. …
+
+Audience for this reply: agent. Use that register. Switch only for the part another agent will execute.
+
+Ticket: spec/features/active/F…/ticket.md
+
+Vision (read-only): `spec/vision.md` — durable intent. Load it before choosing or starting work.
+
+Board (read-only): `spec/build.md` — consult before reporting work; do not edit.
+
+&lt;/limen-project-context&gt;</pre>
+					<p class="note">A job's note, as sent. The model sees it; the human does not (display: false). Added only when:</p>
+					<p class="if">Coordinator: the Human cue replaces the Agent cue, and the Ticket, Vision and Board lines go</p>
+					<pre class="q">Audience for this reply: human. Use that register. …
+When this reply hands control back with work in flight, end with a short overview: what is finished, what is running and which job has it, what is waiting on the owner.</pre>
+					<p class="if">The last turn stopped on an error</p>
+					<pre class="q">The previous turn failed with {{failure}} and nothing reached the human.</pre>
+					<p class="if">The prompt starts “Limen job ” (a wake, 5)</p>
+					<pre class="q">This turn was opened by a job wake, not by the human. They have not seen the job's work or its state: say which job it was and what it did before what comes next.</pre>
+					<p class="if">The last turn got a tool result reminder (3)</p>
+					<pre class="q">Last turn edited hook/wake.ts.
+Last turn started or merged work.</pre>
+					<p class="if">Coordinator: project files drift from the package, or the board is over 120 lines</p>
+					<pre class="q">## Guidance drift
+These project files copy or replace a Limen package default. Ask whether to delete leftovers and stale copies …
+
+spec/build.md is &lt;n&gt; lines; fold older PROVEN entries into monthly highlights.</pre>
+					<p class="src">hook/communication.ts turnCue · cue text: communication.md “## Cue:” sections, capability.md Cue</p>
+				</div>
+
+				<div class="card">
+					<h3><span class="n">3</span>Tool result reminders</h3>
+					<p class="when">After a matching write, edit or bash · every role · appended to the tool result, so it stays in history</p>
+					<p class="if">Write or edit under spec/</p>
+					<pre class="q">[limen] Specs: a ticket is about 300 words: outcome, scope, out of scope, acceptance. No status line, no progress markers. …</pre>
+					<p class="if">Write or edit of a file that is not .md</p>
+					<pre class="q">[limen] Styleguide (.agents/limen/styleguide.md): Styleguide; Shape; Prefer; Checked by Biome; Avoid.</pre>
+					<p class="if">Bash with limen spawn, git merge, or a ticket into spec/features/planned/</p>
+					<pre class="q">[limen] Vision (spec/vision.md): Vision; Product principles; Current direction; Research, quality, and picture.</pre>
+					<p class="note">Headings only, at most 8. Group members also get peer progress here (hook/group-peer.ts).</p>
+					<p class="src">hook/communication.ts reminderKind, projectReminder</p>
+				</div>
+
+				<div class="card none">
+					<h3>Not injected: most tool results</h3>
+					<p class="when">read, grep, glob, test runs, every other bash command, a write or edit of a .md file outside spec/</p>
+					<p class="note">The result reaches the model unchanged. A job makes hundreds of tool calls: a cue on each costs about 32 tokens a call, sits inside data the model parses, and turns into noise when it repeats. The F948 A/B also showed the short cue alone does almost nothing.</p>
+				</div>
+
+				<div class="card">
+					<h3><span class="n">4</span>Steer</h3>
+					<p class="when">While a job runs · job only · a user message between tool calls, after the history</p>
+					<pre class="q">$ limen steer &lt;id&gt; "Touch only the context sections."
+
+.limen/jobs/&lt;id&gt;/steer/inbox/0001
+Touch only the context sections.</pre>
+					<p class="note">The job's steering hook sends the text as typed, before the next model call. No wrapper, no cue. The job log gets “steered: …”.</p>
+					<p class="src">src/commands/steer.ts → hook/steering.ts</p>
+				</div>
+
+				<div class="card">
+					<h3><span class="n">5</span>Wake</h3>
+					<p class="when">A job ends (finish tool or engine exit) · coordinator only · a new user message: a new turn if idle, a follow-up if busy</p>
+					<pre class="q">Limen job "&lt;label&gt;": # Context graph: keep the clean layout, bring back the real details
+is done (&lt;id&gt;) on branch &lt;branch&gt;.
+
+Commits:
+&lt;up to 10&gt;
+
+Final message:
+&lt;first 15 lines&gt;
+
+Job done. Next step: land it, or name the check that still blocks landing. Done does not mean that review passed.
+
+Inspect the job record, branch diff and commits, log/session, and relevant checks. Then land the work at the verified commit. …</pre>
+					<p class="note">The prompt starts “Limen job ”, so the hidden note adds the Wake cue (2). A finish ping also goes to the webhook, queued and retried.</p>
+					<p class="src">hook/wake.ts → src/job/wake-text.ts completionWake</p>
+				</div>
+			</div>
 		</div>
 	</div>
 </section>
@@ -182,58 +392,6 @@
 	</ul>
 	<p class="g">Limits: single-turn answers, small samples, read by eye. Decay over a long session was not measured.</p>
 </section>
-
-<details>
-	<summary>Details</summary>
-
-	<h3>Loading</h3>
-	<p>A coordinator loads the hooks through templates/limen-extension.ts. A job loads them through --extension flags from src/runtime/wrapper.ts (detached) or supervisor.ts (hosted).</p>
-
-	<h3>System prompt, the Limen block</h3>
-	<p>before_agent_start (hook/communication.ts) sets it, in this order. Each file is capped at 1000 lines.</p>
-	<ul>
-		<li>Frame: templates/capability.md, every role, ≈70 tokens. No project file replaces it.</li>
-		<li>Private planning: only when the planning source is private.</li>
-		<li>Shop manual: templates/agents.md, coordinator only, only without a project AGENTS.md.</li>
-		<li>Register: communication.md, the text above the first “## Cue:”.</li>
-		<li>Search: the register's Search cue, only if jg is Jevgrep.</li>
-		<li>Vision: spec/vision.md, coordinator. Styleguide: .agents/limen/styleguide.md.</li>
-		<li>Board digest: NOW and NEXT of spec/build.md, coordinator, always last, so a board change breaks only the end of the prefix.</li>
-	</ul>
-
-	<h3>Hidden note (1), after the history</h3>
-	<ul>
-		<li>The capability cue, every role, ≈32 tokens.</li>
-		<li>Register cues: Shared, then Human (coordinator) or Agent (job).</li>
-		<li>The Failure cue, if the last turn stopped on an error. The Wake cue, if the prompt starts “Limen job ”.</li>
-		<li>Job: ticket path, vision and board pointers.</li>
-		<li>“Last turn edited &lt;path&gt;”, after a write or edit that got a reminder.</li>
-		<li>Coordinator: guidance drift and board size (&gt; 120 lines).</li>
-		<li>Coordinator: on every human turn or idle wake. Job: once, with the task.</li>
-	</ul>
-
-	<h3>Tool result reminders (2)</h3>
-	<ul>
-		<li>Write or edit under spec/: the register's Specs cue.</li>
-		<li>Write or edit of a non-.md file: styleguide headings.</li>
-		<li>Bash with limen spawn, git merge, or a ticket into spec/features/planned/: vision headings.</li>
-		<li>Every other tool result: nothing. A job makes hundreds of calls; the text would sit inside data the model parses, and identical repeats turn into noise.</li>
-		<li>Group members only: group-peer.ts adds peer progress.</li>
-	</ul>
-
-	<h3>Steer (3) and wake (4)</h3>
-	<ul>
-		<li>Steer: limen steer writes steer/inbox; the job gets it between tool calls.</li>
-		<li>A job ends by the finish tool or engine exit. A finish ping goes to the webhook, queued and retried.</li>
-		<li>hook/wake.ts sweeps .limen/jobs and sends “Limen job …”. An idle coordinator starts a new turn and gets the note; a busy one queues it as a follow-up.</li>
-	</ul>
-
-	<h3>Not in a job's system prompt</h3>
-	<p>Shop manual, vision, board digest. The hidden note points to the files instead.</p>
-
-	<h3>Sources</h3>
-	<p>Token counts and A/B numbers: spec/features/active/F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system/study.md. Everything else: hook/*.ts, src/runtime/engine.ts, src/commands/spawn.ts.</p>
-</details>
 
 </body>
 </html>
