@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { finishWebhookEnv, sendTestPing } from "../integrations/finish-webhook.ts";
 import { deliverQueued } from "../integrations/webhook-queue.ts";
@@ -22,5 +23,8 @@ export async function webhookCommand(args: readonly string[], cwd: string): Prom
 	const status = sendTestPing(root, config);
 	if (status !== 0) {
 		process.exitCode = status;
+		return;
 	}
+	// Every target accepted the key, so an earlier refusal no longer holds.
+	await rm(`${root}/.limen/webhook-rejected`, { force: true });
 }

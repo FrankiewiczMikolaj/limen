@@ -53,6 +53,8 @@ limen open <id|suffix|label>
 
 Open groups replace individual member candidates with one line: `group <feature>: N member branches; the lead decides (limen group status <id>)`. Closed groups leave the inbox. Work outside groups keeps its ordinary candidate or decision row.
 
+When a webhook target refused a ping with HTTP 401 or 403, the first line after the plant is `Finish webhook rejects: invalid key (…)`. It names the target, the event, the time and the receipt folder. A later ping that every target accepts, or a passing `limen webhook test`, removes it.
+
 In a terminal, `jobs` shows an aligned table for people. Through a pipe, it prints the compact format that tools read. `LIMEN_VIEW=human|compact` selects a view. `NO_COLOR` removes the color.
 
 The default compact `jobs` view lists running jobs and recent empty jobs. It hides empty jobs that ended more than 7 days ago and prints `N older empty jobs hidden`. `limen jobs --all` shows every job. An unknown job ID exits 1 with `no job matches "<id>"`.

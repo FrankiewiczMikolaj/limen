@@ -106,9 +106,13 @@ export async function statusCommand(args: readonly string[], cwd: string): Promi
 		scan.worktrees,
 		scan.originTabs,
 	);
+	const refused = await text(`${root}/.limen/webhook-rejected`);
 	console.log(
 		[
 			`Plant ${root}`,
+			...(refused
+				? [`Finish webhook rejects: invalid key (${refused}); fix the key, then run limen webhook test`]
+				: []),
 			`Running (${scan.running.length}):`,
 			...(scan.running.length ? scan.running : ["  none"]),
 			`Candidates to inspect (${ready.length}):`,
