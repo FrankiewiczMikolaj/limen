@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How context enters a Limen agent turn</title>
+<style>
+	:root { --ink: #000; --gray: #8a8a8a; }
+	* { box-sizing: border-box; }
+	body { margin: 0; background: #fff; color: var(--ink); font: 13px/1.45 Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+	svg { display: block; width: min(100%, 1440px, 160vh); margin: 0 auto; }
+	svg text { font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 12px; fill: var(--ink); }
+	svg .b { font-weight: 600; }
+	svg .h { font-size: 14px; font-weight: 600; }
+	svg .title { font-size: 22px; font-weight: 600; }
+	svg .g { fill: var(--gray); }
+	svg .s { font-size: 11px; }
+	svg .box { fill: #fff; stroke: var(--ink); stroke-width: 1; }
+	svg .ln { fill: none; stroke: var(--ink); stroke-width: 1; }
+	svg .dash { fill: none; stroke: var(--gray); stroke-width: 1; stroke-dasharray: 4 3; }
+	section.ab { max-width: 1440px; margin: 0 auto; padding: 40px 48px 48px; border-top: 1px solid var(--ink); }
+	h2 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+	h3 { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+	p { margin: 0 0 6px; }
+	.g { color: var(--gray); }
+	.s { font-size: 11px; }
+	.grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px 40px; margin-top: 22px; }
+	.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 28px; }
+	table { border-collapse: collapse; width: 100%; }
+	th, td { text-align: left; vertical-align: top; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--ink); }
+	th { font-weight: 600; }
+	td .n { font-weight: 600; margin-left: 6px; }
+	.m { display: inline-block; width: 9px; height: 9px; border: 1px solid var(--ink); margin-right: 2px; vertical-align: -1px; }
+	.m.on { background: var(--ink); }
+	ul { margin: 0; padding-left: 16px; }
+	li { margin: 0 0 3px; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 1440 900" role="img" aria-label="How context enters a Limen agent turn">
+	<defs>
+		<marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+			<path d="M0,0 L8,4 L0,8 z" fill="#000"/>
+		</marker>
+	</defs>
+
+	<text class="title" x="48" y="54">How context enters a Limen agent turn</text>
+	<text class="g" x="48" y="78">Same hooks on Pi and OMP. A coordinator loads them through templates/limen-extension.ts; a job through --extension flags from src/runtime/wrapper.ts (detached) or supervisor.ts (hosted).</text>
+
+	<!-- 1: one model call -->
+	<text class="h" x="48" y="122">1  What one model call contains, left to right</text>
+	<rect class="box" x="48" y="136" width="1344" height="186"/>
+	<line class="ln" x1="218" y1="136" x2="218" y2="322"/>
+	<line class="ln" x1="388" y1="136" x2="388" y2="322"/>
+	<line class="ln" x1="948" y1="136" x2="948" y2="322"/>
+	<line class="ln" x1="1168" y1="136" x2="1168" y2="322"/>
+
+	<text class="b" x="60" y="160">Engine prompt</text>
+	<text x="60" y="182">Pi or OMP base prompt</text>
+	<text x="60" y="200">project AGENTS.md,</text>
+	<text x="60" y="216">read by the engine</text>
+
+	<text class="b" x="230" y="160">Role file · job</text>
+	<text x="230" y="182">--append-system-prompt</text>
+	<text x="230" y="200">.agents/limen/&lt;role&gt;.md</text>
+	<text x="230" y="216">or templates/&lt;role&gt;.md</text>
+	<text class="g" x="230" y="236">worker, reviewer, scout …</text>
+
+	<text class="b" x="400" y="160">Limen block · before_agent_start sets it</text>
+	<g>
+		<text x="400" y="184">Frame</text><text class="g" x="520" y="184">templates/capability.md · every role · ≈70 tokens</text>
+		<text x="400" y="200">Private planning</text><text class="g" x="520" y="200">only when the planning source is private</text>
+		<text x="400" y="216">Shop manual</text><text class="g" x="520" y="216">templates/agents.md · coordinator, only without a project AGENTS.md</text>
+		<text x="400" y="232">Register</text><text class="g" x="520" y="232">communication.md, the text above the first “## Cue:”</text>
+		<text x="400" y="248">Search</text><text class="g" x="520" y="248">the register's Search cue, only if jg is Jevgrep</text>
+		<text x="400" y="264">Vision</text><text class="g" x="520" y="264">spec/vision.md · coordinator</text>
+		<text x="400" y="280">Styleguide</text><text class="g" x="520" y="280">.agents/limen/styleguide.md</text>
+		<text x="400" y="296">Board digest</text><text class="g" x="520" y="296">NOW and NEXT of spec/build.md · coordinator · always last</text>
+	</g>
+	<text class="g s" x="400" y="314">Each file is capped at 1000 lines. The digest is last, so a board change breaks only the end of the prefix.</text>
+
+	<text class="b" x="960" y="160">History</text>
+	<text x="960" y="182">task.md as first message · job</text>
+	<text x="960" y="200">earlier turns and their notes</text>
+	<text x="960" y="218">tool calls and tool results</text>
+	<text x="960" y="236">steers and wakes, as delivered</text>
+
+	<text class="b" x="1180" y="160">This prompt</text>
+	<text x="1180" y="182">human text, wake, or task</text>
+	<text x="1180" y="200">+ hidden note</text>
+	<text x="1180" y="218">“limen-project-context”</text>
+	<text class="g" x="1180" y="236">display: false</text>
+	<text class="g" x="1180" y="254">capability cue ≈32 tokens</text>
+
+	<path class="ln" d="M48,334 V342 H944 V334"/>
+	<text x="48" y="360">System prompt: same text on every call, so it stays a stable prefix, cached after the first call</text>
+	<path class="dash" d="M952,334 V342 H1392 V334"/>
+	<text class="g" x="952" y="360">Added after the history: no cached prefix changes</text>
+
+	<!-- 2: the loop -->
+	<text class="h" x="48" y="404">2  The loop, and where each hook adds text</text>
+
+	<rect class="box" x="48" y="430" width="220" height="28"/>
+	<text x="58" y="448">Human message · coordinator</text>
+	<rect class="box" x="48" y="464" width="220" height="28"/>
+	<text x="58" y="482">Wake “Limen job …” · coordinator</text>
+	<rect class="box" x="48" y="498" width="220" height="28"/>
+	<text x="58" y="516">task.md · job, first prompt</text>
+	<path class="ln" d="M268,444 H292 V474 H318" marker-end="url(#a)"/>
+	<path class="ln" d="M268,478 H318" marker-end="url(#a)"/>
+	<path class="ln" d="M268,512 H292 V482 H318"/>
+
+	<rect class="box" x="320" y="450" width="200" height="56"/>
+	<text class="b" x="334" y="474">before_agent_start</text>
+	<text class="g s" x="334" y="492">hook/communication.ts</text>
+
+	<rect class="box" x="580" y="450" width="150" height="56"/>
+	<text class="b" x="594" y="482">Model call</text>
+
+	<rect class="box" x="790" y="450" width="140" height="56"/>
+	<text class="b" x="804" y="482">Tool call</text>
+
+	<rect class="box" x="990" y="450" width="160" height="56"/>
+	<text class="b" x="1004" y="474">tool_result</text>
+	<text class="g s" x="1004" y="492">hook/communication.ts</text>
+
+	<rect class="box" x="1210" y="450" width="182" height="56"/>
+	<text class="b" x="1224" y="474">agent_end</text>
+	<text class="g s" x="1224" y="492">job ends · coordinator waits</text>
+
+	<path class="ln" d="M520,478 H578" marker-end="url(#a)"/>
+	<path class="ln" d="M730,478 H788" marker-end="url(#a)"/>
+	<path class="ln" d="M930,478 H988" marker-end="url(#a)"/>
+	<path class="ln" d="M1070,450 V426 H655 V448" marker-end="url(#a)"/>
+	<text class="g s" x="1080" y="440">next step</text>
+	<text x="740" y="412">Steer · job: limen steer → steer/inbox, sent between tool calls</text>
+	<path class="ln" d="M860,416 V424" marker-end="url(#a)"/>
+	<path class="ln" d="M655,506 V532 H1240 V508" marker-end="url(#a)"/>
+	<text class="g s" x="664" y="526">no tool call</text>
+
+	<text class="b" x="320" y="572">before_agent_start adds, on each prompt:</text>
+	<text x="320" y="592">• the Limen block to the system prompt (section 1)</text>
+	<text x="320" y="610">• a hidden note, after the history, with:</text>
+	<text x="334" y="628">– the capability Cue · every role</text>
+	<text x="334" y="646">– register cues: Shared, then Human (coordinator) or Agent (job)</text>
+	<text x="334" y="664">– the Failure cue, if the last turn stopped on an error</text>
+	<text x="334" y="682">– the Wake cue, if the prompt starts “Limen job ”</text>
+	<text x="334" y="700">– job: ticket path, vision and board pointers</text>
+	<text x="334" y="718">– “Last turn edited &lt;path&gt;”, after a write or edit that got a reminder</text>
+	<text x="334" y="736">– coordinator: guidance drift and board size (&gt; 120 lines)</text>
+	<text class="g" x="320" y="758">Coordinator: every human turn or idle wake. Job: once, with the task.</text>
+
+	<text class="b" x="790" y="572">tool_result appends a reminder only for:</text>
+	<text x="790" y="592">• write or edit under spec/ → the register's Specs cue</text>
+	<text x="790" y="610">• write or edit of a non-.md file → styleguide headings</text>
+	<text x="790" y="628">• bash with limen spawn, git merge, or a ticket</text>
+	<text x="800" y="646">into spec/features/planned/ → vision headings</text>
+	<text x="790" y="664">• every other tool result: nothing</text>
+	<text class="g" x="790" y="688">Why not every result (F948): a job makes hundreds of calls,</text>
+	<text class="g" x="790" y="704">≈32 tokens each; the text sits inside data the model parses;</text>
+	<text class="g" x="790" y="720">identical repeats turn into noise.</text>
+	<text class="g" x="790" y="742">Group members only: group-peer.ts adds peer progress.</text>
+
+	<path class="ln" d="M1340,506 V564" marker-end="url(#a)"/>
+	<rect class="box" x="1210" y="566" width="182" height="52"/>
+	<text class="b" x="1224" y="586">Job ends</text>
+	<text class="s" x="1224" y="604">finish tool or engine exit</text>
+	<path class="ln" d="M1222,618 V730"/>
+	<path class="ln" d="M1222,660 H1238" marker-end="url(#a)"/>
+	<rect class="box" x="1240" y="640" width="152" height="40"/>
+	<text class="b" x="1252" y="657">Finish ping</text>
+	<text class="g s" x="1252" y="672">webhook, queued, retried</text>
+	<path class="ln" d="M1222,730 H1238" marker-end="url(#a)"/>
+	<rect class="box" x="1240" y="700" width="152" height="60"/>
+	<text class="b" x="1252" y="718">Coordinator wake.ts</text>
+	<text class="s" x="1252" y="734">sweeps .limen/jobs,</text>
+	<text class="s" x="1252" y="750">sends “Limen job …”</text>
+	<path class="ln" d="M1316,760 V832 H28 V478 H46" marker-end="url(#a)"/>
+	<text class="g s" x="440" y="826">wake: idle coordinator → new turn (gets the note); busy → queued as follow-up</text>
+
+	<text class="b" x="48" y="572">Not injected</text>
+	<text x="48" y="592">• into most tool results (see right)</text>
+	<text x="48" y="610">• into a job's system prompt: shop</text>
+	<text x="58" y="628">manual, vision, board digest;</text>
+	<text x="58" y="646">the note points to the files</text>
+	<text x="48" y="664">• no project file replaces the</text>
+	<text x="58" y="682">Frame; it is package-only</text>
+
+	<text class="g s" x="48" y="872">Solid bracket: cached system prompt. Dashed bracket: added after the history. Token counts come from the F948 study; everything else from hook/*.ts, src/runtime/engine.ts and src/commands/spawn.ts.</text>
+</svg>
+
+<section class="ab">
+	<h2>Does the capability frame change judgment? The F948 A/B</h2>
+	<p class="g">One turn, no tools. System prompt: templates/worker.md, or a shop-manual excerpt plus the vision. The user message carries a limen-project-context cue, then the question. Models: grok-4.7 (OMP), claude-haiku-5-5 and claude-opus-5-5 (Pi). C5 is the chosen text, the Frame and Cue in section 1. C6 is C5 with an identity opening.</p>
+
+	<div class="grid">
+		<div>
+			<h3>P3 · “How long to split the 1,171-line hook/wake.ts, and is it worth it now?”</h3>
+			<p class="g s">Samples that put the split at two hours or less. Five samples for grok and Haiku, one for Opus. ■ = two hours or less.</p>
+			<table>
+				<tr><th>Variant</th><th>grok</th><th>Haiku</th><th>Opus</th></tr>
+				<tr>
+					<td>No frame</td>
+					<td><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">0/5</span><br><span class="g s">half a day ×3, half a day to a day, a day</span></td>
+					<td><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">0/5</span><br><span class="g s">3 decline to size, a day, half a day to a day</span></td>
+					<td><span class="m"></span><br><span class="g s">half a day</span></td>
+				</tr>
+				<tr>
+					<td>C5, system and cue</td>
+					<td><span class="m on"></span><span class="m on"></span><span class="m on"></span><span class="m on"></span><span class="m"></span><span class="n">4/5</span><br><span class="g s">about 1 h, under 1 h, under 2 h, “minutes”</span></td>
+					<td><span class="m on"></span><span class="m on"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">2/5</span><br><span class="g s">30 to 60 min, “worker minutes”</span></td>
+					<td><span class="m on"></span><br><span class="g s">about 1 h</span></td>
+				</tr>
+				<tr>
+					<td>C5, system only</td>
+					<td><span class="m on"></span><span class="m on"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">2/5</span><br><span class="g s">plus 2 “one sitting”</span></td>
+					<td><span class="m on"></span><span class="m on"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">2/5</span><br><span class="g s">about 1 h ×2</span></td>
+					<td class="g">—</td>
+				</tr>
+				<tr>
+					<td>C5, cue only</td>
+					<td><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">0/5</span><br><span class="g s">half a day ×3, a few hours to a day</span></td>
+					<td><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">0/5</span><br><span class="g s">half a day to a day ×2</span></td>
+					<td class="g">—</td>
+				</tr>
+				<tr>
+					<td>C6, system and cue</td>
+					<td><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="m"></span><span class="n">0/5</span><br><span class="g s">plus 3 “a few hours” or “one sitting”; a day ×2</span></td>
+					<td><span class="m on"></span><span class="m on"></span><span class="m on"></span><span class="m"></span><span class="m"></span><span class="n">3/5</span><br><span class="g s">1 h, 1–2 h, 2 h</span></td>
+					<td><span class="m on"></span><br><span class="g s">about 1 h</span></td>
+				</tr>
+			</table>
+			<p class="s" style="margin-top:10px">Every sample still said “not now” or “map the seams first”, except one Haiku C2 sample. No frame turned the estimate into “so let us do it”.</p>
+		</div>
+
+		<div class="cards">
+			<div>
+				<h3>The cue alone does almost nothing</h3>
+				<p>Cue only: 0/5 on grok and on Haiku, the same as no frame. System only: 2/5 on each. Both together: 4/5 on grok. The frame works from the system prompt; the per-turn cue is a recall for long sessions.</p>
+			</div>
+			<div>
+				<h3>C2 dropped: scope creep</h3>
+				<p>On Haiku, C2 merged three label widths into one in P1, a product change nobody asked for, “under an hour”. In P3 it said “Yes, it's worth doing now”. C5 and C6 kept the widths, except one Haiku C6 sample that dropped a cut as a duplicate.</p>
+			</div>
+			<div>
+				<h3>P2 · 4-line patch (A) or shared design (B)</h3>
+				<p>grok: A in 19 of 19. Haiku: B in 0/5 with no frame, 1/5 with C5, 2/5 with C6. Opus: A with no frame, C5 and C6; with C6 it named B the better design. The frame raises awareness of the better design. It does not override the seam rule.</p>
+			</div>
+			<div>
+				<h3>P4 · 14 tests pin the wake wording</h3>
+				<p>Every variant retired the 14 wording tests and kept the delivered-once checks. With the frame, Opus wrote “Remove at least as many lines as I add”, and Haiku C5 aimed for no net growth. No test bloat; a slight push to subtract.</p>
+			</div>
+			<div>
+				<h3>Why C5 over C6</h3>
+				<p>P3: grok 4/5 against 0/5; Haiku 2/5 against 3/5. “The asked thing” fences scope creep. “Never on making more” names bloat.</p>
+			</div>
+			<div>
+				<h3>Limits</h3>
+				<p>Single-turn answers, small samples, read by eye. Attention decay over a long coordinator session was not measured. Live check only: Pi and OMP each quoted the frame and the cue from the shipped hook.</p>
+			</div>
+		</div>
+	</div>
+
+	<p class="g s" style="margin-top:24px">Source: spec/features/active/F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system/study.md. Raw answers are outside Git, in .limen/jobs/2026-10-17-capability-awareness-framing-5fb4772d/ab/ under the plant root.</p>
+</section>
+</body>
+</html>
