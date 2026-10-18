@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { appendFile, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { jobMembership } from "../job/group-cabinet.ts";
+import { enqueueSteer } from "../job/steer-inbox.ts";
 import {
 	appendLimenLog,
 	atomicWrite,
@@ -201,21 +202,25 @@ export async function runInternalJob(): Promise<void> {
 	const enginePid = child.pid;
 	const stallWatch: ToolStallWatch = { tool: "", born: "", started: 0 };
 	let observing = false;
-	let ownershipWarning = false;
+	// The advisory file shows the current observation; the log gets a line only when the observation changes.
+	let advised = "";
+	let logged = "";
 	const warnUncertain = async (detail: string) => {
-		if (ownershipWarning) {
-			return;
-		}
-		ownershipWarning = true;
 		const line = `tool stall observation uncertain: ${detail}`;
-		await atomicWrite(`${jobDir}/advisory`, `${line}\n`);
-		await appendLimenLog(jobDir, line);
+		if (line !== advised) {
+			advised = line;
+			await atomicWrite(`${jobDir}/advisory`, `${line}\n`);
+		}
+		if (line !== logged) {
+			logged = line;
+			await appendLimenLog(jobDir, line);
+		}
 	};
 	const clearUncertain = async () => {
-		if (!ownershipWarning) {
+		if (!advised) {
 			return;
 		}
-		ownershipWarning = false;
+		advised = "";
 		await rm(`${jobDir}/advisory`, { force: true });
 	};
 	const observeStall = async (pid: number) => {
@@ -281,8 +286,19 @@ export async function runInternalJob(): Promise<void> {
 	};
 	const stallTimer = setInterval(checkStall, 3_000);
 	const timeout = setTimeout(() => exhaust(`timeout after ${timeoutMs}ms`), timeoutMs);
+	// A model cannot see the clock; one steer at 80% lets it leave a commit or a verdict before the timeout.
+	const steerAt = Math.round(timeoutMs * 0.8);
+	const deadlineSteer = setTimeout(() => {
+		if (exhausted || stopRequested) {
+			return;
+		}
+		const minutes = Math.max(1, Math.round((timeoutMs - steerAt) / 60_000));
+		const text = `${minutes} min left before the timeout: commit your work or write your verdict now; mark checks you did not run as unverified.`;
+		void enqueueSteer(jobDir, text).catch(failLog);
+	}, steerAt);
 	const result = await outcome;
 	clearTimeout(timeout);
+	clearTimeout(deadlineSteer);
 	clearInterval(stallTimer);
 	if (graceTimer) {
 		clearTimeout(graceTimer);
