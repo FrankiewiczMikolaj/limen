@@ -1,5 +1,6 @@
 ---
 opened: 2026-10-07
+landed: 2026-10-07
 ---
 
 # F931 · The OptChat explainer shows what the prompt cache reads and what is paid in full, for a typical thread and for OptChat

@@ -1,5 +1,6 @@
 ---
 opened: 2026-10-07
+landed: 2026-10-07
 ---
 
 # F930 · The OptChat explainer shows plainly how OptChat differs from typical context management
