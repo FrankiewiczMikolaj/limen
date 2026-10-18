@@ -4,7 +4,7 @@ Research only; no Limen code changed. Full report: [omp-3day-review-2026-10-18.h
 
 Scope: 429 OMP session files from 2026-10-15 19:30 to 2026-10-18 19:30 UTC (504 MB): 273 jobs, 26 coordinator sessions, 6 plants; Alice is most of it.
 
-The core loop works: jobs, worktrees, steers, finish and review carried 273 jobs. The losses come from the harness under load and from one assumption that no longer holds: one coordinator per plant. Alice ran up to 19 coordinators at once, started and shepherded by Tony. The models held rules for 30 h at 600k+ tokens and negotiated ownership well; Limen's records, timeouts and landing did not keep up.
+The core loop works: jobs, worktrees, steers, finish and review carried 273 jobs. The losses come from the harness under load and from one assumption that no longer holds: one coordinator per plant. Alice had 19 coordinator tabs open at once, started and shepherded by Tony. The models held rules for 30 h at 600k+ tokens and negotiated ownership well; Limen's records, timeouts and landing did not keep up.
 
 ## Tweak
 
