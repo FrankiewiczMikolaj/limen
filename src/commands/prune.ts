@@ -2,6 +2,7 @@ import { readdir, readFile, realpath, rm } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { retainedGroupJob } from "../job/group-cabinet.ts";
 import { isTerminal } from "../job/job.ts";
+import { appendLimenLog } from "../job/record.ts";
 import {
 	branchExists,
 	deleteBranch,
@@ -25,9 +26,14 @@ export async function pruneCommand(args: readonly string[], cwd: string): Promis
 		throw new Error("prune --dry-run requires --retire");
 	}
 	if (!retire) {
-		const removed = await pruneFinishedWorktrees(limenRoot(cwd));
+		const removals = await pruneFinishedWorktrees(limenRoot(cwd));
+		for (const removal of removals) {
+			console.log(pruneLine(removal));
+		}
 		console.log(
-			removed === 0 ? "no finished worktrees" : `pruned ${removed} finished worktree${removed === 1 ? "" : "s"}`,
+			removals.length === 0
+				? "no finished worktrees"
+				: `pruned ${removals.length} finished worktree${removals.length === 1 ? "" : "s"}`,
 		);
 		return;
 	}
@@ -105,19 +111,38 @@ async function retireFinishedJobs(
 	return { ids: retired.map((job) => job.id), branches: deleted };
 }
 
-export async function pruneFinishedWorktrees(root: string, keep: readonly string[] = []): Promise<number> {
+/** One path that prune removed: the job that recorded it, when one did, and why no live job kept it. */
+export type PruneRemoval = { readonly path: string; readonly jobDir: string | undefined; readonly reason: string };
+/** Why prune removes a worktree some job recorded; a job that kept it never gets here. */
+type PruneOwners = Map<string, { readonly jobDir: string; readonly reason: string }>;
+export function pruneLine(removal: PruneRemoval): string {
+	return `pruned ${removal.path} (job ${removal.jobDir ? basename(removal.jobDir) : "none"}): ${removal.reason}`;
+}
+/** Prunes, writes each line to this job's log and to the log of the job whose worktree went; returns the count. */
+export async function pruneForJob(jobDir: string, root: string, keep: readonly string[]): Promise<number> {
+	const removals = await pruneFinishedWorktrees(root, keep);
+	for (const removal of removals) {
+		const line = pruneLine(removal);
+		await appendLimenLog(jobDir, line);
+		if (removal.jobDir && removal.jobDir !== jobDir) {
+			await appendLimenLog(removal.jobDir, line).catch(() => {});
+		}
+	}
+	return removals.length;
+}
+export async function pruneFinishedWorktrees(root: string, keep: readonly string[] = []): Promise<PruneRemoval[]> {
 	const jobsRoot = `${root}/.limen/jobs`;
 	const keepPaths = new Set<string>();
 	for (const path of keep) {
 		keepPaths.add(await resolved(path));
 	}
-	const { repositories, removed: abandoned } = await scanJobRecords(root, jobsRoot, keepPaths);
-	await keepLiveWorktrees(jobsRoot, keepPaths);
-	let removed = abandoned;
+	const owners: PruneOwners = new Map();
+	const { repositories, removals } = await scanJobRecords(root, jobsRoot, keepPaths, owners);
+	await keepLiveWorktrees(jobsRoot, keepPaths, owners);
 	for (const repository of repositories) {
-		removed += await pruneRepositoryWorktrees(repository, keepPaths);
+		removals.push(...(await pruneRepositoryWorktrees(repository, keepPaths, owners)));
 	}
-	return removed;
+	return removals;
 }
 type LandedBranch = { readonly repository: string; readonly branch: string };
 /**
@@ -192,9 +217,10 @@ async function scanJobRecords(
 	root: string,
 	jobsRoot: string,
 	keepPaths: Set<string>,
-): Promise<{ repositories: Set<string>; removed: number }> {
+	owners: PruneOwners,
+): Promise<{ repositories: Set<string>; removals: PruneRemoval[] }> {
 	const repositories = new Set<string>();
-	let removed = 0;
+	const removals: PruneRemoval[] = [];
 	for (const id of await jobIds(jobsRoot)) {
 		const jobDir = `${jobsRoot}/${id}`;
 		if (await retainedGroupJob(jobDir)) {
@@ -210,8 +236,12 @@ async function scanJobRecords(
 			if ((Number.isFinite(startedAt) && Date.now() - startedAt < STARTUP_GRACE_MS) || (await startingJob(jobDir))) {
 				continue;
 			}
+			const tree = await text(`${jobDir}/worktree`);
+			if (tree) {
+				owners.set(await resolved(tree), { jobDir, reason: "its record never got a state and was removed" });
+			}
 			await rm(jobDir, { recursive: true, force: true });
-			removed += 1;
+			removals.push({ path: jobDir, jobDir, reason: "record never got a state and its spawner is gone" });
 			continue;
 		}
 		const repo = (await text(`${jobDir}/repo`)) || undefined;
@@ -221,11 +251,11 @@ async function scanJobRecords(
 	if (repositories.size === 0) {
 		repositories.add(root);
 	}
-	return { repositories, removed };
+	return { repositories, removals };
 }
-/** Keeps the worktree of every live, starting or retained group job. */
-async function keepLiveWorktrees(jobsRoot: string, keepPaths: Set<string>): Promise<void> {
-	for (const id of await jobIds(jobsRoot)) {
+/** Keeps the worktree of every live, starting or retained group job; the latest other record says why it goes. */
+async function keepLiveWorktrees(jobsRoot: string, keepPaths: Set<string>, owners: PruneOwners): Promise<void> {
+	for (const id of (await jobIds(jobsRoot)).sort()) {
 		const jobDir = `${jobsRoot}/${id}`;
 		const recorded = await text(`${jobDir}/worktree`);
 		if (!recorded) {
@@ -235,14 +265,22 @@ async function keepLiveWorktrees(jobsRoot: string, keepPaths: Set<string>): Prom
 		const startedAt = Date.parse(await text(`${jobDir}/started-at`));
 		const starting =
 			(Number.isFinite(startedAt) && Date.now() - startedAt < STARTUP_GRACE_MS) || (await startingJob(jobDir));
+		const path = await resolved(recorded);
 		if ((await retainedGroupJob(jobDir)) || (state ? await liveJob(jobDir) : starting)) {
-			keepPaths.add(await resolved(recorded));
+			keepPaths.add(path);
+			continue;
 		}
+		const reason = state === "running" ? "job is running but its process is gone" : `job ${state || "has no state"}`;
+		owners.set(path, { jobDir, reason });
 	}
 }
-/** Removes Limen worktrees no kept job holds, then leftover directories; returns how many worktrees it removed. */
-async function pruneRepositoryWorktrees(repository: string, keepPaths: ReadonlySet<string>): Promise<number> {
-	let removed = 0;
+/** Removes Limen worktrees no kept job holds, then leftover directories; returns what it removed and why. */
+async function pruneRepositoryWorktrees(
+	repository: string,
+	keepPaths: ReadonlySet<string>,
+	owners: PruneOwners,
+): Promise<PruneRemoval[]> {
+	const removals: PruneRemoval[] = [];
 	const worktreeRoot = await resolved(`${dirname(repository)}/.${basename(repository)}-limen-worktrees`);
 	const primary = await resolved(repository);
 	for (const worktree of listWorktrees(repository)) {
@@ -256,7 +294,8 @@ async function pruneRepositoryWorktrees(repository: string, keepPaths: ReadonlyS
 		}
 		try {
 			removeWorktree(repository, path);
-			removed += 1;
+			const owner = owners.get(path);
+			removals.push({ path, jobDir: owner?.jobDir, reason: owner?.reason ?? "no job records this worktree" });
 		} catch {
 			// A locked checkout stays until the next prune.
 		}
@@ -273,8 +312,10 @@ async function pruneRepositoryWorktrees(repository: string, keepPaths: ReadonlyS
 			continue;
 		}
 		await rm(path, { recursive: true, force: true });
+		const owner = owners.get(path);
+		removals.push({ path, jobDir: owner?.jobDir, reason: "directory is not a registered Git worktree" });
 	}
-	return removed;
+	return removals;
 }
 
 async function jobIds(jobsRoot: string): Promise<string[]> {

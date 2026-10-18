@@ -1,6 +1,6 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureFinishAuthor, finishWebhookEnv } from "../integrations/finish-webhook.ts";
@@ -11,7 +11,7 @@ import { syncLifecycle } from "../job/group-events.ts";
 import { memberPacket, routeFlags } from "../job/group-packet.ts";
 import { hostedAgentName, makeJobId, parseDuration, SESSION_ID } from "../job/job.ts";
 import { publishJob } from "../job/publication.ts";
-import { appendLimenLog, atomicWrite, finalizeJob } from "../job/record.ts";
+import { atomicWrite, finalizeJob } from "../job/record.ts";
 import {
 	addBranchWorktree,
 	addDetachedWorktree,
@@ -47,7 +47,6 @@ import { normalizeWorkerExtensions } from "../runtime/worker-extensions.ts";
 import { launchHostedSupervisor, launchWrapper } from "../runtime/wrapper.ts";
 import { hunkBinary } from "./diff.ts";
 import { parseFlags } from "./flags.ts";
-import { pruneFinishedWorktrees } from "./prune.ts";
 
 type SpawnOptions = {
 	task: string;
@@ -156,6 +155,8 @@ type SpawnedJob = {
 	readonly preamble: string;
 	readonly role: string;
 	readonly memberDeadline: number | undefined;
+	/** What the wrapper or supervisor runs after its handshake: prune keeping the spawner's checkout, then --prepare. */
+	readonly setup: { readonly LIMEN_SETUP_KEEP: string; readonly LIMEN_SETUP_PREPARE: string };
 };
 async function spawnJob(args: readonly string[], cwd: string, group?: SpawnGroup): Promise<void> {
 	const parsed = parseSpawnArgs(args);
@@ -299,7 +300,7 @@ async function spawnTaskText(loaded: SpawnTask, repoFlag: string | undefined, pl
 	}
 	return task;
 }
-/** Plans the worktree, claims the member slot, writes the job record, creates the worktree, then starts the job. */
+/** Plans the worktree, claims the member slot, writes the job record and prints its ID, then creates the worktree and starts the job. */
 async function recordSpawnedJob(launch: SpawnLaunch): Promise<void> {
 	const { options, group, place, task } = launch;
 	const { root, repository, source } = place;
@@ -337,8 +338,20 @@ async function recordSpawnedJob(launch: SpawnLaunch): Promise<void> {
 	const base = pinnedBase ?? baseCommit;
 	const taskBody = await jobTaskBody(launch, candidate, member);
 	await publishSpawnedJob(launch, { jobDir, id, taskBody, branch, worktree: plan.path, base, role, member, candidate });
-	const worktree = await createJobWorktree(launch, jobDir, plan);
-	await launchSpawnedJob(launch, { jobDir, id, root, worktree, preamble, role, memberDeadline: member?.deadline });
+	// The ID prints once the record exists, so a caller killed during the rest still names its job.
+	console.log(id);
+	try {
+		const worktree = executeWorktree(place.repository, plan);
+		const setup = {
+			LIMEN_SETUP_KEEP: place.currentRoot,
+			LIMEN_SETUP_PREPARE: options.prepare ?? process.env.LIMEN_PREPARE?.trim() ?? "",
+		};
+		const memberDeadline = member?.deadline;
+		await launchSpawnedJob(launch, { jobDir, id, root, worktree, preamble, role, memberDeadline, setup });
+	} catch (error) {
+		await finalizeJob(jobDir, "failed", `${group ? "group launch" : "spawn"} failed: ${String(error)}`);
+		throw error;
+	}
 }
 function assertTicketsAtBase(repository: string, baseCommit: string, task: string): void {
 	for (const { path } of ticketPointers(task)) {
@@ -414,23 +427,6 @@ async function publishSpawnedJob(launch: SpawnLaunch, record: SpawnRecord): Prom
 		...(finishConfig ? { finishConfig } : {}),
 	});
 }
-/** Creates the worktree once the record is visible. On failure a group job is failed and any other record removed. */
-async function createJobWorktree(launch: SpawnLaunch, jobDir: string, plan: WorktreePlan): Promise<string> {
-	const { place } = launch;
-	try {
-		const worktree = executeWorktree(place.repository, plan);
-		await pruneFinishedWorktrees(place.root, [worktree, place.currentRoot]).catch(() => {});
-		await runPrepare(jobDir, worktree, launch.options.prepare ?? process.env.LIMEN_PREPARE?.trim());
-		return worktree;
-	} catch (error) {
-		if (launch.group) {
-			await finalizeJob(jobDir, "failed", `group launch failed: ${String(error)}`);
-		} else {
-			await rm(jobDir, { recursive: true, force: true });
-		}
-		throw error;
-	}
-}
 /** Marks the job running, then starts it in a Herdr pane or as a detached wrapper. */
 async function launchSpawnedJob(launch: SpawnLaunch, job: SpawnedJob): Promise<void> {
 	const versions = capturedVersions(launch.profile).then((text) =>
@@ -457,6 +453,7 @@ async function startHostedJob(launch: SpawnLaunch, job: SpawnedJob, versions: Pr
 		preamble: job.preamble,
 		taskFile: `${job.jobDir}/task.md`,
 		role: job.role,
+		setup: job.setup,
 		...(model ? { model } : {}),
 		...(options.provider ? { provider: options.provider } : {}),
 		...(options.thinking ? { thinking: options.thinking } : {}),
@@ -477,6 +474,7 @@ async function startDetachedJob(launch: SpawnLaunch, job: SpawnedJob, versions: 
 		LIMEN_JOB_ID: id,
 		LIMEN_LABEL: options.label,
 		LIMEN_CONTEXT_ROOT: root,
+		...job.setup,
 	};
 	if (group) {
 		environment.LIMEN_GROUP_ID = group.run.id;
@@ -526,6 +524,8 @@ export async function startHosted(input: {
 	readonly provider?: string;
 	readonly thinking?: string;
 	readonly continueFile?: string;
+	/** Spawn's setup for the supervisor to run after its handshake; a continue passes none. */
+	readonly setup?: { readonly LIMEN_SETUP_KEEP: string; readonly LIMEN_SETUP_PREPARE: string };
 }): Promise<void> {
 	const agentName = hostedAgentName(input.id);
 	const group = (await text(`${input.jobDir}/group`)) || "";
@@ -567,6 +567,8 @@ export async function startHosted(input: {
 			LIMEN_PROVIDER: input.provider ?? "",
 			LIMEN_THINKING: input.thinking ?? "",
 			LIMEN_CONTINUE_FILE: input.continueFile ?? "",
+			LIMEN_SETUP_KEEP: input.setup?.LIMEN_SETUP_KEEP ?? "",
+			LIMEN_SETUP_PREPARE: input.setup?.LIMEN_SETUP_PREPARE ?? "",
 		});
 		await waitForHandshake(input.jobDir, supervisorPid, "hosted supervisor");
 	} catch (error) {
@@ -747,22 +749,6 @@ async function readSpawnTask(
 		throw new Error("spawn requires task text");
 	}
 	return { text, bytes, raw: true };
-}
-async function runPrepare(jobDir: string, worktree: string, command: string | undefined): Promise<void> {
-	if (!command) {
-		return;
-	}
-	const result = spawnSync(command, {
-		cwd: worktree,
-		shell: true,
-		encoding: "utf8",
-		timeout: Number(process.env.LIMEN_PREPARE_MS) || 300_000,
-	});
-	const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trimEnd();
-	await appendLimenLog(jobDir, `prepare: ${command}${output ? `\n${output}` : ""}`);
-	if (result.error || result.status !== 0) {
-		await appendLimenLog(jobDir, `prepare failed: ${result.error?.message ?? `exit ${result.status}`}`);
-	}
 }
 function probeVersion(command: string): Promise<string> {
 	return new Promise((resolve) => {
