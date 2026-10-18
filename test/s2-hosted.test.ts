@@ -68,6 +68,7 @@ switch (noun + " " + verb) {
 		if (running) process.kill(running.pid, "SIGTERM");
 		ok({});
 	}
+	case "agent prompt": fail("agent_prompt_stalled"); // Sent, but the busy coordinator pane started no turn.
 	default: ok({});
 }
 `;
@@ -156,10 +157,9 @@ test("a hosted job gets one tab, its task as @task, and finishes done with its h
 	assert.equal(named("workspace", "create").length, 1);
 	assert.match(named("workspace", "create")[0]?.join(" ") ?? "", /--label repo workers/);
 	assert.equal(named("tab", "create").length, 1, "one tab for one hosted job");
-	assert.ok(!named("agent", "start")[0]?.includes("--mode"));
-	// The prompt receipt is written after Herdr answered; only then is the wake count final.
-	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").includes("turn observed"));
-	assert.equal(prompts(first), 1, "the coordinator pane gets one wake prompt");
+	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").startsWith("attempt 1:"));
+	assert.match(jobFile(p, first, "notify/herdr-prompt"), /^attempt 1: delivered to coord:p0, turn not seen [^\n]+$/);
+	assert.equal(prompts(first), 1, "a wake Herdr sent is never sent again");
 });
 
 let second = "";

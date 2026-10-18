@@ -30,7 +30,7 @@ The type of coordinator controls how the wake comes:
 | **Herdr, without a Pi session (OMP)** | The job records the coordinator pane as `origin-pane`. When the job ends, Limen runs `herdr agent prompt` on that pane. Then Limen waits until Herdr sees the pane at work. |
 | **Group lead** | A team coordinator's finish reaches the lead as a group event through `hook/group-peer.ts`. When that hook is not live for the lead session, Limen prompts the lead pane through Herdr instead, with the group status and the reload hint. Workers inside a team never wake the lead. |
 
-For a Herdr wake, `limen jobs <id>` shows the result as `herdr-wake`: `turn observed`, `submitted …; no turn observed`, or `failed …`.
+For a Herdr wake, `limen jobs <id>` shows the result as `herdr-wake`: `turn observed`, `delivered …, turn not seen` (Herdr sent the text; a busy pane may queue it), `may have reached …; not resent` (Herdr timed out after it may have sent the text), or `not sent …` (Herdr refused before it sent input). Limen sends the wake again only after `not sent`, and stops after two attempts; text that may have reached the pane is never sent twice.
 
 `limen continue` from a shell with no wake route (no Pi session and no Herdr pane), for example a remote executor, keeps the parent's route: the parent's coordinator gets the continuation's wake.
 

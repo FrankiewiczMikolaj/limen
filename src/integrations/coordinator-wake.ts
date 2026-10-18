@@ -8,14 +8,17 @@ import { herdrBinary } from "./herdr.ts";
 
 const PROMPT_MS = 15_000;
 const ATTEMPTS = 2;
+// Herdr refuses these before it sends any input; every other failure may follow a submission.
+const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found)\b/;
 
 /**
  * Start a turn on the Herdr pane that spawned this job. Only jobs whose coordinator had no Pi session record
  * `origin-pane`; Pi coordinators keep their in-process wake. A group member's finish travels as a group event instead,
  * except a team coordinator's finish while the lead's group hook is not running: then this wakes the lead pane.
- * Claimed once per job by `notify/herdr-prompt`, which keeps one line per attempt. Two unsuccessful attempts stop
- * automatic delivery; recovery is then deliberate. `notify/delivered/_herdr` is written only when Herdr observed the
- * pane working after submission.
+ * Claimed once per job by `notify/herdr-prompt`, which keeps one line per attempt. Only an attempt Herdr refused before
+ * it sent any input is tried again, at most twice; text that may have reached the pane is never sent again, so a
+ * coordinator hears its wake once. `notify/delivered/_herdr` is written only when Herdr observed the pane working after
+ * submission.
  */
 export async function promptCoordinator(jobDir: string, shutdownDeadline = Number.POSITIVE_INFINITY): Promise<void> {
 	const pane = await textFile(`${jobDir}/origin-pane`);
@@ -49,8 +52,10 @@ export async function promptCoordinator(jobDir: string, shutdownDeadline = Numbe
 		const result = outcome.ok
 			? `turn observed on ${pane}`
 			: /agent_prompt_stalled/.test(outcome.detail)
-				? `submitted to ${pane}; no turn observed`
-				: `failed on ${pane}: ${outcome.detail}`;
+				? `delivered to ${pane}, turn not seen`
+				: UNSENT.test(outcome.detail)
+					? `not sent to ${pane}: ${outcome.detail}`
+					: `may have reached ${pane}, turn not seen (${outcome.detail}); not resent`;
 		lines.push(`attempt ${attempt}: ${result} ${new Date().toISOString()}`);
 		await appendLimenLog(jobDir, `coordinator wake via Herdr: attempt ${attempt}: ${result}`);
 		if (outcome.ok) {
@@ -61,11 +66,14 @@ export async function promptCoordinator(jobDir: string, shutdownDeadline = Numbe
 			}).catch(() => {});
 			break;
 		}
+		if (!UNSENT.test(outcome.detail)) {
+			break;
+		}
 		if (attempt < ATTEMPTS) {
 			await atomicWrite(`${jobDir}/notify/herdr-prompt`, `attempting ${pane}\n${lines.join("\n")}\n`);
 		} else {
 			lines.push(
-				`automatic delivery stopped after ${ATTEMPTS} unsuccessful attempts; inspect the job and wake the coordinator deliberately`,
+				`automatic delivery stopped after ${ATTEMPTS} attempts Herdr did not send; inspect the job and wake the coordinator deliberately`,
 			);
 		}
 	}
