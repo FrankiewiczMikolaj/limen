@@ -105,9 +105,9 @@ test("prune keeps live, nested and half-published work, drops finished worktrees
 	// A finished record on the running job's branch and worktree, as a continuation's parent is, must not free them.
 	const twin = jobDir(p, "2000-01-01-twin-aaaaaaaa");
 	await mkdir(twin);
-	for (const [name, value] of [["state", "done"], ["branch", jobFile(p, live, "branch")], ["worktree", liveTree]]) {
-		await writeFile(join(twin, name), `${value}\n`);
-	}
+	await writeFile(join(twin, "state"), "done\n");
+	await writeFile(join(twin, "branch"), `${jobFile(p, live, "branch")}\n`);
+	await writeFile(join(twin, "worktree"), `${liveTree}\n`);
 	const landedBranch = jobFile(p, landed, "branch");
 	git(p.root, "merge", "-q", "--no-edit", landedBranch);
 	const retired = limen(p, ["prune", "--retire"]);
