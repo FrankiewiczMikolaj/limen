@@ -102,10 +102,10 @@ test("prune keeps live, nested and half-published work, drops finished worktrees
 	await release(nestedDir);
 	assert.equal(waitJob(p, nested, { cwd: liveTree }), "done");
 
-	git(p.root, "merge", "-q", "--no-edit", jobFile(p, landed, "branch"));
-	const retired = limen(p, ["prune", "--retire"]);
-	assert.equal(retired.status, 0, retired.stderr);
-	assert.ok(!existsSync(jobDir(p, landed)), "a landed job is retired");
+	const landedBranch = jobFile(p, landed, "branch");
+	git(p.root, "merge", "-q", "--no-edit", landedBranch);
+	assert.equal(limen(p, ["prune", "--retire"]).status, 0);
+	assert.deepEqual([existsSync(jobDir(p, landed)), git(p.root, "branch", "--list", landedBranch)], [false, ""]);
 	assert.ok(existsSync(jobDir(p, unmerged)), "an unmerged job stays");
 	assert.ok(existsSync(jobDir(p, live)), "a running job stays");
 	await release(jobDir(p, live));
