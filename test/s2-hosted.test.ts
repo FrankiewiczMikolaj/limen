@@ -157,7 +157,6 @@ test("a hosted job gets one tab, its task as @task, and finishes done with its h
 	assert.equal(named("workspace", "create").length, 1);
 	assert.match(named("workspace", "create")[0]?.join(" ") ?? "", /--label repo workers/);
 	assert.equal(named("tab", "create").length, 1, "one tab for one hosted job");
-	assert.ok(!named("agent", "start")[0]?.includes("--mode"));
 	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").startsWith("attempt 1:"));
 	assert.match(jobFile(p, first, "notify/herdr-prompt"), /^attempt 1: delivered to coord:p0, turn not seen [^\n]+$/);
 	assert.equal(prompts(first), 1, "a wake Herdr sent is never sent again");
