@@ -247,6 +247,8 @@ type JobEvidence = {
 	readonly cleanup: string;
 	readonly finishWebhook: string;
 	readonly herdrWake: string;
+	/** Detail only: who ran the spawn; older records have only `spawned-by`, a job id. */
+	readonly spawnedBy: string;
 	/** Detail only: the served model (and the requested one when they differ) and the session token totals. */
 	readonly model: string;
 	readonly tokens: string;
@@ -362,6 +364,10 @@ async function readJobEvidence(
 	const cleanup = detailed ? await text(`${jobDir}/cleanup`) : "";
 	const finishWebhook = detailed && fields.state !== "running" ? await inspectFinishWebhook(jobDir) : "";
 	const herdrWake = detailed ? await text(`${jobDir}/notify/herdr-prompt`) : "";
+	const [spawner, spawnerJob] = detailed
+		? await Promise.all([text(`${jobDir}/spawner`), text(`${jobDir}/spawned-by`)])
+		: ["", ""];
+	const spawnedBy = spawner || (spawnerJob ? `job ${spawnerJob}` : "");
 	const usage = detailed ? readSessionUsage(jobDir, Date.parse(fields.started) || 0) : undefined;
 	const model = detailed ? modelLine(await text(`${jobDir}/model`), usage) : "";
 	const tokens = usage ? tokenLine(usage) : "";
@@ -376,6 +382,7 @@ async function readJobEvidence(
 			cleanup,
 			finishWebhook,
 			herdrWake,
+			spawnedBy,
 			model,
 			tokens,
 		},
@@ -440,6 +447,9 @@ function jobBlocks(loaded: LoadedJob, facts: JobFacts): string[] {
 	if (fields.parent) {
 		blocks.push(`  parent ${displayed(fields.parent, detailed)}`);
 	}
+	if (evidence.spawnedBy) {
+		blocks.push(`  spawned-by ${evidence.spawnedBy}`);
+	}
 	if (fields.candidate) {
 		blocks.push(`  candidate ${displayed(fields.candidate, detailed)}`);
 	}
@@ -496,6 +506,7 @@ function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 		...(evidence.commitsStat ? { commitCount: evidence.commits.split("\n").filter((line) => line.trim()).length } : {}),
 		...(fields.repo ? { repo: fields.repo } : {}),
 		...(fields.parent ? { parent: fields.parent } : {}),
+		...(evidence.spawnedBy ? { spawnedBy: evidence.spawnedBy } : {}),
 		...(fields.candidate ? { candidate: fields.candidate } : {}),
 		...(fields.hosted ? { hosted: true } : {}),
 		...(agentStatus ? { agentStatus } : {}),
