@@ -202,17 +202,18 @@ export async function runInternalJob(): Promise<void> {
 	const enginePid = child.pid;
 	const stallWatch: ToolStallWatch = { tool: "", born: "", started: 0 };
 	let observing = false;
-	// The advisory file shows the current observation; the log gets a line only when the observation changes.
+	// The advisory file shows the current observation; the log gets each distinct observation once per run, since a
+	// flaky process query alternates its reasons every few seconds and coordinators tail this log.
 	let advised = "";
-	let logged = "";
+	const logged = new Set<string>();
 	const warnUncertain = async (detail: string) => {
 		const line = `tool stall observation uncertain: ${detail}`;
 		if (line !== advised) {
 			advised = line;
 			await atomicWrite(`${jobDir}/advisory`, `${line}\n`);
 		}
-		if (line !== logged) {
-			logged = line;
+		if (!logged.has(line)) {
+			logged.add(line);
 			await appendLimenLog(jobDir, line);
 		}
 	};
