@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { formatDrift, inheritFile, listDrift, packageRoot, readOptional } from "../src/project/inherit.ts";
 import {
 	planningSource,
@@ -15,7 +15,18 @@ const MAX_CONTEXT_LINES = 1000;
 const BOARD_ADVISORY_LINES = 120;
 const STYLE_FILE = ".agents/limen/styleguide.md";
 const VISION_FILE = "spec/vision.md";
-const MAX_REMINDER_HEADINGS = 8;
+const REGISTER_FILE = ".agents/limen/communication.md";
+const PACKAGED_REGISTER = "templates/communication.md";
+// A styleguide heading that names one of these words applies only to files with the listed extensions.
+const LANGUAGES: Readonly<Record<string, readonly string[]>> = {
+	rust: ["rs"],
+	typescript: ["ts", "tsx", "mts", "cts"],
+	javascript: ["js", "jsx", "mjs", "cjs"],
+	frontend: ["ts", "tsx", "js", "jsx", "css", "html", "svelte", "vue"],
+	css: ["css", "scss"],
+	swift: ["swift"],
+	python: ["py"],
+};
 const jevgrepSeen = new Map<string, boolean>();
 
 type Context = { readonly cwd: string };
@@ -27,17 +38,34 @@ type ToolEvent = {
 	readonly toolName?: string;
 	readonly input?: Record<string, unknown>;
 	readonly content?: readonly ToolContent[];
+	readonly isError?: boolean;
 };
 type ToolPatch = { readonly content: ToolContent[] };
 type PiApi = {
 	on(event: "before_agent_start", handler: (event: StartEvent, context: Context) => StartResult | undefined): void;
 	on(event: "message_end", handler: (event: unknown) => void): void;
+	on(event: "session_start" | "session_compact", handler: () => void): void;
 	on(event: "tool_result", handler: (event: ToolEvent, context: Context) => ToolPatch | undefined): void;
 };
 
 type ReminderKind = "specs" | "style" | "vision";
+type Section = { readonly title: string; readonly level: number; readonly start: number; readonly end: number };
+type LineRange = readonly [number, number];
+/** What the context holds: guidance lines the agent read, and sections a reminder already named. Compaction drops both. */
+type Recall = { readonly read: Map<ReminderKind, LineRange[]>; readonly named: Set<string> };
 
-/** Stable guidance rides the system prompt once per call. The per-turn note is a short cue; tool results recall the rule that applies. */
+const REMINDER_KINDS = ["style", "vision", "specs"] as const;
+// Each reminder asks for one project file; `pattern` also finds that file, or the packaged register, in a read.
+const GUIDANCE: Readonly<Record<ReminderKind, { readonly file: string; readonly pattern: RegExp }>> = {
+	style: { file: STYLE_FILE, pattern: /\.agents\/limen\/styleguide\.md\b/ },
+	vision: { file: VISION_FILE, pattern: /\bspec\/vision\.md\b/ },
+	specs: { file: REGISTER_FILE, pattern: /(?:\.agents\/limen|\btemplates)\/communication\.md\b/ },
+};
+
+/**
+ * Stable guidance rides the system prompt once per call. The per-turn note is a short cue. After an edit, a spawn or a
+ * merge, the tool result asks the agent to read the guidance lines that apply, once per context, until it has read them.
+ */
 export default function limenCommunication(pi: PiApi): void {
 	let lastTouch: string | undefined;
 	let lastFailure: string | undefined;
@@ -72,14 +100,25 @@ export default function limenCommunication(pi: PiApi): void {
 		}
 		lastFailure = assistantStopReason(message) || undefined;
 	});
+	const recall: Recall = { read: new Map(), named: new Set() };
+	const forget = () => {
+		recall.read.clear();
+		recall.named.clear();
+	};
+	pi.on("session_start", forget);
+	pi.on("session_compact", forget);
 	pi.on("tool_result", (event, context) => {
-		const kind = reminderKind(event);
+		if (event.isError) {
+			return;
+		}
+		noteRead(recall, event);
+		const kind = reminderKind(event, process.env.LIMEN_JOB === "1");
 		if (!kind) {
 			return;
 		}
 		lastTouch = touchLine(event, kind);
 		const root = process.env.LIMEN_CONTEXT_ROOT ?? context.cwd;
-		const reminder = kind === "specs" ? registerCue(root, "Specs") : projectReminder(root, kind);
+		const reminder = recallReminder(recall, kind, toolPath(event), root, context.cwd);
 		if (!reminder) {
 			return;
 		}
@@ -202,7 +241,7 @@ function privatePlanning(root: string, job: boolean): boolean {
 }
 
 function readRegister(cwd: string): string {
-	const inherited = inheritFile(cwd, ".agents/limen/communication.md", "templates/communication.md");
+	const inherited = inheritFile(cwd, REGISTER_FILE, PACKAGED_REGISTER);
 	if (!inherited) {
 		return "";
 	}
@@ -213,7 +252,7 @@ function readRegister(cwd: string): string {
 
 /** Cue sections belong to the selected register; absent sections have no package fallback. */
 function registerCue(cwd: string, heading: string): string {
-	const inherited = inheritFile(cwd, ".agents/limen/communication.md", "templates/communication.md");
+	const inherited = inheritFile(cwd, REGISTER_FILE, PACKAGED_REGISTER);
 	if (!inherited) {
 		return "";
 	}
@@ -308,7 +347,7 @@ function jobTicket(cwd: string): string {
 	return ticketPointers(task)[0]?.path ?? "";
 }
 
-function reminderKind(event: ToolEvent): ReminderKind | undefined {
+function reminderKind(event: ToolEvent, job: boolean): ReminderKind | undefined {
 	const name = event.toolName ?? "";
 	if (name === "write" || name === "edit") {
 		const path = toolPath(event);
@@ -320,7 +359,7 @@ function reminderKind(event: ToolEvent): ReminderKind | undefined {
 		}
 		return;
 	}
-	if ((name === "bash" || name === "powershell") && isVisionCommand(stringField(event.input, "command"))) {
+	if ((name === "bash" || name === "powershell") && isVisionCommand(stringField(event.input, "command"), job)) {
 		return "vision";
 	}
 }
@@ -355,51 +394,221 @@ function isSpecPath(path: string): boolean {
 }
 
 function isCodePath(path: string): boolean {
-	if (!path) {
+	if (!path || /^[a-z][\w+.-]*:\/\//i.test(path)) {
 		return false;
 	}
 	return !/\.md$/i.test(posixPath(path));
 }
 
-function projectReminder(cwd: string, kind: "style" | "vision"): string {
-	const relative = kind === "style" ? STYLE_FILE : VISION_FILE;
-	const label = kind === "style" ? "Styleguide" : "Vision";
-	const text = readOptional(join(cwd, relative));
-	if (text === undefined) {
-		return `[limen] ${label}: no project file at ${relative}.`;
-	}
-	const headings = markdownHeadings(text);
-	if (!headings.length) {
-		return `[limen] ${label} (${relative}): no headings; read the file.`;
-	}
-	const shown = headings.slice(0, MAX_REMINDER_HEADINGS);
-	const more = headings.length > MAX_REMINDER_HEADINGS ? "; read the file" : "";
-	return `[limen] ${label} (${relative}): ${shown.join("; ")}${more}.`;
-}
-
-function markdownHeadings(text: string): readonly string[] {
-	const headings: string[] = [];
-	for (const line of text.replaceAll("\r\n", "\n").split("\n")) {
-		const match = /^#{1,6}\s+(\S.*)$/.exec(line.trim());
-		if (!match) {
-			continue;
-		}
-		const title = (match[1] ?? "").replace(/\s+#+\s*$/, "").trim();
-		if (title) {
-			headings.push(title);
-		}
-	}
-	return headings;
-}
-
-function isVisionCommand(command: string): boolean {
+/** A worker merges main into its own branch to stay current; that starts no new work. */
+function isVisionCommand(command: string, job: boolean): boolean {
 	if (/\blimen\s+spawn\b/.test(command)) {
 		return true;
 	}
 	if (/\bgit\s+merge\b/.test(command)) {
-		return true;
+		return !job;
 	}
 	return /\b(?:mkdir|cp|mv|touch|install)\b/.test(command) && /spec\/features\/planned\//.test(command);
+}
+
+/** A read tool covers the lines it showed; a shell read covers the whole file. */
+function noteRead(recall: Recall, event: ToolEvent): void {
+	const name = event.toolName ?? "";
+	if (name === "read") {
+		const [, file = "", selector = ""] = /^(.*?\.md)(?::(.*))?$/i.exec(posixPath(toolPath(event))) ?? [];
+		const kind = REMINDER_KINDS.find((candidate) => GUIDANCE[candidate].pattern.test(file));
+		if (kind) {
+			recall.read.set(kind, [...(recall.read.get(kind) ?? []), ...readRanges(selector, event)]);
+		}
+		return;
+	}
+	const command = posixPath(stringField(event.input, "command"));
+	if (
+		(name !== "bash" && name !== "powershell") ||
+		!/\b(?:cat|sed|head|tail|less|bat|nl|Get-Content)\b/.test(command)
+	) {
+		return;
+	}
+	for (const kind of REMINDER_KINDS) {
+		if (GUIDANCE[kind].pattern.test(command)) {
+			recall.read.set(kind, [...(recall.read.get(kind) ?? []), [1, Number.POSITIVE_INFINITY]]);
+		}
+	}
+}
+
+/**
+ * A truncated read says `[Showing lines 1-300 of 429`. Otherwise Pi takes offset and limit, and OMP puts `:50-100`,
+ * `:50+20`, `:50` or `:5,9` after the path; a read without either shows the whole file.
+ */
+function readRanges(selector: string, event: ToolEvent): LineRange[] {
+	const text = (event.content ?? []).map((part) => part.text ?? "").join("\n");
+	const shown = /\[Showing lines (\d+)-(\d+) of \d+/.exec(text);
+	if (shown) {
+		return [[Number(shown[1]), Number(shown[2])]];
+	}
+	const offset = event.input?.offset;
+	const limit = event.input?.limit;
+	if (typeof offset === "number" || typeof limit === "number") {
+		const start = typeof offset === "number" ? Math.max(1, offset) : 1;
+		return [[start, typeof limit === "number" ? start + limit - 1 : Number.POSITIVE_INFINITY]];
+	}
+	const parts = selector.split(":").find((part) => /^[\d,+-]+$/.test(part));
+	if (!parts) {
+		return [[1, Number.POSITIVE_INFINITY]];
+	}
+	const list = parts.split(",");
+	return list.map((part) => lineRange(part, list.length > 1));
+}
+
+/** `:-60` counts back from the end of a file this hook does not measure, so it covers nothing. */
+function lineRange(part: string, list: boolean): LineRange {
+	const [, from = "", sign = "", to = ""] = /^(\d*)([-+]?)(\d*)$/.exec(part) ?? [];
+	const start = Number(from);
+	if (!start) {
+		return [0, 0];
+	}
+	if (sign === "+" && to) {
+		return [start, start + Number(to) - 1];
+	}
+	if (sign === "-" && to) {
+		return [start, Number(to)];
+	}
+	return [start, list && !sign ? start : Number.POSITIVE_INFINITY];
+}
+
+/** Names the guidance lines that apply and are still unread, once until compaction; quiet when nothing new applies. */
+function recallReminder(recall: Recall, kind: ReminderKind, path: string, root: string, cwd: string): string {
+	const inside = projectPath(cwd, path);
+	const guide = guidance(kind, root, cwd);
+	if (!guide || (kind === "style" && !inside)) {
+		return "";
+	}
+	const target = inside || path;
+	const read = recall.read.get(kind) ?? [];
+	const unread = applicableSections(kind, guide.sections, target).filter((section) => !isRead(section, read));
+	const keys = unread.map((section) => `${kind}:${section.start}:${section.title}`);
+	if (keys.every((key) => recall.named.has(key))) {
+		return "";
+	}
+	for (const key of keys) {
+		recall.named.add(key);
+	}
+	return reminderText(kind, guide.shown, unread, target);
+}
+
+/** The path from the project root, or "" for a file outside it. */
+function projectPath(cwd: string, path: string): string {
+	const file = posixPath(relative(cwd, resolve(cwd, path)));
+	return file.startsWith("../") || isAbsolute(file) ? "" : file;
+}
+
+/** The copy in the agent's worktree wins, shown by its short path; the register falls back to the package. */
+function guidance(
+	kind: ReminderKind,
+	root: string,
+	cwd: string,
+): { readonly shown: string; readonly sections: readonly Section[] } | undefined {
+	const paths = [join(cwd, GUIDANCE[kind].file), join(root, GUIDANCE[kind].file)];
+	if (kind === "specs") {
+		paths.push(join(packageRoot(), PACKAGED_REGISTER));
+	}
+	for (const path of paths) {
+		const text = readOptional(path);
+		if (text !== undefined) {
+			return { shown: projectPath(cwd, path) || path, sections: markdownSections(text) };
+		}
+	}
+}
+
+function applicableSections(kind: ReminderKind, sections: readonly Section[], file: string): readonly Section[] {
+	if (kind === "style") {
+		return styleSections(sections, file);
+	}
+	if (kind === "specs") {
+		const index = sections.findIndex((section) => section.level === 2 && section.title === "Specs");
+		const head = sections[index];
+		const next = sections.slice(index + 1).find((section) => section.level <= 2);
+		return head ? [{ ...head, end: next ? next.start - 1 : (sections.at(-1)?.end ?? head.end) }] : [];
+	}
+	return [{ title: "Vision", level: 1, start: 1, end: sections.at(-1)?.end ?? 1 }];
+}
+
+/** A heading that names a path or a language scopes its section and the sections below it; others apply to every file. */
+function styleSections(sections: readonly Section[], file: string): readonly Section[] {
+	const scopes: (boolean | undefined)[] = [];
+	return sections.filter((section) => {
+		scopes.length = section.level;
+		const applies = sectionScope(section.title, file) ?? scopes.findLast((scope) => scope !== undefined);
+		scopes[section.level] = applies;
+		return applies !== false;
+	});
+}
+
+/** `crates/alice` matches files below it, `convex/http.ts` itself, and Rust matches `.rs` files. */
+function sectionScope(title: string, file: string): boolean | undefined {
+	const paths = [...title.matchAll(/`([^`]+)`/g)].map((match) => match[1] ?? "").filter((token) => /[/.]/.test(token));
+	if (paths.length) {
+		return paths.some((path) => file === path.replace(/\/$/, "") || file.startsWith(path.replace(/\/?$/, "/")));
+	}
+	const extension = /\.([^./]+)$/.exec(file)?.[1]?.toLowerCase() ?? "";
+	const languages = (title.toLowerCase().match(/[a-z]+/g) ?? []).filter((word) => Object.hasOwn(LANGUAGES, word));
+	return languages.length ? languages.some((word) => LANGUAGES[word]?.includes(extension)) : undefined;
+}
+
+function isRead(section: Section, read: readonly LineRange[]): boolean {
+	for (let line = section.start; line <= section.end; line++) {
+		if (!read.some(([start, end]) => start <= line && line <= end)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function reminderText(kind: ReminderKind, shown: string, sections: readonly Section[], file: string): string {
+	const ask = `read ${shown} lines ${lineList(sections)} now`;
+	if (kind === "vision") {
+		return `[limen] Vision: ${ask}, before your next spawn, merge or planned ticket. Check this step against it.`;
+	}
+	if (kind === "specs") {
+		return `[limen] Specs: ${ask}, before your next edit under spec/. They hold the rules for ${file}. Check this edit against them.`;
+	}
+	const scoped = sections.filter((section) => sectionScope(section.title, file)).map((section) => section.title);
+	const named = scoped.length ? `, including the sections ${scoped.join(", ")}` : "";
+	return `[limen] Styleguide: ${ask}, before your next edit. They hold the rules for ${file}${named}. Check this edit against them.`;
+}
+
+/** `1-59, 85-125`: sections that touch share one range. */
+function lineList(sections: readonly Section[]): string {
+	const ranges: [number, number][] = [];
+	for (const { start, end } of sections) {
+		const last = ranges.at(-1);
+		if (last && last[1] + 1 >= start) {
+			last[1] = Math.max(last[1], end);
+		} else {
+			ranges.push([start, end]);
+		}
+	}
+	return ranges.map(([start, end]) => (start === end ? `${start}` : `${start}-${end}`)).join(", ");
+}
+
+/** Each heading starts a section that runs to the next heading; text above the first heading is a section too. */
+function markdownSections(text: string): readonly Section[] {
+	const lines = text.replaceAll("\r\n", "\n").trimEnd().split("\n");
+	const starts: Omit<Section, "end">[] = [];
+	let fenced = false;
+	for (const [index, line] of lines.entries()) {
+		if (/^\s*(?:```|~~~)/.test(line)) {
+			fenced = !fenced;
+		}
+		const match = fenced ? null : /^(#{1,6})\s+(\S.*?)(?:\s+#+)?\s*$/.exec(line);
+		if (match) {
+			starts.push({ title: match[2] ?? "", level: match[1]?.length ?? 1, start: index + 1 });
+		}
+	}
+	if (starts[0]?.start !== 1) {
+		starts.unshift({ title: "", level: 1, start: 1 });
+	}
+	return starts.map((section, index) => ({ ...section, end: (starts[index + 1]?.start ?? lines.length + 1) - 1 }));
 }
 
 function appendText(content: readonly ToolContent[] | undefined, text: string): ToolContent[] {
