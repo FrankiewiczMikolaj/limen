@@ -28,19 +28,9 @@ const PEER = fileURLToPath(new URL("../hook/group-peer.ts", import.meta.url));
 const FEATURE = dirname(TICKET);
 const LEAD = { PI_SESSION_ID: "s8-lead" };
 const ROUTE = ["--engine", "omp", "--provider", "fake", "--model", "fake-1", "--thinking", "high", "--detached"];
-const SETTINGS = [
-	"--teams",
-	"2",
-	"--workers-per-team",
-	"1",
-	"--timeout",
-	"30m",
-	"--worker-timeout",
-	"20m",
-	"--worker-thinking",
-	"high",
-	...ROUTE,
-];
+const TEAM = "omp:fake/fake-1:high";
+const SETTINGS = ["--team", TEAM, "--team", TEAM, "--workers", "1", "--timeout", "30m", "--detached"];
+const ROUNDS = join(dirname(FEATURE), "F002-rounds");
 let p: Plant;
 let lead: string;
 let session: ChildProcess;
@@ -53,6 +43,8 @@ before(async () => {
 		await mkdir(dirname(join(p.root, FEATURE, "group", `${name}.md`)), { recursive: true });
 		await writeFile(join(p.root, FEATURE, "group", `${name}.md`), `# ${name}\n`);
 	}
+	await mkdir(join(p.root, ROUNDS));
+	await writeFile(join(p.root, ROUNDS, "ticket.md"), "# F002 · rounds\n");
 	git(p.root, "add", "-A");
 	git(p.root, "commit", "-q", "-m", "group packet");
 	await writeFile(
@@ -238,8 +230,31 @@ test("each recipient reads a finding once, the lead hears it as a followUp, and 
 	assert.deepEqual([...new Set(delivered().map((entry) => entry.event))], ["followUp"]);
 });
 
+test("a second group runs two routes through draft, critique and final, and the lead hears its result once", async () => {
+	const teams = ["--team", TEAM, "--team", "omp:fake/fake-2:low", "--rounds", "draft,critique,final"];
+	const started = await run(["group", "start", ROUNDS, ...teams], LEAD);
+	assert.equal(started.status, 0, started.output);
+	const finished = `Group ${ROUNDS} (${started.id}) finished`;
+	await until(lead, () => delivered().some((entry) => entry.text?.includes(finished)));
+	const runFile = readFileSync(join(p.root, ".limen/groups", started.id, "run.json"), "utf8");
+	const jobs: Array<{ id: string; team: string; round: number; parent?: string }> = JSON.parse(runFile).members;
+	// Every team continues in its own session into the critique; the final round is the first team's alone.
+	assert.deepEqual(
+		jobs.map((job) => `${job.team} ${job.round} ${jobs.findIndex((other) => other.id === job.parent)}`),
+		["team-1 0 -1", "team-2 0 -1", "team-1 1 0", "team-2 1 1", "team-1 2 2"],
+	);
+	const argv: string[] = JSON.parse(jobFile(p, jobs[3]?.id ?? "", "fake-argv.json"));
+	assert.deepEqual([argv[argv.indexOf("--model") + 1], argv[argv.indexOf("--thinking") + 1]], ["fake-2", "low"]);
+	const finalTask = readFileSync(join(jobDir(p, jobs[4]?.id ?? ""), "task.md"), "utf8");
+	assert.match(finalTask, /rounds\/1-draft\/team-2\.md[\s\S]*rounds\/2-critique\/team-2\.md/);
+	assert.equal(delivered().filter((entry) => entry.text?.includes(finished)).length, 1);
+	// Five team jobs start and end here; the lead hears none of it.
+	assert.ok(!delivered().some((entry) => entry.text?.includes("| lifecycle |")));
+});
+
 test("close refuses a member with uncommitted work until it is clean; each lead step pings once", async () => {
-	assert.equal(limen(p, ["group", "stop", group], { env: LEAD }).status, 0);
+	const stopped = limen(p, ["group", "stop", group], { env: LEAD });
+	assert.equal(stopped.status, 0, stopped.stderr);
 	const dirty = join(jobFile(p, roster.coordinator2, "worktree"), "recovery.txt");
 	await writeFile(dirty, "keep me\n");
 	assert.equal(limen(p, ["group", "close", group], { env: LEAD }).status, 1);

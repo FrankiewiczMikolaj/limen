@@ -13,7 +13,7 @@ export type GroupEvent = {
 	at: number;
 	author: string;
 	team: string;
-	kind: "finding" | "lifecycle";
+	kind: "finding" | "lifecycle" | "result";
 	text: string;
 	target?: string;
 };
@@ -73,6 +73,23 @@ export async function groupEvents(run: GroupRun): Promise<GroupEvent[]> {
 		)
 	).sort((left, right) => left.at - right.at || left.id.localeCompare(right.id));
 }
+/** The group's one result, for the lead only. */
+export async function publishResult(run: GroupRun, text: string): Promise<void> {
+	await groupLock(groupPath(run), async () => {
+		const event: GroupEvent = {
+			id: `result-${run.id}`,
+			at: Date.now(),
+			author: "limen",
+			team: "limen",
+			kind: "result",
+			text,
+			target: "lead",
+		};
+		await mkdir(`${groupPath(run)}/events`, { recursive: true });
+		await saveJson(`${groupPath(run)}/events/${event.id}.json`, event);
+		await queueEvent(run, event);
+	});
+}
 export async function syncLifecycle(run: GroupRun, mode: "skip" | "wait" = "wait"): Promise<void> {
 	const current = await readRun(run.root, run.id);
 	if (!(await lifecycleChanges(current)).length) {
@@ -120,6 +137,7 @@ async function sweepLifecycle(run: GroupRun): Promise<void> {
 		if (previous.value === value) {
 			continue;
 		}
+		// A team hears its own jobs start and end; other teams and the lead hear only findings and the result.
 		const event: GroupEvent = {
 			id: `lifecycle-${member.id}-${field}-${randomUUID()}`,
 			at: Date.now(),
@@ -127,6 +145,7 @@ async function sweepLifecycle(run: GroupRun): Promise<void> {
 			team: member.team,
 			kind: "lifecycle",
 			text: `${member.role} ${member.id}: ${field} ${value || "cleared"}`,
+			target: member.team,
 		};
 		// Persist the occurrence before publishing so an interrupted sweep resumes the same event.
 		await saveJson(marker, { value, event });
@@ -153,9 +172,11 @@ async function receipt(run: GroupRun, recipient: string, event: string): Promise
 async function queueEvent(run: GroupRun, event: GroupEvent): Promise<void> {
 	const recipients = [{ id: `lead-${run.lead}`, team: "lead" }, ...run.members];
 	for (const recipient of recipients) {
+		const lead = recipient.team === "lead";
 		if (
 			recipient.id === event.author ||
-			(event.target && recipient.team !== "lead" && recipient.team !== event.target)
+			(event.target && !lead && recipient.team !== event.target) ||
+			(lead && event.kind === "lifecycle")
 		) {
 			continue;
 		}
@@ -182,7 +203,10 @@ async function eligibleEvents(identity: GroupIdentity, now: number) {
 	const ancestry = recipientAncestry(identity);
 	const eligible = [];
 	for (const event of await groupEvents(identity.run)) {
-		if (ancestry.has(event.author) || (event.target && identity.member && event.target !== identity.member.team)) {
+		const elsewhere = identity.member
+			? event.target && event.target !== identity.member.team
+			: event.kind === "lifecycle";
+		if (ancestry.has(event.author) || elsewhere) {
 			continue;
 		}
 		const recorded = await receipt(identity.run, identity.recipient, event.id);

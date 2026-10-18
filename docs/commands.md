@@ -114,17 +114,17 @@ limen picture tick --engine E --provider P --model M --thinking T [--dir D] [--b
 
 ### Team groups
 
-Start a team group, and show the status of, publish, wait for, stop, or close it.
+Start a group, and show the status of, publish, wait for, stop, or close it.
 
 ```text
-limen group start FEATURE --teams N --workers-per-team N --timeout D --worker-timeout D --engine E --provider P --model M --thinking T --worker-thinking T [--team-model team-N=provider/model] [--extension PATH ...] [--team-extension team-N=PATH ...] [--detached|--tab] [--new-run]
+limen group start FEATURE --team ENGINE:PROVIDER/MODEL:THINKING [--team …] [--rounds draft,critique,revise,final] [--workers N] [--timeout D] [--extension PATH ...] [--team-extension team-N=PATH ...] [--detached|--tab]
 limen group status [GROUP-ID] [--json]
 limen group publish [GROUP-ID] [--team team-N] "finding"
 limen group wait [GROUP-ID] [--timeout D]
 limen group stop|close [GROUP-ID]
 ```
 
-Members get their group from their recorded membership. The group lead gives the group ID. Repeat `--team-model` to give more than one team its own model. For Pi, repeat `--extension PATH` for common extensions and `--team-extension team-N=PATH` for team-only additions. Common paths precede team paths; the recorded effective lists are inherited by members, reviews and worker continuations. Engine/provider/model/reasoning flags still need explicit values. See [Groups](groups.md).
+Each `--team` is one agent on its own route, for example `--team omp:pi-claude/claude-opus-5-5:high`; the teams are `team-1`, `team-2`, and so on, in flag order. `--rounds` defaults to `draft`, `--workers` to 0 and `--timeout` to 90m. Members get their group from their recorded membership. The group lead gives the group ID. For Pi, repeat `--extension PATH` for common extensions and `--team-extension team-N=PATH` for team-only additions. Common paths precede team paths; the recorded effective lists are inherited by members, reviews and worker continuations. See [Groups](groups.md).
 
 ### GitHub comments
 

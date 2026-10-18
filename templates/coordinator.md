@@ -1,14 +1,10 @@
-# Managed team coordinator
+# Group team
 
-You pursue one feature with a distinct approach inside an explicitly activated group. Your canonical root, group, team, feature, settings and fixed worker launch allowance are recorded in the group cabinet and supplied in the task. The group participation contract in your task applies to you; this file adds only what a team coordinator does.
+You are one team of a group that the lead started. The group contract, your route, your worker allowance and your round are in your task; this file adds only how a team works.
 
-Peer updates never transfer jobs, expand scope, or authorize landing.
+Read the ticket, and the brief and approach note when your task names them. Do the work yourself unless your task gives you a worker allowance. With one, launch only your own workers with `limen spawn` and your route; every worker, continuation and review uses one slot, and there is no model fallback. When the allowance runs out or a route fails, finish with what you have and say so. Integrate only your team's branches into your worktree with ordinary Git.
 
-Read your ticket and shared brief. Launch only your own workers with `limen spawn`, passing the recorded engine, provider, model and worker reasoning explicitly. Every worker, continuation and separately authorized review consumes a launch slot. There is no coordinator continuation, recursive coordinator, automatic repair, additional wave, helper-agent launch, or model fallback. Ordinary built-in subagents are not the group path. If the allowance is exhausted or a route fails, preserve work and ask the lead.
-
-Keep your turn available while children are live. Respond to peer evidence with a check, not agreement by default.
-
-Inspect and, when useful, integrate only your team's committed branches into your assigned candidate worktree with ordinary Git. Do not approve another team. Commit your team evidence with your candidate. Summarize actual checks, candidate SHAs, peer findings used or rejected, and remaining uncertainty for the lead. Only the lead deliberately closes the group.
+Peer results never transfer jobs, widen the ticket, or authorize landing. Answer peer evidence with a check, not agreement by default. End each round with actual checks, commit SHAs, peer points used or rejected, and what is still uncertain.
 
 ## Ticket contract
 

@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { herdrAvailable } from "../integrations/herdr.ts";
-import type { GroupIdentity, GroupMember, GroupRun } from "../job/group-cabinet.ts";
+import type { GroupIdentity, GroupMember, GroupRun, TeamRoute } from "../job/group-cabinet.ts";
 import {
 	groupIdentity,
 	groupLock,
@@ -15,44 +15,39 @@ import {
 	readRun,
 	runs,
 	saveJson,
+	startGroupAdvance,
 	teamRoute,
 } from "../job/group-cabinet.ts";
 import { acceptBatch, acceptTransport, groupEvents, publishEvent, syncLifecycle } from "../job/group-events.ts";
+import { roundNames, routeFlags } from "../job/group-packet.ts";
 import { parseDuration, SESSION_ID } from "../job/job.ts";
-import { cleanWorktree, commitHasFile, headCommit, repoRoot } from "../project/git.ts";
+import { cleanWorktree, commitHasFile, headCommit, limenRoot, repoRoot } from "../project/git.ts";
 import { type PlanningSource, planningSource, privatePlanningFile } from "../project/planning.ts";
-import { type EngineProfile, preflightEngine, resolveSpawnEngine } from "../runtime/engine.ts";
+import { preflightEngine, resolveSpawnEngine } from "../runtime/engine.ts";
 import { normalizeWorkerExtensions } from "../runtime/worker-extensions.ts";
 import { parseFlags } from "./flags.ts";
-import { spawnCommand } from "./spawn.ts";
+import { advanceGroup, teamJobLabel } from "./group-rounds.ts";
+import { herdrWakePane, spawnCommand } from "./spawn.ts";
 import { stopCommand } from "./stop.ts";
 
 const WAIT_CAP_MS = 20_000;
 const WRAP_UP_RESERVE_MS = 60_000;
+const DEFAULT_TIMEOUT = "90m";
+const LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
 type GroupStartOptions = {
-	readonly flags: ReadonlyMap<string, string>;
-	readonly teamModels: Record<string, { provider: string; model: string }>;
+	readonly routes: readonly TeamRoute[];
+	readonly rounds: readonly string[];
+	readonly workers: string;
+	readonly timeout: string;
 	readonly extensions: readonly string[];
 	readonly teamSelections: Readonly<Record<string, readonly string[]>>;
-	readonly newRun: boolean;
 	readonly mode: GroupRun["mode"];
 };
-const VALUE_FLAGS = [
-	"teams",
-	"workers-per-team",
-	"timeout",
-	"worker-timeout",
-	"engine",
-	"provider",
-	"model",
-	"thinking",
-	"worker-thinking",
-] as const;
-const GROUP_SETTINGS = "run limen group start FEATURE with the settings in docs/groups.md";
-const INVALID_START = `invalid or repeated group start argument; ${GROUP_SETTINGS}`;
-const INVALID_TEAM_MODEL =
-	"invalid --team-model; run limen group start FEATURE --team-model team-N=provider/model with the other group settings";
+const GROUP_START =
+	"run limen group start FEATURE --team ENGINE:PROVIDER/MODEL:THINKING (once per team) [--rounds draft,critique,final] [--workers N] [--timeout 90m]";
+const INVALID_START = `invalid or repeated group start argument; ${GROUP_START}`;
+const INVALID_TEAM = `invalid --team; ${GROUP_START}, for example --team omp:openai-codex/gpt-6.1-sol:high`;
 const BOTH_MODES =
 	"choose either hosted tabs or detached jobs, not both; run limen group start FEATURE with one of --tab or --detached";
 
@@ -60,51 +55,30 @@ function parseGroupStartArgs(args: readonly string[]): GroupStartOptions {
 	const { values } = parseFlags(
 		args.slice(1),
 		{
-			teams: { type: "string" },
-			"workers-per-team": { type: "string" },
+			team: { type: "string", multiple: true },
+			rounds: { type: "string" },
+			workers: { type: "string" },
 			timeout: { type: "string" },
-			"worker-timeout": { type: "string" },
-			engine: { type: "string" },
-			provider: { type: "string" },
-			model: { type: "string" },
-			thinking: { type: "string" },
-			"worker-thinking": { type: "string" },
 			extension: { type: "string", multiple: true },
 			"team-extension": { type: "string", multiple: true },
-			"team-model": { type: "string", multiple: true },
-			"new-run": { type: "boolean" },
 			tab: { type: "boolean" },
 			detached: { type: "boolean" },
 		} as const,
 		{
 			// Every word after the feature is a flag; a known one with a bad value reads as invalid, not unknown.
 			unknown: (word, next) =>
-				word && next && !next.startsWith("--") ? `unknown group flag ${word}; ${GROUP_SETTINGS}` : INVALID_START,
+				word && next && !next.startsWith("--") ? `unknown group flag ${word}; ${GROUP_START}` : INVALID_START,
 			missing: (flag) => {
-				if (flag === "--team-model") {
-					return INVALID_TEAM_MODEL;
+				if (flag === "--team") {
+					return INVALID_TEAM;
 				}
 				return flag === "--extension" || flag === "--team-extension" ? `${flag} requires a value` : INVALID_START;
 			},
-			repeated: (flag) => {
-				if (flag === "--new-run") {
-					return undefined;
-				}
-				return flag === "--tab" || flag === "--detached" ? BOTH_MODES : INVALID_START;
-			},
+			repeated: (flag) => (flag === "--tab" || flag === "--detached" ? BOTH_MODES : INVALID_START),
 			positionals: false,
 			endOfFlags: false,
 		},
 	);
-	const flags = new Map<string, string>();
-	for (const name of VALUE_FLAGS) {
-		const value = values[name];
-		if (value) {
-			flags.set(`--${name}`, value);
-		}
-	}
-	const teamSelections = teamExtensionPaths(values["team-extension"] ?? []);
-	const teamModels = teamModelRoutes(values["team-model"] ?? []);
 	if (values.tab && values.detached) {
 		throw new Error(BOTH_MODES);
 	}
@@ -115,7 +89,23 @@ function parseGroupStartArgs(args: readonly string[]): GroupStartOptions {
 	if (values.detached) {
 		mode = "detached";
 	}
-	return { flags, teamModels, extensions: values.extension ?? [], teamSelections, newRun: !!values["new-run"], mode };
+	return {
+		routes: (values.team ?? []).map(teamRouteFlag),
+		rounds: (values.rounds ?? "draft").split(",").map((name) => name.trim()),
+		workers: values.workers ?? "0",
+		timeout: values.timeout ?? DEFAULT_TIMEOUT,
+		extensions: values.extension ?? [],
+		teamSelections: teamExtensionPaths(values["team-extension"] ?? []),
+		mode,
+	};
+}
+/** `--team ENGINE:PROVIDER/MODEL:THINKING`; the model may hold `/` and `:`, the reasoning level is last. */
+function teamRouteFlag(value: string): TeamRoute {
+	const route = /^([^:/\s]+):([^:/\s]+)\/(\S+):([a-z]+)$/.exec(value);
+	if (!route?.[1] || !route[2] || !route[3] || !route[4] || !LEVELS.includes(route[4])) {
+		throw new Error(`${INVALID_TEAM}; the reasoning level is one of ${LEVELS.join(", ")}`);
+	}
+	return { engine: resolveSpawnEngine(route[1]).id, provider: route[2], model: route[3], thinking: route[4] };
 }
 function teamExtensionPaths(values: readonly string[]): Record<string, string[]> {
 	const paths: Record<string, string[]> = {};
@@ -128,32 +118,12 @@ function teamExtensionPaths(values: readonly string[]): Record<string, string[]>
 	}
 	return paths;
 }
-function teamModelRoutes(values: readonly string[]): Record<string, { provider: string; model: string }> {
-	const routes: Record<string, { provider: string; model: string }> = {};
-	for (const value of values) {
-		const route = /^(team-[1-9]\d*)=([^/\s]+)\/(\S+)$/.exec(value);
-		if (!route?.[1] || !route[2] || !route[3]) {
-			throw new Error(INVALID_TEAM_MODEL);
-		}
-		if (routes[route[1]]) {
-			throw new Error(
-				`${route[1]} model supplied twice; run limen group start FEATURE with one --team-model for that team`,
-			);
-		}
-		routes[route[1]] = { provider: route[2], model: route[3] };
-	}
-	return routes;
-}
 type GroupSettings = {
 	readonly teams: string[];
+	readonly routes: Record<string, TeamRoute>;
+	readonly rounds: string[];
 	readonly workersPerTeam: number;
 	readonly timeout: number;
-	readonly workerTimeoutMs: number;
-	readonly profile: EngineProfile;
-	readonly provider: string;
-	readonly model: string;
-	readonly thinking: string;
-	readonly workerThinking: string;
 };
 type GroupActivation = {
 	readonly feature: string;
@@ -171,16 +141,16 @@ export async function startGroup(args: readonly string[], cwd: string): Promise<
 	const featureArgument = args[0];
 	if (!featureArgument || featureArgument.startsWith("--")) {
 		throw new Error(
-			"group start has no feature directory; run limen group start spec/features/active/FEATURE with the settings in docs/groups.md",
+			`group start has no feature directory; ${GROUP_START.replace("FEATURE", "spec/features/active/FEATURE")}`,
 		);
 	}
 	const options = parseGroupStartArgs(args);
 	// Deliberately ignore inherited LIMEN_CONTEXT_ROOT for new activation.
 	const root = repoRoot(cwd);
 	const feature = groupFeature(root, cwd, featureArgument);
-	const source = await groupPlanningSource(root, feature, featureArgument, options.newRun);
+	const source = await groupPlanningSource(root, feature, featureArgument);
 	const lead = await liveGroupLead(root);
-	const settings = groupSettings(options);
+	const settings = await groupSettings(options);
 	await checkGroupPacket(root, feature, settings.teams, source);
 	const activated = await activateGroup(root, cwd, { feature, source, lead, settings, options });
 	if (activated.created) {
@@ -197,15 +167,11 @@ function groupFeature(root: string, cwd: string, featureArgument: string): strin
 	}
 	return feature;
 }
-/** A repeated start resumes the prior run, so it keeps that run's planning source. */
-async function groupPlanningSource(
-	root: string,
-	feature: string,
-	featureArgument: string,
-	newRun: boolean,
-): Promise<PlanningSource> {
-	const priorRun = newRun ? undefined : (await runs(root)).filter((run) => run.feature === feature).at(-1);
-	const source = priorRun ? (priorRun.planningSource ?? "committed") : planningSource(root);
+/** A repeated start resumes the feature's open run, so it keeps that run's planning source. */
+async function groupPlanningSource(root: string, feature: string, featureArgument: string): Promise<PlanningSource> {
+	const latest = (await runs(root)).filter((run) => run.feature === feature).at(-1);
+	const open = latest && !latest.stopped && !latest.closed && !latest.finishedAt ? latest : undefined;
+	const source = open ? (open.planningSource ?? "committed") : planningSource(root);
 	if (source === "private" && featureArgument.split(/[\\/]/).includes("..")) {
 		throw new Error(
 			"private planning feature path must not contain '..'; run limen group start spec/features/active/FEATURE from the project root",
@@ -228,52 +194,28 @@ async function liveGroupLead(root: string): Promise<string> {
 	}
 	return lead;
 }
-function groupSetting(flags: ReadonlyMap<string, string>, key: string): string {
-	const value = flags.get(key);
-	if (!value) {
-		throw new Error(
-			`group start is missing ${key}; run limen group start FEATURE ${key} VALUE with the other group settings`,
-		);
+/** The roster, routes, rounds, allowance and deadline, checked before anything is written. */
+async function groupSettings({ routes, rounds, workers, timeout, mode }: GroupStartOptions): Promise<GroupSettings> {
+	if (!routes.length) {
+		throw new Error(`group start has no team; ${GROUP_START}`);
 	}
-	return value;
-}
-function groupCount(flags: ReadonlyMap<string, string>, key: string): number {
-	const value = groupSetting(flags, key);
-	if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
-		throw new Error(
-			`${key} must be a positive integer; run limen group start FEATURE ${key} N with the other group settings`,
-		);
-	}
-	return Number(value);
-}
-/** The roster, deadlines, engine route and reasoning levels, checked in the order a missing setting is reported. */
-function groupSettings({ flags, teamModels, mode }: GroupStartOptions): GroupSettings {
-	const teams = Array.from({ length: groupCount(flags, "--teams") }, (_, index) => `team-${index + 1}`);
-	for (const team of Object.keys(teamModels)) {
-		if (!teams.includes(team)) {
-			throw new Error(
-				`--team-model names ${team}, which is not in the roster; run limen group start FEATURE with a team from --teams`,
-			);
+	const teams = routes.map((_, index) => `team-${index + 1}`);
+	const known = await roundNames();
+	for (const [index, name] of rounds.entries()) {
+		if (!known.includes(name)) {
+			throw new Error(`unknown group round ${JSON.stringify(name)}; use rounds from ${known.join(", ")}`);
+		}
+		if (name === "final" && index !== rounds.length - 1) {
+			throw new Error("the final round writes the group's one result, so it must be the last round");
 		}
 	}
-	const workersPerTeam = groupCount(flags, "--workers-per-team");
-	const timeout = parseDuration(groupSetting(flags, "--timeout"));
-	const workerTimeoutMs = parseDuration(groupSetting(flags, "--worker-timeout"));
-	const profile = resolveSpawnEngine(groupSetting(flags, "--engine"));
-	const provider = groupSetting(flags, "--provider");
-	const model = groupSetting(flags, "--model");
-	const thinking = groupSetting(flags, "--thinking");
-	const workerThinking = groupSetting(flags, "--worker-thinking");
-	for (const level of [thinking, workerThinking]) {
-		if (!["off", "minimal", "low", "medium", "high", "xhigh"].includes(level)) {
-			throw new Error(
-				"unsupported group reasoning level; run limen group start FEATURE with --thinking and --worker-thinking set to off, minimal, low, medium, high, or xhigh",
-			);
-		}
+	if (!/^\d+$/.test(workers) || !Number.isSafeInteger(Number(workers))) {
+		throw new Error(`--workers must be a whole number of workers per team; ${GROUP_START}`);
 	}
-	if (timeout <= WRAP_UP_RESERVE_MS || workerTimeoutMs <= 0) {
+	const timeoutMs = parseDuration(timeout);
+	if (timeoutMs <= WRAP_UP_RESERVE_MS) {
 		throw new Error(
-			`group timeout must leave a ${WRAP_UP_RESERVE_MS / 1000}-second wrap-up reserve; run limen group start FEATURE with --timeout above 1m and a positive --worker-timeout`,
+			`group timeout must leave a ${WRAP_UP_RESERVE_MS / 1000}-second wrap-up reserve; run limen group start FEATURE with --timeout above 1m`,
 		);
 	}
 	if (mode === "tab" && !herdrAvailable()) {
@@ -281,38 +223,41 @@ function groupSettings({ flags, teamModels, mode }: GroupStartOptions): GroupSet
 			"hosted group requires Herdr; run limen group start FEATURE --detached with the other group settings, or return to Herdr",
 		);
 	}
-	return { teams, workersPerTeam, timeout, workerTimeoutMs, profile, provider, model, thinking, workerThinking };
+	return {
+		teams,
+		routes: Object.fromEntries(teams.map((team, index) => [team, routes[index] as TeamRoute])),
+		rounds: [...rounds],
+		workersPerTeam: Number(workers),
+		timeout: timeoutMs,
+	};
 }
-/** Check the packet before activation: readable inside the canonical root when private, committed at HEAD otherwise. */
+/** The ticket must exist; a brief and approach notes are optional. Committed at HEAD, or readable inside the root when private. */
 async function checkGroupPacket(
 	root: string,
 	feature: string,
 	teams: readonly string[],
 	source: PlanningSource,
 ): Promise<void> {
+	const ticket = `${feature}/ticket.md`;
+	if (!existsSync(`${root}/${ticket}`)) {
+		throw new Error(`group packet is missing ${ticket}; create it, then run limen group start ${feature}`);
+	}
 	for (const path of [
-		`${feature}/ticket.md`,
+		ticket,
 		`${feature}/group/brief.md`,
 		...teams.map((team) => `${feature}/group/teams/${team}.md`),
 	]) {
-		if (source === "private") {
-			await privatePlanningFile(root, path);
+		if (!existsSync(`${root}/${path}`)) {
 			continue;
 		}
-		await readFile(`${root}/${path}`, "utf8").catch((error: NodeJS.ErrnoException) => {
-			if (error.code === "ENOENT") {
-				throw new Error(
-					`group packet is missing ${path}; create it, then run limen group start ${feature} with the group settings`,
-				);
-			}
-			throw error;
-		});
-		if (!commitHasFile(root, headCommit(root), path)) {
+		if (source === "private") {
+			await privatePlanningFile(root, path);
+		} else if (!commitHasFile(root, headCommit(root), path)) {
 			throw new Error(`group packet ${path} is not committed; run git add ${path} and commit before starting`);
 		}
 	}
 }
-/** Under the cabinet lock: resume the feature's last run, or write a new run once every prior run has ended. */
+/** Under the cabinet lock: resume the feature's open run, or write a new run once every prior run has ended. */
 async function activateGroup(
 	root: string,
 	cwd: string,
@@ -321,8 +266,9 @@ async function activateGroup(
 	const { feature, options, settings } = activation;
 	return groupLock(`${root}/.limen/groups`, async () => {
 		const previous = (await runs(root)).filter((run) => run.feature === feature);
-		if (!options.newRun && previous.length) {
-			return { run: previous.at(-1) as GroupRun, created: false };
+		const latest = previous.at(-1);
+		if (latest && !latest.stopped && !latest.closed && !latest.finishedAt) {
+			return { run: latest, created: false };
 		}
 		await assertPriorRunsEnded(root, previous);
 		for (const team of Object.keys(options.teamSelections)) {
@@ -331,7 +277,9 @@ async function activateGroup(
 			}
 		}
 		const teamExtensions = await teamExtensionPathsByTeam(settings, options, cwd);
-		preflightEngine(settings.profile, settings.model, settings.provider);
+		for (const route of Object.values(settings.routes)) {
+			preflightEngine(resolveSpawnEngine(route.engine), route.model, route.provider);
+		}
 		const run = newGroupRun(root, activation, teamExtensions);
 		await mkdir(groupPath(run));
 		await saveJson(`${groupPath(run)}/run.json`, run);
@@ -340,11 +288,6 @@ async function activateGroup(
 }
 async function assertPriorRunsEnded(root: string, previous: readonly GroupRun[]): Promise<void> {
 	for (const prior of previous) {
-		if (!prior.stopped && !prior.closed) {
-			throw new Error(
-				`group ${prior.feature} (${prior.id}) is still open; run limen group stop ${prior.id} before starting a new run`,
-			);
-		}
 		for (const member of prior.members) {
 			if (await memberLive(root, member)) {
 				throw new Error(
@@ -364,7 +307,7 @@ async function teamExtensionPathsByTeam(
 		teamExtensions[team] = await normalizeWorkerExtensions(
 			[...options.extensions, ...(options.teamSelections[team] ?? [])],
 			cwd,
-			settings.profile.id,
+			resolveSpawnEngine(settings.routes[team]?.engine).id,
 		);
 	}
 	return teamExtensions;
@@ -374,51 +317,41 @@ function newGroupRun(
 	{ feature, source, lead, settings, options }: GroupActivation,
 	teamExtensions: Record<string, string[]>,
 ): GroupRun {
+	const leadPane = herdrWakePane(undefined);
 	return {
 		id: randomUUID(),
 		root,
 		feature,
 		planningSource: source,
 		lead,
+		...(leadPane ? { leadPane } : {}),
 		startedAt: Date.now(),
 		teams: settings.teams,
+		routes: settings.routes,
 		workersPerTeam: settings.workersPerTeam,
-		engine: settings.profile.id,
-		provider: settings.provider,
-		model: settings.model,
-		thinking: settings.thinking,
-		workerThinking: settings.workerThinking,
+		rounds: settings.rounds,
+		round: 0,
 		deadline: Date.now() + settings.timeout,
-		workerTimeoutMs: settings.workerTimeoutMs,
 		reserveMs: WRAP_UP_RESERVE_MS,
 		stopped: false,
 		closed: false,
 		mode: options.mode,
 		members: [],
-		teamModels: options.teamModels,
 		teamExtensions,
 	};
 }
-/** One coordinator job per team of a new run. A failed launch is recorded and ends the start. */
+/** Each team's first-round job. A failed launch is recorded and ends the start. */
 async function spawnTeamCoordinators(root: string, run: GroupRun): Promise<void> {
 	const ticket = run.planningSource === "private" ? `${root}/${run.feature}/ticket.md` : `${run.feature}/ticket.md`;
-	const featureName = run.feature.split("/").at(-1) ?? run.feature;
-	const featureLabel = /^F\d+/i.exec(featureName)?.[0]?.toUpperCase() ?? featureName;
 	for (const team of run.teams) {
+		const route = teamRoute(run, team);
 		try {
 			await spawnCommand(
 				[
-					`Pursue the feature with your team. Ticket: ${ticket}`,
+					`Work the ticket as ${team} of the group. Ticket: ${ticket}`,
 					"--label",
-					`${team} coordinator · ${featureLabel}`,
-					"--engine",
-					run.engine,
-					"--provider",
-					teamRoute(run, team).provider,
-					"--model",
-					teamRoute(run, team).model,
-					"--thinking",
-					run.thinking,
+					teamJobLabel(run, team, 0),
+					...routeFlags(route).split(" "),
 					...(run.mode === "auto" ? [] : [`--${run.mode}`]),
 				],
 				root,
@@ -476,13 +409,18 @@ export async function groupCommand(args: readonly string[], cwd: string): Promis
 }
 async function runGroupCommand(args: readonly string[], cwd: string): Promise<void> {
 	const [command, ...rest] = args;
-	if (!command || !["start", "status", "publish", "wait", "stop", "close"].includes(command)) {
+	if (!command || !["start", "status", "publish", "wait", "stop", "close", "advance"].includes(command)) {
 		throw new Error(
 			`${command ? `unknown group command ${JSON.stringify(command)}` : "no group command supplied"}; run limen group status GROUP-ID`,
 		);
 	}
 	if (command === "start") {
 		console.log((await startGroup(rest, cwd)).id);
+		return;
+	}
+	if (command === "advance") {
+		// Internal: a finished team job starts this; it moves the group only once its round has ended.
+		await advanceGroup(limenRoot(cwd), rest[0] ?? "");
 		return;
 	}
 	const explicit = process.env.LIMEN_GROUP_ID ? undefined : rest.shift();
@@ -556,13 +494,21 @@ async function printGroupStatus(identity: GroupIdentity, rest: readonly string[]
 		);
 		return;
 	}
+	const round = run.rounds[run.round] ?? "";
 	console.log(`Group ${run.feature} (${run.id})`);
 	console.log(
-		`Deadline: ${new Date(run.deadline).toLocaleString()} · ${Math.max(0, Math.ceil((run.deadline - Date.now()) / 60_000))} minutes left`,
+		run.finishedAt
+			? `Finished after round ${run.round + 1} of ${run.rounds.length} (${round}) · result: ${groupPath(run)}/result.md`
+			: `Round ${run.round + 1} of ${run.rounds.length}: ${round} · deadline ${new Date(run.deadline).toLocaleString()} · ${Math.max(0, Math.ceil((run.deadline - Date.now()) / 60_000))} minutes left`,
 	);
 	console.log(`Stopped: ${run.stopped ? "yes" : "no"} · Closed: ${run.closed ? "yes" : "no"}`);
 	for (const member of members) {
-		console.log(`${member.team} ${member.role} (${member.id}): ${member.state}`);
+		const place = member.role === "coordinator" ? `round ${(member.round ?? 0) + 1}` : "worker";
+		console.log(`${member.team} ${place} (${member.id}): ${member.state}`);
+	}
+	if (!run.finishedAt && !run.stopped) {
+		// A round whose last finish could not start the next one moves on here.
+		startGroupAdvance(run);
 	}
 }
 /** Blocks new launches, then stops every live member job. Throws with the members that could not be stopped. */

@@ -92,8 +92,9 @@ usage:
   limen init --drop-leftovers
   limen workspace init
   limen planning [committed|private]                # inspect or persist the project planning source; default committed
-  limen group start FEATURE --teams N --workers-per-team N --timeout D --worker-timeout D --engine E --provider P --model M --thinking T --worker-thinking T [--team-model team-N=provider/model] [--extension PATH ...] [--team-extension team-N=PATH ...; Pi only] [--detached|--tab] [--new-run]
-  limen group status [GROUP-ID] [--json]  # short roster by default; --json keeps the full record
+  limen group start FEATURE --team ENGINE:PROVIDER/MODEL:THINKING [--team …] [--rounds draft,critique,revise,final; default draft] [--workers N; default 0] [--timeout D; default 90m] [--extension PATH ...] [--team-extension team-N=PATH ...; Pi only] [--detached|--tab]
+                                  # one agent per --team on its own route; Limen runs the rounds and tells the lead the result once
+  limen group status [GROUP-ID] [--json]  # rounds and roster by default; --json keeps the full record
   limen group publish [GROUP-ID] [--team team-N] "finding"  # members inherit verified membership; lead supplies ID
   limen group wait [GROUP-ID] [--timeout D]
   limen group stop|close [GROUP-ID]
