@@ -49,8 +49,15 @@ export function provenLines(tickets: readonly TicketRecord[]): string[] {
 
 /** The board text with NOW and PROVEN rebuilt from the lanes; every other line stays as written. */
 export function renderBoard(text: string, tickets: readonly TicketRecord[]): string {
-	const now = replaceSection(text, "NOW", [GENERATED("active"), "", ...nowLines(tickets)], ["NEXT", "PROVEN"]);
-	return replaceSection(now, "PROVEN", [GENERATED("done"), "", ...provenLines(tickets)], []);
+	const now = nowLines(tickets);
+	const proven = provenLines(tickets);
+	const board = replaceSection(
+		text,
+		"NOW",
+		[GENERATED("active"), ...(now.length ? ["", ...now] : [])],
+		["NEXT", "PROVEN"],
+	);
+	return replaceSection(board, "PROVEN", [GENERATED("done"), ...(proven.length ? ["", ...proven] : [])], []);
 }
 
 /** Rewrites NOW and PROVEN in the project's board. A project without a board gets none. Returns whether it changed. */

@@ -165,3 +165,25 @@ test("a land that conflicts beside an uncommitted file aborts and leaves the che
 	assert.equal(await readFile(join(p.root, "README.md"), "utf8"), "main's readme\n");
 	assert.equal(await readFile(join(p.root, "draft.txt"), "utf8"), "another session drafts\n");
 });
+
+test("the board shows a failed job as failed, and a land moves the job's ticket from NOW to PROVEN in one commit", async () => {
+	const failed = spawnJob(p, "commit\nfail 3", ["--label", "demo · F001"]);
+	assert.equal(waitJob(p, failed), "failed");
+	assert.match(limen(p, ["board"]).stdout, /`F001-demo` \(🟠 ACTIVE\)[^\n]*\n {2}- last job failed: demo · F001/);
+	const board = join(p.root, "spec/build.md");
+	await writeFile(board, (await readFile(board, "utf8")).replace(/## TRACK\n[^#]*/, "## TRACK\n\n- Owner call.\n\n"));
+	git(p.root, "commit", "-q", "-am", "owner edits TRACK");
+	const id = spawnJob(p, "commit", ["--label", "demo · F001"]);
+	assert.equal(waitJob(p, id), "done");
+	const landed = limen(p, ["land", id, "--yes"]);
+	assert.equal(landed.status, 0, landed.stderr);
+	const close = git(p.root, "show", "--name-status", "--format=%s", "main");
+	assert.equal(close.split("\n")[0], `Close F001: landed by ${id}`);
+	const done =
+		/^R\d+\tspec\/features\/active\/F001-demo\/ticket\.md\t(spec\/features\/done\/\d{4}-\d\d\/F001-demo\/ticket\.md)$/m;
+	assert.match(git(p.root, "show", `main:${done.exec(close)?.[1]}`), /^landed: \d{4}-\d\d-\d\d$/m);
+	assert.match(close, /^M\tspec\/build\.md$/m);
+	const text = git(p.root, "show", "main:spec/build.md");
+	assert.match(text, /## TRACK\n\n- Owner call\.\n\n## NOW\n\n<!--[^\n]*-->\n\n## /);
+	assert.match(text, /- `F001-demo` \(🟢 PROVEN\): The demo plant has one ticket; landed \d{4}-\d\d-\d\d\n/);
+});

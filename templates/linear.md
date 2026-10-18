@@ -43,7 +43,7 @@ Three rituals pin the lifecycle so no step gets skipped. Each is the shop manual
 ### Activate (a feature leaves the backlog)
 
 1. Find `spec/features/planned/FNNN-<slug>/` and read its `ticket.md`. If the folder is missing or the ticket is not executable as written, stop and say what's wrong.
-2. Move the whole folder to `spec/features/active/` and update `spec/build.md` (🟠 ACTIVE, NOW/NEXT) in the same change. In committed mode, commit that change, because workers see only committed files.
+2. Move the whole folder to `spec/features/active/`. In committed mode, commit that change, because workers see only committed files.
 3. Print the spawn command ready to run: short coordinator instruction, `--label "what this changes · FNNN"` (the shop manual's label rule: feature number last), `Ticket:` pointing at the active folder. Do not spawn it unless asked in the same breath.
 4. Mirror, if on: in the configured team/project, set the issue titled `FNNN:` to the **started**-type state (create it from the ticket first if it doesn't exist yet).
 
@@ -56,7 +56,7 @@ Three rituals pin the lifecycle so no step gets skipped. Each is the shop manual
 
 ### Land (or drop)
 
-1. Write `outcome.md` in the active folder: what landed and the merge commit — or why the work was dropped.
-2. Move the whole folder to `spec/features/done/YYYY-MM/` (or `dropped/YYYY-MM/`), mark the board 🟢 PROVEN (or ⚪ DROPPED) and update TRACK / NOW / NEXT / PROVEN, all in one coherent commit — exactly the shop manual's step 7.
+1. Land with `limen land <id>`: it moves the folder to `spec/features/done/YYYY-MM/` and regenerates NOW and PROVEN in one commit; `limen ticket done FNNN` does the same for work that landed another way. To drop, move the folder to `dropped/YYYY-MM/` and mark it ⚪ DROPPED in one commit — exactly the shop manual's step 7.
+2. Write `outcome.md` in the moved folder: what landed and the merge commit — or why the work was dropped — and commit it.
 3. Sweep the shop floor: `limen close FNNN` for leftover tabs, `limen prune` for finished worktrees.
 4. Mirror, if on: close the `FNNN:` issue — the **completed**-type state with a comment naming the merge commit, or the **canceled**-type state with the drop reason.

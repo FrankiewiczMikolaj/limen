@@ -265,7 +265,7 @@ function boardAdvisory(cwd: string): string {
 	if (count <= BOARD_ADVISORY_LINES) {
 		return "";
 	}
-	return `spec/build.md is ${count} lines; fold older PROVEN entries into monthly highlights.`;
+	return `spec/build.md is ${count} lines; trim TRACK and NEXT, and close landed tickets (limen board lists them).`;
 }
 
 function boardDigest(cwd: string): string {

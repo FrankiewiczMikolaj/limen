@@ -13,7 +13,7 @@ import { landTicketCheck } from "./land.ts";
 const HELP = [
 	'limen ticket new "what becomes true" [--lane planned|active] [--touches id,id]',
 	"limen ticket check [BRANCH]  # the land gate for tickets BRANCH adds or changes against the plant branch; default: this checkout's branch",
-	"limen ticket done FNNN [FNNN ...]  # landed without limen land: move the active ticket to done/ with a landed date; NOW and PROVEN follow",
+	"limen ticket done FNNN [FNNN ...] [--on YYYY-MM-DD]  # landed without limen land: move the active ticket to done/ with its landed date (default today); NOW and PROVEN follow",
 ].join("\n");
 const PLACE_ID = ID_PATTERN;
 
@@ -147,12 +147,20 @@ export async function ticketCommand(args: readonly string[], cwd: string): Promi
 }
 
 /** The close `limen land` makes, for work that landed by a hand merge or needed no code. */
-async function ticketDone(codes: readonly string[], cwd: string): Promise<void> {
-	if (codes.length === 0 || !codes.every((code) => /^F\d+$/i.test(code))) {
+async function ticketDone(args: readonly string[], cwd: string): Promise<void> {
+	const help = () => HELP;
+	const { values, positionals: codes } = parseFlags(args, { on: { type: "string" } } as const, {
+		unknown: help,
+		missing: help,
+		repeated: help,
+		endOfFlags: false,
+	});
+	const on = values.on;
+	if (codes.length === 0 || !codes.every((code) => /^F\d+$/i.test(code)) || (on && !/^\d{4}-\d\d-\d\d$/.test(on))) {
 		throw new Error(HELP);
 	}
 	const root = limenRoot(cwd);
-	const closed = await closeTickets(root, codes, "landed");
+	const closed = await (on ? closeTickets(root, codes, `landed ${on}`, on) : closeTickets(root, codes, "landed"));
 	const missing = codes.filter((code) => !closed.moved.some((path) => path.includes(`/${code.toUpperCase()}-`)));
 	for (const path of closed.moved) {
 		console.log(`closed ${path}${closed.commit ? ` in ${closed.commit}` : ""}`);

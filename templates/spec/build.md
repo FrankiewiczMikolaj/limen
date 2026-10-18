@@ -1,8 +1,8 @@
 # Build
 
-> Coordinator-maintained narrative board. Reconcile it with the planned and active feature folders before selecting, starting, resuming, reviewing, merging, proving, or dropping work. Update it in the same coherent change that changes feature state. Drift is an advisory, never a runtime gate.
+> Coordinator-maintained narrative board. TRACK, NEXT, PARKED and DROPPED are coordinator prose: keep them true in the change that moves feature state. NOW and PROVEN are generated from the feature lanes by `limen land`, `limen ticket done` and `limen board --write`; edit the tickets, not those lines.
 
-TRACK at most three bullets. NOW one clause per feature plus one clause for the current slice, about forty words. NEXT one clause. PROVEN keeps the last ten landed features, then one line per older month: count landed, three highlights in product words, and the month's folder.
+TRACK at most three bullets. NEXT one clause per ticket. PROVEN names the last ten landed features, then one count line per month.
 
 Status marks are prose only: 🟠 ACTIVE · 🔴 PLANNED · 🟢 PROVEN · ⚪ DROPPED. Nothing in `limen` treats them as workflow state.
 
@@ -12,7 +12,7 @@ Status marks are prose only: 🟠 ACTIVE · 🔴 PLANNED · 🟢 PROVEN · ⚪ D
 
 ## NOW
 
-- `FNNN-slug` (ACTIVE): <!-- One clause of outcome plus one clause of the current slice; about forty words. -->
+<!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
 ## NEXT
 
@@ -20,5 +20,4 @@ Status marks are prose only: 🟠 ACTIVE · 🔴 PLANNED · 🟢 PROVEN · ⚪ D
 
 ## PROVEN
 
-- `FNNN-slug` (PROVEN): <!-- One of at most ten. Landed outcome plus commit and review reference. -->
-- <!-- 2026-08: 40 landed. Hosted jobs end themselves; wakes reach the owning session; reviews stop at the ceiling. spec/features/done/2026-08/ -->
+<!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->

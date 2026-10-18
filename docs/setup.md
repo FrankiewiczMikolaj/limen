@@ -176,7 +176,7 @@ The installed `limen` package supplies the default shop manual, role prompts, sp
 ```text
 .agents/limen/styleguide.md           project coding practice
 spec/vision.md                        durable product intent
-spec/build.md                         TRACK / NOW / NEXT / PROVEN
+spec/build.md                         TRACK / NOW / NEXT / PROVEN; NOW and PROVEN generated from the lanes
 spec/features/                        planned, active, done, and dropped work
 .pi/extensions/limen.ts               Pi stub: load hooks from the package
 .omp/extensions/limen.ts              OMP stub: load the same hooks

@@ -76,10 +76,10 @@ limen unwatch <id|suffix|label> | --all
 
 ### Land and clean up
 
-Merge a job, close the Herdr tabs of a feature, and remove finished worktrees or records.
+Merge a job and close its ticket, close the Herdr tabs of a feature, and remove finished worktrees or records.
 
 ```text
-limen land <id|suffix|label> [--onto BRANCH] [--yes]
+limen land <id|suffix|label> [--onto BRANCH] [--yes] [--keep-open]
 limen close <FNNN>
 limen prune [--retire [--dry-run]]
 ```
@@ -88,13 +88,19 @@ limen prune [--retire [--dry-run]]
 
 `land` asks for a confirm only when stdin is a terminal; `--yes` skips it there too. After the merge, `land` deletes the job's local `limen/*` branch and the finished worktree that holds it. It keeps the branch while another job on that branch, such as a continuation, is still running, and prints why.
 
-### Tickets
+After the merge, `land` also closes the active tickets the job works on: the tickets its label, ID or `Ticket:` pointers name, or, when they name none, the feature that starts its commit subjects (`F946: …`). Each folder moves to `spec/features/done/YYYY-MM/` with a `landed` date, NOW and PROVEN in `spec/build.md` are regenerated, and both go in one commit, `Close FNNN: landed by <id>`. `--keep-open` keeps the tickets active while more slices remain. When the board or a ticket folder has uncommitted edits, the tickets stay active and `land` says so.
 
-Show who first added a ticket.
+### Tickets and the board
+
+Show who first added a ticket, close a ticket whose work landed another way, and show the board.
 
 ```text
 limen ticket-author <ticket-path>
+limen ticket done FNNN [FNNN ...] [--on YYYY-MM-DD]
+limen board [--write]
 ```
+
+NOW and PROVEN in `spec/build.md` are generated from the feature lanes: NOW lists `active/`, PROVEN the last ten landed tickets and one count line per month folder. TRACK, NEXT, PARKED and DROPPED stay as the coordinator wrote them. `limen board` prints the board with each active ticket's running job, or its last job when none runs: failed, done but not landed, or landed. It lists running jobs that name no active ticket below NOW. `--write` rewrites NOW and PROVEN in the file.
 
 ### Map build and refresh
 

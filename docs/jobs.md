@@ -9,7 +9,7 @@ Use this guide to start, inspect, review, and recover coding jobs.
 ## How work runs
 
 1. Tell the coordinator the outcome that you want.
-2. The coordinator writes or moves the ticket. It keeps `spec/build.md` correct.
+2. The coordinator writes or moves the ticket. When the work lands, `limen land` moves the ticket to `done/` and regenerates NOW and PROVEN on `spec/build.md`.
 3. The coordinator commits the ticket, so that the worker can see it.
 4. The coordinator starts a job.
 5. Stay in that conversation. A wake comes when a job ends.
@@ -112,7 +112,7 @@ Use these steps in this order:
 
 ### Spec keeper
 
-`limen keeper <ticket> (--job <id> [--job <id> …] | --group <id>) [--candidate <branch>]` starts a short detached job (default timeout 20 minutes) that fixes the spec links of finished work: ticket front matter, the board line and map sources. `--group` adds every member job of that group. The coordinator starts it; no hook does.
+`limen keeper <ticket> (--job <id> [--job <id> …] | --group <id>) [--candidate <branch>]` starts a short detached job (default timeout 20 minutes) that fixes the spec links of finished work: ticket front matter, a planned or dropped board line, and map sources. `--group` adds every member job of that group. The coordinator starts it; no hook does.
 
 - It refuses while a listed job is still running, so it never races a worker. In a group, only the lead starts it.
 - It creates `limen/keeper-<fnnn>-<tip>` at the candidate tip: the single job's branch, or `--candidate` for several jobs on one integration branch. The keeper commits only there.
