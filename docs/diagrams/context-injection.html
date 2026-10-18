@@ -319,15 +319,15 @@ spec/build.md is &lt;n&gt; lines; fold older PROVEN entries into monthly highlig
 
 				<div class="card">
 					<h3><span class="n">3</span>Tool result reminders</h3>
-					<p class="when">After a matching write, edit or bash · every role · appended to the tool result, so it stays in history</p>
+					<p class="when">After a successful matching write, edit or bash · once per area until the agent reads the lines or the context compacts · appended to the tool result, so it stays in history</p>
 					<p class="if">Write or edit under spec/</p>
-					<pre class="q">[limen] Specs: a ticket is about 300 words: outcome, scope, out of scope, acceptance. No status line, no progress markers. …</pre>
-					<p class="if">Write or edit of a file that is not .md</p>
-					<pre class="q">[limen] Styleguide (.agents/limen/styleguide.md): Styleguide; Shape; Prefer; Checked by Biome; Avoid.</pre>
-					<p class="if">Bash with limen spawn, git merge, or a ticket into spec/features/planned/</p>
-					<pre class="q">[limen] Vision (spec/vision.md): Vision; Product principles; Current direction; Research, quality, and picture.</pre>
-					<p class="note">Headings only, at most 8. Group members also get peer progress here (hook/group-peer.ts).</p>
-					<p class="src">hook/communication.ts reminderKind, projectReminder</p>
+					<pre class="q">[limen] Specs: make your next tool call a read of templates/communication.md lines 19-43. They hold the rules for spec/features/planned/F010-x/ticket.md. Read them even if an earlier copy is in your context, then check this edit against them.</pre>
+					<p class="if">Write or edit of a file in the project that is not .md (every file of a multi-file edit)</p>
+					<pre class="q">[limen] Styleguide: make your next tool call a read of .agents/limen/styleguide.md lines 1-125, 173-207, 260-429. They hold the rules for crates/alice/src/work/store.rs, including the sections `crates/alice`, Rust. Read them even if an earlier copy is in your context, then check this edit against them.</pre>
+					<p class="if">Bash with limen spawn, a ticket into spec/features/planned/, or a coordinator's git merge</p>
+					<pre class="q">[limen] Vision: make your next tool call a read of spec/vision.md lines 1-33. Read it even if an earlier copy is in your context, then check this step against it.</pre>
+					<p class="note">A styleguide heading that names a path (`crates/alice`) or a language (Rust, Frontend) applies only to matching files; other sections apply to every file. Lines the agent read with the read tool or cat are not named again. Group members also get peer progress here (hook/group-peer.ts).</p>
+					<p class="src">hook/communication.ts guidanceAsks, recallReminder</p>
 				</div>
 
 				<div class="card none">
