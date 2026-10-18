@@ -49,6 +49,7 @@ type PiApi = {
 };
 
 type ReminderKind = "specs" | "style" | "vision";
+type Ask = { readonly kind: ReminderKind; readonly paths: readonly string[] };
 type Section = { readonly title: string; readonly level: number; readonly start: number; readonly end: number };
 type LineRange = readonly [number, number];
 /** What the context holds: guidance lines the agent read, and sections a reminder already named. Compaction drops both. */
@@ -112,17 +113,17 @@ export default function limenCommunication(pi: PiApi): void {
 			return;
 		}
 		noteRead(recall, event);
-		const kind = reminderKind(event, process.env.LIMEN_JOB === "1");
-		if (!kind) {
+		const asks = guidanceAsks(event, process.env.LIMEN_JOB === "1");
+		if (!asks.length) {
 			return;
 		}
-		lastTouch = touchLine(event, kind);
+		lastTouch = touchLine(event, asks);
 		const root = process.env.LIMEN_CONTEXT_ROOT ?? context.cwd;
-		const reminder = recallReminder(recall, kind, toolPath(event), root, context.cwd);
-		if (!reminder) {
+		const reminders = asks.map((ask) => recallReminder(recall, ask, root, context.cwd)).filter(Boolean);
+		if (!reminders.length) {
 			return;
 		}
-		return { content: appendText(event.content, reminder) };
+		return { content: appendText(event.content, reminders.join("\n\n")) };
 	});
 }
 
@@ -347,33 +348,32 @@ function jobTicket(cwd: string): string {
 	return ticketPointers(task)[0]?.path ?? "";
 }
 
-function reminderKind(event: ToolEvent, job: boolean): ReminderKind | undefined {
+/** OMP names the files of a multi-file edit in `paths`; Pi and a one-file OMP edit name the file in `path`. */
+function guidanceAsks(event: ToolEvent, job: boolean): readonly Ask[] {
 	const name = event.toolName ?? "";
 	if (name === "write" || name === "edit") {
-		const path = toolPath(event);
-		if (isSpecPath(path)) {
-			return "specs";
-		}
-		if (isCodePath(path)) {
-			return "style";
-		}
-		return;
+		const listed = event.input?.paths;
+		const paths = Array.isArray(listed)
+			? listed.filter((path): path is string => typeof path === "string")
+			: [toolPath(event)];
+		const asks: Ask[] = [
+			{ kind: "specs", paths: paths.filter(isSpecPath) },
+			{ kind: "style", paths: paths.filter((path) => !isSpecPath(path) && isCodePath(path)) },
+		];
+		return asks.filter((ask) => ask.paths.length);
 	}
 	if ((name === "bash" || name === "powershell") && isVisionCommand(stringField(event.input, "command"), job)) {
-		return "vision";
+		return [{ kind: "vision", paths: [] }];
 	}
+	return [];
 }
 
-function touchLine(event: ToolEvent, kind: ReminderKind): string {
-	if (kind === "specs") {
-		const verb = event.toolName === "edit" ? "edited" : "wrote";
-		return `Last turn ${verb} ${toolPath(event)}.`;
+function touchLine(event: ToolEvent, asks: readonly Ask[]): string {
+	const paths = asks.flatMap((ask) => ask.paths);
+	if (!paths.length) {
+		return "Last turn started or merged work.";
 	}
-	if (kind === "style") {
-		const verb = event.toolName === "edit" ? "edited" : "wrote";
-		return `Last turn ${verb} ${toolPath(event)}.`;
-	}
-	return "Last turn started or merged work.";
+	return `Last turn ${event.toolName === "edit" ? "edited" : "wrote"} ${paths.join(", ")}.`;
 }
 
 function toolPath(event: ToolEvent): string {
@@ -411,7 +411,7 @@ function isVisionCommand(command: string, job: boolean): boolean {
 	return /\b(?:mkdir|cp|mv|touch|install)\b/.test(command) && /spec\/features\/planned\//.test(command);
 }
 
-/** A read tool covers the lines it showed; a shell read covers the whole file. */
+/** A read tool covers the lines it showed; `cat` covers the whole file, while `head` or `sed` may show only a slice. */
 function noteRead(recall: Recall, event: ToolEvent): void {
 	const name = event.toolName ?? "";
 	if (name === "read") {
@@ -423,10 +423,7 @@ function noteRead(recall: Recall, event: ToolEvent): void {
 		return;
 	}
 	const command = posixPath(stringField(event.input, "command"));
-	if (
-		(name !== "bash" && name !== "powershell") ||
-		!/\b(?:cat|sed|head|tail|less|bat|nl|Get-Content)\b/.test(command)
-	) {
+	if ((name !== "bash" && name !== "powershell") || !/\b(?:cat|bat|Get-Content)\b/.test(command)) {
 		return;
 	}
 	for (const kind of REMINDER_KINDS) {
@@ -477,23 +474,23 @@ function lineRange(part: string, list: boolean): LineRange {
 }
 
 /** Names the guidance lines that apply and are still unread, once until compaction; quiet when nothing new applies. */
-function recallReminder(recall: Recall, kind: ReminderKind, path: string, root: string, cwd: string): string {
-	const inside = projectPath(cwd, path);
-	const guide = guidance(kind, root, cwd);
-	if (!guide || (kind === "style" && !inside)) {
+function recallReminder(recall: Recall, ask: Ask, root: string, cwd: string): string {
+	const guide = guidance(ask.kind, root, cwd);
+	const inside = ask.paths.map((path) => projectPath(cwd, path));
+	const files = ask.kind === "style" ? inside.filter(Boolean) : ask.paths.map((path, index) => inside[index] || path);
+	if (!guide || (ask.kind !== "vision" && !files.length)) {
 		return "";
 	}
-	const target = inside || path;
-	const read = recall.read.get(kind) ?? [];
-	const unread = applicableSections(kind, guide.sections, target).filter((section) => !isRead(section, read));
-	const keys = unread.map((section) => `${kind}:${section.start}:${section.title}`);
+	const read = recall.read.get(ask.kind) ?? [];
+	const unread = applicableSections(ask.kind, guide.sections, files).filter((section) => !isRead(section, read));
+	const keys = unread.map((section) => `${ask.kind}:${section.start}:${section.title}`);
 	if (keys.every((key) => recall.named.has(key))) {
 		return "";
 	}
 	for (const key of keys) {
 		recall.named.add(key);
 	}
-	return reminderText(kind, guide.shown, unread, target);
+	return reminderText(ask.kind, guide.shown, unread, files);
 }
 
 /** The path from the project root, or "" for a file outside it. */
@@ -520,9 +517,14 @@ function guidance(
 	}
 }
 
-function applicableSections(kind: ReminderKind, sections: readonly Section[], file: string): readonly Section[] {
+function applicableSections(
+	kind: ReminderKind,
+	sections: readonly Section[],
+	files: readonly string[],
+): readonly Section[] {
 	if (kind === "style") {
-		return styleSections(sections, file);
+		const each = files.map((file) => styleSections(sections, file));
+		return sections.filter((section) => each.some((applies) => applies.includes(section)));
 	}
 	if (kind === "specs") {
 		const index = sections.findIndex((section) => section.level === 2 && section.title === "Specs");
@@ -564,17 +566,23 @@ function isRead(section: Section, read: readonly LineRange[]): boolean {
 	return true;
 }
 
-function reminderText(kind: ReminderKind, shown: string, sections: readonly Section[], file: string): string {
-	const ask = `read ${shown} lines ${lineList(sections)} now`;
+function reminderText(
+	kind: ReminderKind,
+	shown: string,
+	sections: readonly Section[],
+	files: readonly string[],
+): string {
+	const ask = `make your next tool call a read of ${shown} lines ${lineList(sections)}`;
+	const again = "even if an earlier copy is in your context";
 	if (kind === "vision") {
-		return `[limen] Vision: ${ask}, before your next spawn, merge or planned ticket. Check this step against it.`;
+		return `[limen] Vision: ${ask}. Read it ${again}, then check this step against it.`;
 	}
-	if (kind === "specs") {
-		return `[limen] Specs: ${ask}, before your next edit under spec/. They hold the rules for ${file}. Check this edit against them.`;
-	}
-	const scoped = sections.filter((section) => sectionScope(section.title, file)).map((section) => section.title);
+	const scoped = sections
+		.filter((section) => files.some((file) => sectionScope(section.title, file)))
+		.map((section) => section.title);
 	const named = scoped.length ? `, including the sections ${scoped.join(", ")}` : "";
-	return `[limen] Styleguide: ${ask}, before your next edit. They hold the rules for ${file}${named}. Check this edit against them.`;
+	const label = kind === "specs" ? "Specs" : "Styleguide";
+	return `[limen] ${label}: ${ask}. They hold the rules for ${files.join(", ")}${named}. Read them ${again}, then check this edit against them.`;
 }
 
 /** `1-59, 85-125`: sections that touch share one range. */

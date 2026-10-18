@@ -1,6 +1,5 @@
-// U13: after an edit, a spawn or a merge, the tool result asks for the guidance lines that apply and are still unread:
-// path and language sections of the styleguide only for matching files, once per area until compaction, never after a
-// failed edit, and not again once the agent read those lines with OMP selectors or Pi offsets.
+// U13: an edit or a spawn asks once per area for the unread guidance lines that apply; a read of them (OMP selector or Pi
+// offset) silences it until compaction, and a failed edit or a worker's merge of main asks nothing.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,16 +7,16 @@ import { join } from "node:path";
 import test from "node:test";
 import limenCommunication from "../hook/communication.ts";
 
-const STYLE =
-	"# Styleguide\n\nKeep it small.\n\n## `crates/core`\n\nOne owner.\n\n## `web/`\n\nRunes.\n\n## Rust\n\nTyped errors.\n\n## Frontend\n\nNo fetch.\n";
-
-async function project(t: test.TestContext) {
+test("guidance reminders name the unread lines for the edited area, once until read or compaction", async (t) => {
 	const cwd = await mkdtemp(join(tmpdir(), "u13-"));
 	t.after(() => rm(cwd, { recursive: true, force: true }));
 	await mkdir(join(cwd, ".agents/limen"), { recursive: true });
+	await writeFile(
+		join(cwd, ".agents/limen/styleguide.md"),
+		"# S\n\n## `crates/core`\n\n1\n\n## `web/`\n\n2\n\n## Rust\n\n3\n",
+	);
 	await mkdir(join(cwd, "spec"));
-	await writeFile(join(cwd, ".agents/limen/styleguide.md"), STYLE);
-	await writeFile(join(cwd, "spec/vision.md"), "# Vision\n\n## Principles\n\nOne owner.\n");
+	await writeFile(join(cwd, "spec/vision.md"), "# Vision\n\nOne owner.\n");
 	process.env.LIMEN_JOB = "1";
 	delete process.env.LIMEN_CONTEXT_ROOT;
 	const handlers = new Map<string, unknown>();
@@ -26,32 +25,22 @@ async function project(t: test.TestContext) {
 		const handler = handlers.get(name);
 		return typeof handler === "function" ? handler(...args) : undefined;
 	};
-	const tool = (toolName: string, input: Record<string, unknown>, isError = false): string => {
-		const patch = call("tool_result", { toolName, input, isError, content: [{ type: "text", text: "ok" }] }, { cwd });
-		return patch?.content.at(-1)?.text?.split("\n\n").at(-1) ?? "";
-	};
-	return { tool, compact: () => call("session_compact") };
-}
-
-test("a code edit asks for the unread styleguide lines that apply, once per area", async (t) => {
-	const { tool, compact } = await project(t);
-	const rust = tool("edit", { path: "crates/core/src/a.rs" });
-	assert.match(rust, /read \.agents\/limen\/styleguide\.md lines 1-8, 13-16 now, before your next edit/);
-	assert.match(rust, /crates\/core\/src\/a\.rs, including the sections `crates\/core`, Rust\./);
-	assert.equal(tool("edit", { path: "crates/core/src/b.rs" }), "", "same area, already asked");
-	assert.match(tool("write", { path: "web/app.ts" }), /lines 1-4, 9-12, 17-19 now.*`web\/`, Frontend\./);
-	tool("read", { path: ".agents/limen/styleguide.md:1-12" });
-	tool("read", { path: ".agents/limen/styleguide.md", offset: 13, limit: 7 });
+	const tool = (toolName: string, input: object, isError = false): string =>
+		call("tool_result", { toolName, input, isError, content: [] }, { cwd })?.content.at(-1)?.text ?? "";
+	assert.match(
+		tool("edit", { path: "crates/core/a.rs" }),
+		/styleguide\.md lines 1-6, 11-13\. .*`crates\/core`, Rust\./,
+	);
+	assert.equal(tool("edit", { path: "crates/core/b.rs" }), "", "same area, already asked");
+	assert.match(tool("edit", { paths: ["web/x.ts", "README.md"] }), /lines 1-2, 7-10\. .* web\/x\.ts,/);
+	tool("read", { path: ".agents/limen/styleguide.md:1-10" });
+	tool("read", { path: ".agents/limen/styleguide.md", offset: 11, limit: 3 });
 	assert.equal(tool("edit", { path: "crates/io/c.rs" }), "", "every line that applies was read");
-	compact();
-	assert.equal(tool("edit", { path: "web/x.ts" }, true), "", "a failed edit asks nothing");
-	assert.match(tool("edit", { path: "web/x.ts" }), /lines 1-4, 9-12, 17-19 now/);
-});
-
-test("a spec edit asks once for the Specs section; a worker's merge of main asks nothing", async (t) => {
-	const { tool } = await project(t);
-	assert.match(tool("write", { path: "spec/features/planned/F1-x/ticket.md" }), /Specs: read \S+ lines \d+-\d+ now/);
-	assert.equal(tool("edit", { path: "spec/build.md" }), "");
-	assert.equal(tool("bash", { command: "git merge main" }), "");
-	assert.match(tool("bash", { command: "limen spawn --engine omp x" }), /Vision: read spec\/vision\.md lines 1-5 now/);
+	call("session_compact");
+	assert.equal(tool("edit", { path: "web/y.ts" }, true), "", "a failed edit asks nothing");
+	assert.match(tool("edit", { path: "web/y.ts" }), /lines 1-2, 7-10\./);
+	assert.match(tool("write", { path: "spec/features/planned/F1-x/ticket.md" }), /Specs: .* lines \d+-\d+\. They hold/);
+	assert.equal(tool("edit", { path: "spec/build.md" }), "", "the Specs lines were already named");
+	assert.equal(tool("bash", { command: "git merge main" }), "", "a worker merging main starts no work");
+	assert.match(tool("bash", { command: "limen spawn x" }), /Vision: .* spec\/vision\.md lines 1-3\./);
 });
