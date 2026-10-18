@@ -161,7 +161,7 @@ type SpawnedJob = {
 async function spawnJob(args: readonly string[], cwd: string, group?: SpawnGroup): Promise<void> {
 	const parsed = parseSpawnArgs(args);
 	await checkLaunchAuthority(parsed, group);
-	const hosted = chooseHostedLaunch(parsed);
+	const hosted = chooseHostedLaunch(parsed, group !== undefined);
 	const loaded = await readSpawnTask(parsed.task, parsed.taskFile, cwd);
 	const options = {
 		...parsed,
@@ -235,10 +235,10 @@ async function checkLaunchAuthority(parsed: SpawnOptions, group: SpawnGroup | un
 		}
 	}
 }
-/** True for a Herdr pane, false for a detached wrapper. */
-function chooseHostedLaunch(parsed: SpawnOptions): boolean {
+/** True for a Herdr pane, false for a detached wrapper. Only --tab hosts; a group without a mode flag keeps Herdr's pane. */
+function chooseHostedLaunch(parsed: SpawnOptions, grouped: boolean): boolean {
 	const herdr = herdrAvailable();
-	const hosted = parsed.detached ? false : parsed.tab || herdr;
+	const hosted = parsed.detached ? false : parsed.tab || (grouped && herdr);
 	if (parsed.tab && parsed.detached) {
 		throw new Error("--tab and --detached cannot be combined");
 	}
