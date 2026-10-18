@@ -91,7 +91,7 @@ limen land <id>
 
 ### Job IDs and labels
 
-- **Job ID:** The last line of `spawn` output is the durable job ID.
+- **Job ID:** The last line of `spawn` output is the durable job ID. Spawn also prints it as soon as the job record exists, so a spawn killed during setup still names its job.
 - **Labels:** A label names the change first and the feature number last. A repair label or a review label names its round.
 - **Hosted labels:** Ordinary text such as `Fix the lead-in paragraph · F900` is allowed. Lead ownership comes from the coordinator pane, not the label; `--role coordinator` and `--role lead` remain refused.
 - **Group labels:** Team jobs read `team-2 coordinator · F773`, so jobs on the same feature remain distinct.
@@ -123,11 +123,11 @@ Use these steps in this order:
 
 ### Finished jobs
 
-Finished jobs keep their files in `.limen/jobs/`, but not their worktrees. The next spawn removes finished worktrees. A resume with `--branch` keeps that worktree.
+Finished jobs keep their files in `.limen/jobs/`, but not their worktrees. The next job removes finished worktrees before its engine starts and logs one line per removal: path, job, reason. A resume with `--branch` keeps that worktree.
 
 | Command | Effect |
 |---|---|
-| `limen prune` | Removes finished worktrees, as the next spawn does. |
+| `limen prune` | Removes finished worktrees, as the next job does, and prints the path, job and reason of each removal. |
 | `limen prune --retire` | Deletes finished, failed, or stopped job records whose branch is landed (ancestor or cherry-pick) or deleted, and the landed local `limen/*` branches of those records. |
 | `limen prune --retire --dry-run` | Prints the IDs and removes nothing. |
 
