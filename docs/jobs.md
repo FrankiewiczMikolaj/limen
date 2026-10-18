@@ -123,7 +123,7 @@ Use these steps in this order:
 
 ### Finished jobs
 
-Finished jobs keep their files in `.limen/jobs/`, but not their worktrees. Each new job starts a prune of finished worktrees and logs one line per removal: path, job, reason. A resume with `--branch` keeps that worktree.
+Finished jobs keep their files in `.limen/jobs/`, but not their worktrees. The next job removes finished worktrees before its engine starts and logs one line per removal: path, job, reason. A resume with `--branch` keeps that worktree.
 
 | Command | Effect |
 |---|---|

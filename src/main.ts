@@ -24,7 +24,6 @@ import { waitCommand } from "./commands/wait.ts";
 import { unwatchCommand, watchCommand } from "./commands/watch.ts";
 import { webhookCommand } from "./commands/webhook.ts";
 import { resendNearbyPings } from "./integrations/webhook-queue.ts";
-import { runJobPrune } from "./runtime/job-setup.ts";
 import { runHostedSupervisor } from "./runtime/supervisor.ts";
 import { failInternalJob, runInternalJob } from "./runtime/wrapper.ts";
 
@@ -150,10 +149,6 @@ export async function main(args: readonly string[], cwd = process.cwd()): Promis
 		}
 		if (process.env.LIMEN_INTERNAL_HOSTED === "1") {
 			await runHostedSupervisor();
-			return;
-		}
-		if (process.env.LIMEN_INTERNAL_PRUNE === "1") {
-			await runJobPrune();
 			return;
 		}
 		const [name, ...rest] = args;
