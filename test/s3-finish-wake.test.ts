@@ -122,9 +122,8 @@ test("stop, timeout and the tool cap each end a job once and wake its session on
 	const states = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, waitJob(p, id)]));
 	assert.deepEqual(states, { stopped: "stopped", timeout: "failed", cap: "failed" });
 	assert.equal(jobFile(p, ids.timeout, "log").match(/steered: 1 min left before the timeout: /g)?.length, 1);
-	// Each ending has one finished-at stamp. Timeout and the tool cap race the engine's own exit and log one terminal line.
-	// A stop still logs two when the engine exits at once on TERM: stop.ts's 25 ms grace races the wrapper's finalize.
-	// The planned exclusive finalize (F928) fixes it; add ids.stopped to the line count when it lands.
+	// Each ending has one finished-at stamp. Timeout and the tool cap race the engine's exit and log one terminal line;
+	// a stop logs two (stop.ts's 25 ms grace races the finalize) until F928 lands: then count ids.stopped too.
 	for (const [name, id] of Object.entries(ids)) {
 		assert.ok(Number.isFinite(Date.parse(jobFile(p, id, "finished-at"))), `${name} has one stamp`);
 	}
