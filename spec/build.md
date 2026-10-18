@@ -48,10 +48,7 @@
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
 - `F776-trim-low-signal-tests` (🟠 ACTIVE): The test suite is smaller and still guards every real product seam
-- `F775-picture-merge-broad-digdown` (🟠 ACTIVE): Adam sees the broad architecture picture and can dig down to decide fast
 - `F774-picture-endgoal-layout` (🟠 ACTIVE): Adam can click the target picture dashboard as one polished end-goal HTML
-- `F773-styleguide-quality-scan` (🟠 ACTIVE): One ordered list of specs that brings Limen in line with its styleguide and vision
-- `F767-agent-setup-guide-review` (🟠 ACTIVE): A cold agent sets up a Limen seat correctly from the agent setup guide
 - `F766-remote-agent-setup-guide` (🟠 ACTIVE): An agent can set up a Limen seat, GitHub App, and integrations from one short document
 - `F765-picture-ui-style` (🟠 ACTIVE): The picture has one visual language that is minimal and appealing
 - `F764-picture-log-methods` (🟠 ACTIVE): Proven methods make picture logs clearer and stay simple
@@ -78,13 +75,13 @@
 - `F935-a-real-group-shows-as-one-tree-on-the-live-picture` (🟢 PROVEN): A real group shows as one tree on the live picture; landed 2026-10-09
 - `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
 - `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
+- `F775-picture-merge-broad-digdown` (🟢 PROVEN): Adam sees the broad architecture picture and can dig down to decide fast; landed 2026-10-05
+- `F773-styleguide-quality-scan` (🟢 PROVEN): One ordered list of specs that brings Limen in line with its styleguide and vision; landed 2026-10-05
 - `F772-seat-guide-from-live-cold-run` (🟢 PROVEN): The seat setup guide avoids every snag from the live limen-test cold run; landed 2026-10-05
 - `F771-omp-claude-bridge-follows-upstream` (🟢 PROVEN): OMP pi-claude jobs run on a bridge that follows the upstream pi-claude-bridge; landed 2026-10-05
 - `F770-omp-coordinator-counts-as-live` (🟢 PROVEN): A warm OMP coordinator counts as live for the GitHub doorbell; landed 2026-10-05
+- `F767-agent-setup-guide-review` (🟢 PROVEN): A cold agent sets up a Limen seat correctly from the agent setup guide; landed 2026-10-05
 - `F762-private-planning-reads-clearly` (🟢 PROVEN): The private planning code reads clearly and follows the Limen style; landed 2026-10-04
-- `F761-issue-body-rings-doorbell` (🟢 PROVEN): An issue body rings the GitHub doorbell like an issue comment; landed 2026-10-04
-- `F760-issue-comment-rings-doorbell` (🟢 PROVEN): An issue comment rings the GitHub doorbell like a pull request comment; landed 2026-10-04
-- `F758-lead-group-step-rings-finish` (🟢 PROVEN): A finished group step by the lead sends the finish webhook; landed 2026-10-04
-- 2026-10: 32 landed. spec/features/done/2026-10/
+- 2026-10: 35 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/

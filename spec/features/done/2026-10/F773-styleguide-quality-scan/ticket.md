@@ -2,6 +2,7 @@
 touches:
   - limen.plant
 opened: 2026-10-05
+landed: 2026-10-05
 ---
 
 # F773 · One ordered list of specs that brings Limen in line with its styleguide and vision
