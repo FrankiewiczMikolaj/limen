@@ -68,7 +68,7 @@ switch (noun + " " + verb) {
 		if (running) process.kill(running.pid, "SIGTERM");
 		ok({});
 	}
-	case "agent prompt": state.prompt ? fail(state.prompt) : ok({});
+	case "agent prompt": fail("agent_prompt_stalled"); // Sent, but the busy coordinator pane started no turn.
 	default: ok({});
 }
 `;
@@ -158,9 +158,9 @@ test("a hosted job gets one tab, its task as @task, and finishes done with its h
 	assert.match(named("workspace", "create")[0]?.join(" ") ?? "", /--label repo workers/);
 	assert.equal(named("tab", "create").length, 1, "one tab for one hosted job");
 	assert.ok(!named("agent", "start")[0]?.includes("--mode"));
-	// The prompt receipt is written after Herdr answered; only then is the wake count final.
-	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").includes("turn observed"));
-	assert.equal(prompts(first), 1, "the coordinator pane gets one wake prompt");
+	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").startsWith("attempt 1:"));
+	assert.match(jobFile(p, first, "notify/herdr-prompt"), /^attempt 1: delivered to coord:p0, turn not seen [^\n]+$/);
+	assert.equal(prompts(first), 1, "a wake Herdr sent is never sent again");
 });
 
 let second = "";
@@ -242,15 +242,4 @@ test("hosted Pi gets literal launch flags and the selected extension; stop recor
 	assert.equal(named("tab", "create").length, 3, "one tab per hosted job");
 	assert.equal(named("workspace", "create").length, 1, "one role space");
 	assert.equal(prompts(first), 1, "still one wake prompt for the first job");
-});
-
-test("a wake Herdr submitted without a seen turn is recorded as delivered and never sent twice", async () => {
-	await saveState({ ...state(), prompt: "agent_prompt_stalled" });
-	const id = spawnJob(p, "finish stalled handoff", ["--label", "F001 stalled wake"], { env });
-	assert.equal(waitJob(p, id, { env }), "done");
-	const receipt = () => jobFile(p, id, "notify/herdr-prompt");
-	await until(jobDir(p, id), () => receipt().startsWith("attempt 1:"));
-	assert.equal(prompts(id), 1, `a submitted wake is not resent: ${receipt()}`);
-	assert.match(receipt(), /^attempt 1: delivered to coord:p0, turn not seen/);
-	assert.ok(!existsSync(join(jobDir(p, id), "notify/delivered/_herdr")), "no turn was observed");
 });
