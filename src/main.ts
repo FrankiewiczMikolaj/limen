@@ -99,9 +99,9 @@ usage:
   limen group stop|close [GROUP-ID]
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "Implement FNNN: <outcome>. Start by writing <slice>. Ticket: spec/features/active/FNNN-slug/ticket.md" [--label L] [--branch B] [--role NAME] [--timeout 20m; default 90m] [--task-file F|-] [--prepare CMD] [--extension PATH ...; Pi only]
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "Short title" --task-file F|-  # the file is the task; the positional words become the label
-  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "…" [--label L]  # selected engine's flags; in Herdr: hosted, else detached
-  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --tab "…"  # force hosted (requires Herdr; no --timeout)
-  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --detached "…"  # force background worker + log-tail tab
+  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "…" [--label L]  # selected engine's flags; detached, also in Herdr (log-tail tab)
+  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --tab "…"  # hosted: a person types into the tab (requires Herdr; no --timeout)
+  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --detached "…"  # detached, as the default
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --repo R "Implement FNNN: <outcome>. Ticket: spec/features/active/FNNN-slug/ticket.md" [--label L]
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --review --detached --branch B --label L [--base SHA] [--head SHA] "Review the FNNN candidate against spec/features/active/FNNN-slug/ticket.md"
   limen continue <id|suffix|label> "follow-up instruction" [--review] [--label L] [--engine pi|omp] [--provider P] [--model X] [--thinking T] [--tab|--detached] [--extension PATH ...; replaces ordinary Pi list, group list stays fixed]

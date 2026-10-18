@@ -157,7 +157,7 @@ limen spawn --engine <engine> \
   --label "what this changes · FNNN" 'Implement FNNN: <outcome>. Ticket: spec/features/active/FNNN-slug/ticket.md'
 ```
 
-In Herdr, this job is hosted. Use `--detached` when someone asks for a background worker. In both modes, `--provider`, `--model`, and `--thinking` go to the selected engine as separate flag and value pairs. `limen continue` accepts the same flags.
+This job is detached, also in Herdr: a log-tail tab, a 90-minute timeout (change it with `--timeout`), a tool-call cap and process containment. Use `--tab` when a person will type into the worker. In both modes, `--provider`, `--model`, and `--thinking` go to the selected engine as separate flag and value pairs. `limen continue` accepts the same flags.
 
 ## Adjacent-repository workspaces
 
