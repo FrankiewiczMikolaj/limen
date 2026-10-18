@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, writeSync } from "node:fs";
-import { mkdir, utimes, writeFile } from "node:fs/promises";
+import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -53,23 +53,23 @@ const alive = (pid: number) =>
 const wakes = (dir: string, id: string) =>
 	engineEvents(dir).filter((entry) => entry.event !== "notify" && entry.text?.includes(id)).length;
 
-test("prune keeps live, nested and half-published work, drops finished worktrees and leftovers; retire drops only landed jobs", async () => {
-	// A job published but still in its prepare step: no state yet, held on a FIFO past its startup grace.
+test("spawn returns before --prepare; prune keeps live, nested and starting work, drops and explains the rest", async () => {
+	// Spawn returns while its job's --prepare still waits on a FIFO.
 	const gate = join(p.parent, "prepare-gate"),
 		prepared = join(p.parent, "prepared");
 	execFileSync("mkfifo", [gate]);
-	const half = start(["spawn", "--prepare", `pwd > ${prepared}; cat ${gate} > /dev/null`, "say half"]);
+	const half = spawnJob(p, "say half", ["--prepare", `pwd > ${prepared}; cat ${gate} > /dev/null`]);
 	await until(p.parent, () => existsSync(prepared) && readFileSync(prepared, "utf8").endsWith("\n"));
 	const halfTree = readFileSync(prepared, "utf8").trim();
-	const halfId = basename(halfTree);
-	assert.equal(jobFile(p, halfId, "state"), "");
-	await writeFile(join(jobDir(p, halfId), "started-at"), "2000-01-01T00:00:00.000Z\n");
-	// Each spawn below runs its own prune while the half-published job waits.
+	assert.equal(jobFile(p, half, "state"), "running");
+	// Each job below runs its own prune before its engine starts.
 	const landed = spawnJob(p, "commit");
 	const unmerged = spawnJob(p, "commit");
 	assert.equal(waitJob(p, landed), "done");
 	assert.equal(waitJob(p, unmerged), "done");
 	const live = spawnJob(p, "block");
+	await until(jobDir(p, live), () => jobFile(p, live, "log").includes("prune: removed"));
+	assert.match(jobFile(p, landed, "log"), new RegExp(`pruned .*/${landed} \\(job ${landed}\\): job done`));
 	const liveTree = jobFile(p, live, "worktree");
 	// Another checkout (the live job's worktree) runs its own job; its worktree nests inside this plant's worktree root.
 	assert.equal(limen(p, ["init"], { cwd: liveTree }).status, 0);
@@ -77,28 +77,32 @@ test("prune keeps live, nested and half-published work, drops finished worktrees
 	const nestedDir = join(liveTree, ".limen/jobs", nested);
 	const nestedTree = readFileSync(join(nestedDir, "worktree"), "utf8").trim();
 	assert.ok(nestedTree.startsWith(`${join(liveTree, "..")}/.${basename(liveTree)}-limen-worktrees/`), nestedTree);
-	// A start whose spawner died long ago: a record and a worktree, no state, no live `starting` process.
-	const stale = jobDir(p, "2000-01-01-stale-start-aaaaaaaa"),
-		staleTree = join(halfTree, "..", "2000-01-01-stale-start-aaaaaaaa");
-	await mkdir(stale);
-	await writeFile(join(stale, "started-at"), "2000-01-01T00:00:00.000Z\n");
-	await writeFile(join(stale, "worktree"), `${staleTree}\n`);
-	git(p.root, "worktree", "add", "-q", "--detach", staleTree, "HEAD");
+	await until(nestedDir, () => readFileSync(join(nestedDir, "log"), "utf8").includes("prune: removed"));
+	// Two records with a worktree and no state: one whose spawner is alive (this test), one whose spawner died long ago.
+	const [stale, starting] = ["2000-01-01-stale-start-aaaaaaaa", "2000-01-01-live-start-bbbbbbbb"];
+	for (const id of [stale, starting]) {
+		await mkdir(jobDir(p, id));
+		await writeFile(join(jobDir(p, id), "started-at"), "2000-01-01T00:00:00.000Z\n");
+		await writeFile(join(jobDir(p, id), "worktree"), `${join(halfTree, "..", id)}\n`);
+		git(p.root, "worktree", "add", "-q", "--detach", join(halfTree, "..", id), "HEAD");
+	}
+	await writeFile(join(jobDir(p, starting), "starting"), `${process.pid}\n`);
 
 	const pruned = limen(p, ["prune"]);
 	assert.equal(pruned.status, 0, pruned.stderr);
-	for (const dropped of [jobFile(p, landed, "worktree"), jobFile(p, unmerged, "worktree"), stale, staleTree]) {
-		assert.ok(!existsSync(dropped), `prune kept ${dropped}`);
+	assert.match(pruned.stdout, new RegExp(`pruned .*/${stale} \\(job ${stale}\\): its record never got a state`));
+	const dropped = [jobFile(p, landed, "worktree"), jobFile(p, unmerged, "worktree"), jobDir(p, stale)];
+	for (const path of [...dropped, join(halfTree, "..", stale)]) {
+		assert.ok(!existsSync(path), `prune kept ${path}`);
 	}
-	for (const kept of [liveTree, nestedTree, halfTree, jobDir(p, halfId), nestedDir]) {
+	for (const kept of [liveTree, nestedTree, halfTree, jobDir(p, half), nestedDir, join(halfTree, "..", starting)]) {
 		assert.ok(existsSync(kept), `prune removed ${kept}`);
 	}
 	assert.ok(git(p.root, "worktree", "list", "--porcelain").includes(`worktree ${nestedTree}\n`));
+	await rm(jobDir(p, starting), { recursive: true });
 
 	await writeFile(gate, "go\n");
-	const published = await half.done;
-	assert.equal(published.status, 0, published.output);
-	assert.equal(waitJob(p, halfId), "done");
+	assert.equal(waitJob(p, half), "done");
 	await release(nestedDir);
 	assert.equal(waitJob(p, nested, { cwd: liveTree }), "done");
 

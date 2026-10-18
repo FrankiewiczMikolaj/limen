@@ -38,6 +38,7 @@ import {
 	readHostedBinding,
 } from "./hosted-binding.ts";
 import { noteHostedUncertainty } from "./hosted-uncertainty.ts";
+import { setUpJob } from "./job-setup.ts";
 import { prepareRecoveredOwner } from "./recovery.ts";
 import { observeToolStall, type ToolStallWatch } from "./stalled-tool.ts";
 import { assistantStopReason, assistantText } from "./stream.ts";
@@ -135,6 +136,7 @@ async function hostedTarget(jobDir: string, recovering: boolean): Promise<string
 		return target || requiredEnvironment("LIMEN_HOSTED_TARGET");
 	}
 	try {
+		await setUpJob(jobDir, requiredEnvironment("LIMEN_WORKTREE"));
 		return await startHostedAgent(jobDir);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);

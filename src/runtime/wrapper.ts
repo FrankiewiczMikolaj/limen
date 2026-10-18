@@ -19,6 +19,7 @@ import {
 	signalProcessGroup,
 } from "./contain.ts";
 import { argvFor, engineBinary, jobProfile, prepareSkillConfig } from "./engine.ts";
+import { setUpJob } from "./job-setup.ts";
 import { observeToolStall, ownedToolDescendants, type ToolStallWatch, toolStallMs } from "./stalled-tool.ts";
 import { createStreamParser, type StreamEvent } from "./stream.ts";
 import { readWorkerExtensions } from "./worker-extensions.ts";
@@ -89,6 +90,15 @@ export async function runInternalJob(): Promise<void> {
 			shutdownDeadline ??= Date.now() + STOP_GRACE_MS - 500;
 		}
 	});
+	if (process.env.LIMEN_SETUP_KEEP) {
+		// Spawn waits for this handshake, not for setup, so it returns before prune and --prepare run.
+		await writeHandshake(jobDir);
+		await setUpJob(jobDir, worktree);
+		if (stopRequested || (await textFile(`${jobDir}/stop-requested`))) {
+			await finalizeJob(jobDir, "stopped", "stopped during setup", shutdownDeadline);
+			return;
+		}
+	}
 	let exhaustionTermination = Promise.resolve();
 	const exhaust = (reason: string, captured?: readonly JobProcess[]) => {
 		if (exhausted || stopRequested) {
@@ -144,7 +154,7 @@ export async function runInternalJob(): Promise<void> {
 		LIMEN_JOB_LABEL: label,
 	};
 	const privateEnvironment =
-		"LIMEN_INTERNAL_RUN LIMEN_JOB_DIR LIMEN_WORKTREE LIMEN_TASK_FILE LIMEN_PREAMBLE LIMEN_TIMEOUT_MS LIMEN_MODEL LIMEN_PROVIDER LIMEN_THINKING LIMEN_LABEL PI_SESSION_ID PI_SESSION_FILE PI_PROVIDER PI_MODEL PI_REASONING_LEVEL";
+		"LIMEN_INTERNAL_RUN LIMEN_JOB_DIR LIMEN_WORKTREE LIMEN_TASK_FILE LIMEN_PREAMBLE LIMEN_TIMEOUT_MS LIMEN_MODEL LIMEN_PROVIDER LIMEN_THINKING LIMEN_LABEL LIMEN_SETUP_KEEP LIMEN_SETUP_PREPARE PI_SESSION_ID PI_SESSION_FILE PI_PROVIDER PI_MODEL PI_REASONING_LEVEL";
 	for (const name of privateEnvironment.split(" ")) {
 		delete childEnvironment[name];
 	}
