@@ -1,27 +1,51 @@
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { pruneForJob } from "../commands/prune.ts";
 import { appendLimenLog } from "../job/record.ts";
 
 /**
- * The setup spawn hands to the job's owner after publication, so spawn returns before it: prune finished worktrees,
- * then run `--prepare` in the worktree. `LIMEN_SETUP_KEEP` names the spawner's checkout and marks a start that owes
- * setup; a continue or a recovery does not set it. Each step logs its result and time; neither failure ends the job.
+ * The setup spawn hands to the job's owner after publication, so spawn returns before it: start a prune of finished
+ * worktrees, then run `--prepare` in the worktree. `LIMEN_SETUP_KEEP` names the spawner's checkout and marks a start
+ * that owes setup; a continue or a recovery does not set it. Each step logs its result and time; neither failure ends
+ * the job.
  */
 export async function setUpJob(jobDir: string, worktree: string): Promise<void> {
 	const keep = process.env.LIMEN_SETUP_KEEP;
-	const root = process.env.LIMEN_CONTEXT_ROOT;
-	if (!(keep && root)) {
+	if (!keep) {
 		return;
 	}
-	const pruneStart = Date.now();
-	await pruneForJob(jobDir, root, [worktree, keep]).then(
-		(removed) => appendLimenLog(jobDir, `prune: removed ${removed} in ${seconds(pruneStart)}`),
-		(error: unknown) => appendLimenLog(jobDir, `prune failed after ${seconds(pruneStart)}: ${String(error)}`),
+	// Prune is housekeeping in its own process group: it does not hold the engine start, and a stop does not cut it.
+	const prune = spawn(process.execPath, [fileURLToPath(new URL("../../bin/limen", import.meta.url))], {
+		detached: true,
+		stdio: "ignore",
+		env: {
+			...process.env,
+			LIMEN_INTERNAL_RUN: "",
+			LIMEN_INTERNAL_HOSTED: "",
+			LIMEN_INTERNAL_PRUNE: "1",
+			LIMEN_JOB_DIR: jobDir,
+			LIMEN_PRUNE_KEEP: `${worktree}\n${keep}`,
+		},
+	});
+	prune.once(
+		"error",
+		(error) => void appendLimenLog(jobDir, `prune failed to start: ${error.message}`).catch(() => {}),
 	);
+	prune.unref();
 	const command = process.env.LIMEN_SETUP_PREPARE?.trim();
 	if (command) {
 		await runPrepare(jobDir, worktree, command);
 	}
+}
+/** The detached prune a new job starts: it logs each removal and then one summary line with its time. */
+export async function runJobPrune(): Promise<void> {
+	const jobDir = process.env.LIMEN_JOB_DIR ?? "";
+	const root = process.env.LIMEN_CONTEXT_ROOT ?? "";
+	const start = Date.now();
+	await pruneForJob(jobDir, root, (process.env.LIMEN_PRUNE_KEEP ?? "").split("\n")).then(
+		(removed) => appendLimenLog(jobDir, `prune: removed ${removed} in ${seconds(start)}`),
+		(error: unknown) => appendLimenLog(jobDir, `prune failed after ${seconds(start)}: ${String(error)}`),
+	);
 }
 async function runPrepare(jobDir: string, worktree: string, command: string): Promise<void> {
 	const timeoutMs = Number(process.env.LIMEN_PREPARE_MS) || 300_000;
