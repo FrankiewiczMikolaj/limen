@@ -5,6 +5,7 @@ touches:
   - limen.commands
   - limen.sessions.wake
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F783 · Agents write linked tickets, and a spec keeper checks the links before a land

@@ -2,6 +2,7 @@
 touches:
   - limen.plant
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F925 · Adam has a decision on how to reset Limen's tests to the few seams that matter

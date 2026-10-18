@@ -37,17 +37,8 @@
 - `F932-live-picture-activity` (🟠 ACTIVE): The picture shows what each running job is doing now
 - `F931-optchat-prompt-cache-compare` (🟠 ACTIVE): The OptChat explainer shows what the prompt cache reads and what is paid in full, for a typical thread and for OptChat
 - `F930-optchat-vs-typical-context` (🟠 ACTIVE): The OptChat explainer shows plainly how OptChat differs from typical context management
-- `F929-biome-enforces-readable-code-and-the-styleguide-says-the-same` (🟠 ACTIVE): Biome enforces readable code and the styleguide says the same
-- `F927-test-reset-build` (🟠 ACTIVE): Limen's tests are rebuilt from scratch and held under a 3,500-line cap
-- `F926-fleet-leads-start-reviews-wait-and-land-without-workarounds` (🟠 ACTIVE): fleet leads start reviews, wait and land without workarounds
-- `F925-test-reset-decision` (🟠 ACTIVE): Adam has a decision on how to reset Limen's tests to the few seams that matter
-- `F783-spec-structure-and-keeper` (🟠 ACTIVE): Agents write linked tickets, and a spec keeper checks the links before a land
-- `F782-explainer-pages` (🟠 ACTIVE): Adam can read how specs are laid out and how agents run, on two plain pages
-- `F781-plant-webhook-events` (🟠 ACTIVE): The shepherd gets one webhook for every job and coordinator event that needs it
-- `F780-live-picture-viewer` (🟠 ACTIVE): Adam reads the live picture and its decisions from one built page
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
-- `F776-trim-low-signal-tests` (🟠 ACTIVE): The test suite is smaller and still guards every real product seam
 - `F774-picture-endgoal-layout` (🟠 ACTIVE): Adam can click the target picture dashboard as one polished end-goal HTML
 - `F766-remote-agent-setup-guide` (🟠 ACTIVE): An agent can set up a Limen seat, GitHub App, and integrations from one short document
 - `F765-picture-ui-style` (🟠 ACTIVE): The picture has one visual language that is minimal and appealing
@@ -75,13 +66,13 @@
 - `F935-a-real-group-shows-as-one-tree-on-the-live-picture` (🟢 PROVEN): A real group shows as one tree on the live picture; landed 2026-10-09
 - `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
 - `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
-- `F775-picture-merge-broad-digdown` (🟢 PROVEN): Adam sees the broad architecture picture and can dig down to decide fast; landed 2026-10-05
-- `F773-styleguide-quality-scan` (🟢 PROVEN): One ordered list of specs that brings Limen in line with its styleguide and vision; landed 2026-10-05
-- `F772-seat-guide-from-live-cold-run` (🟢 PROVEN): The seat setup guide avoids every snag from the live limen-test cold run; landed 2026-10-05
-- `F771-omp-claude-bridge-follows-upstream` (🟢 PROVEN): OMP pi-claude jobs run on a bridge that follows the upstream pi-claude-bridge; landed 2026-10-05
-- `F770-omp-coordinator-counts-as-live` (🟢 PROVEN): A warm OMP coordinator counts as live for the GitHub doorbell; landed 2026-10-05
-- `F767-agent-setup-guide-review` (🟢 PROVEN): A cold agent sets up a Limen seat correctly from the agent setup guide; landed 2026-10-05
-- `F762-private-planning-reads-clearly` (🟢 PROVEN): The private planning code reads clearly and follows the Limen style; landed 2026-10-04
-- 2026-10: 35 landed. spec/features/done/2026-10/
+- `F929-biome-enforces-readable-code-and-the-styleguide-says-the-same` (🟢 PROVEN): Biome enforces readable code and the styleguide says the same; landed 2026-10-06
+- `F927-test-reset-build` (🟢 PROVEN): Limen's tests are rebuilt from scratch and held under a 3,500-line cap; landed 2026-10-06
+- `F926-fleet-leads-start-reviews-wait-and-land-without-workarounds` (🟢 PROVEN): fleet leads start reviews, wait and land without workarounds; landed 2026-10-06
+- `F925-test-reset-decision` (🟢 PROVEN): Adam has a decision on how to reset Limen's tests to the few seams that matter; landed 2026-10-06
+- `F783-spec-structure-and-keeper` (🟢 PROVEN): Agents write linked tickets, and a spec keeper checks the links before a land; landed 2026-10-06
+- `F782-explainer-pages` (🟢 PROVEN): Adam can read how specs are laid out and how agents run, on two plain pages; landed 2026-10-06
+- `F781-plant-webhook-events` (🟢 PROVEN): The shepherd gets one webhook for every job and coordinator event that needs it; landed 2026-10-06
+- 2026-10: 44 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/

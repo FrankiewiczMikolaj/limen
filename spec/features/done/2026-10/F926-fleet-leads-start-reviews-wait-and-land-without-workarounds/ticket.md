@@ -4,6 +4,7 @@ touches:
   - limen.runtime.liveness
   - limen.cabinet.git
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F926 · fleet leads start reviews, wait and land without workarounds

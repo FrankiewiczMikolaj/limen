@@ -4,6 +4,7 @@ touches:
   - limen.commands
   - limen.picture.viewer
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F929 · Biome enforces readable code and the styleguide says the same

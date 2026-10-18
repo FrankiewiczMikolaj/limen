@@ -4,6 +4,7 @@ touches:
   - limen.sessions.wake
   - limen.integrations.seat
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F781 · The shepherd gets one webhook for every job and coordinator event that needs it

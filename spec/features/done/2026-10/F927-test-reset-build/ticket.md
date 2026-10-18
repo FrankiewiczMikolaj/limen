@@ -3,6 +3,7 @@ touches:
   - limen.plant
   - limen.commands
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F927 · Limen's tests are rebuilt from scratch and held under a 3,500-line cap

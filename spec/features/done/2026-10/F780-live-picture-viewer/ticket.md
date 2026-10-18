@@ -3,6 +3,7 @@ touches:
   - limen.picture.build
   - limen.picture.viewer
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F780 · Adam reads the live picture and its decisions from one built page

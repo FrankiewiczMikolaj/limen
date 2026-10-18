@@ -1,5 +1,6 @@
 ---
 opened: 2026-10-06
+landed: 2026-10-06
 ---
 
 # F782 · Adam can read how specs are laid out and how agents run, on two plain pages
