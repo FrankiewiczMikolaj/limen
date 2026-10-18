@@ -1,7 +1,48 @@
+import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { userInfo } from "node:os";
 import { basename, dirname } from "node:path";
 import type { EngineId } from "../runtime/engine.ts";
 import { SESSION_ID } from "./job.ts";
+
+/**
+ * One line naming who ran this spawn or continue, from what the environment shows: a Limen job, else a Pi session or
+ * Herdr pane (`coordinator` when LIMEN_COORDINATOR=1), then the user and the parent process. Unknown parts are left out.
+ */
+function spawnerLine(): string {
+	const job = process.env.LIMEN_JOB_ID?.trim();
+	if (job && SESSION_ID.test(job)) {
+		return `job ${job}`;
+	}
+	const parts: string[] = process.env.LIMEN_COORDINATOR === "1" ? ["coordinator"] : [];
+	const session = process.env.PI_SESSION_ID?.trim();
+	if (session && SESSION_ID.test(session)) {
+		parts.push(`pi session ${session}`);
+	}
+	const pane = process.env.HERDR_PANE_ID?.trim();
+	if (process.env.HERDR_ENV === "1" && pane && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(pane)) {
+		parts.push(`herdr pane ${pane}`);
+	}
+	const user = process.env.USER?.trim() || userInfo().username;
+	if (user) {
+		parts.push(`user ${user}`);
+	}
+	const command = parentCommand();
+	if (command) {
+		parts.push(`parent ${command} (pid ${process.ppid})`);
+	}
+	return parts.join(", ");
+}
+
+/** The parent's executable as `ps` shows it; empty when `ps` cannot say. */
+function parentCommand(): string {
+	try {
+		const shown = execFileSync("ps", ["-o", "comm=", "-p", String(process.ppid)], { encoding: "utf8", timeout: 2000 });
+		return shown.trim().split("\n", 1)[0]?.trim() ?? "";
+	} catch {
+		return "";
+	}
+}
 
 function hostedNote(deadline: number | undefined): string {
 	const limits = deadline
@@ -96,6 +137,10 @@ export async function publishJob(jobDir: string, job: NewJob): Promise<void> {
 		const spawner = process.env.LIMEN_JOB_ID?.trim();
 		if (spawner && SESSION_ID.test(spawner)) {
 			files["spawned-by"] = `${spawner}\n`;
+		}
+		const spawnedBy = spawnerLine();
+		if (spawnedBy) {
+			files.spawner = `${spawnedBy}\n`;
 		}
 		if (job.continueTask) {
 			files.continue = `${job.continueTask}\n`;

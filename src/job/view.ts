@@ -15,6 +15,8 @@ export type JobRecord = {
 	readonly commitCount?: number;
 	readonly repo?: string;
 	readonly parent?: string;
+	/** Detail only: who ran the spawn, from `spawner`, or `job <id>` from an older record's `spawned-by`. */
+	readonly spawnedBy?: string;
 	readonly candidate?: string;
 	readonly hosted?: boolean;
 	readonly agentStatus?: string;
@@ -129,6 +131,7 @@ export function humanDetail(record: JobRecord, paint: Paint): string {
 	put("branch", job.branch);
 	put("repo", record.repo);
 	put("parent", record.parent);
+	put("spawned-by", record.spawnedBy);
 	put("candidate", record.candidate);
 	put("model", record.model);
 	put("tokens", record.tokens);

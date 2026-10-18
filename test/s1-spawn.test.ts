@@ -76,8 +76,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.notEqual(tree, p.root);
 	assert.equal(git(tree, "branch", "--show-current"), `limen/${id}`);
 	assert.equal(git(tree, "rev-parse", "HEAD"), base);
-	// The picture nests this job under the job whose agent spawned it.
-	assert.equal(jobFile(p, id, "spawned-by"), caller.LIMEN_JOB_ID);
+	await rm(join(dir, "spawner")); // `jobs` below reads the picture's link to the spawner job, `spawned-by`, alone.
 
 	// Plain `git status` on stale stat data rewrites the index under the worker's own `git add` (43c01cf).
 	const index = join(git(tree, "rev-parse", "--absolute-git-dir"), "index");
@@ -111,6 +110,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	const shown = limen(p, ["jobs", id]);
 	assert.ok(shown.stdout.includes(commits[0]?.slice(0, 7) ?? "?"), shown.stdout);
 	assert.ok(shown.stdout.includes("all done"), shown.stdout);
+	assert.ok(shown.stdout.includes(`\n  spawned-by job ${caller.LIMEN_JOB_ID}\n`), shown.stdout);
 
 	// A served model other than the requested one shows both; a turn copied from a parent session is not counted.
 	const usage = { input: 1, output: 10, cacheRead: 100, cacheWrite: 1000 };
@@ -145,6 +145,7 @@ test("a workspace job works in one child repository and loads a selected Pi exte
 	assert.equal(waitJob(p, id, { cwd: workspace }), "done");
 	const dir = join(workspace, ".limen/jobs", id);
 	assert.equal(readFileSync(join(dir, "repo"), "utf8"), "api\n");
+	assert.match(limen(p, ["jobs", id], { cwd: workspace }).stdout, /\n {2}spawned-by user \S+, parent .+ \(pid \d+\)\n/);
 	assert.equal(git(join(workspace, "api"), "rev-list", "--count", `main..limen/${id}`), "1");
 	assert.equal(git(join(workspace, "web"), "branch", "--list", `limen/${id}`), "");
 	const argv: string[] = json(join(dir, "fake-argv.json"));
