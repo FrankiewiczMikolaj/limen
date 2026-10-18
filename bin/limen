@@ -6,5 +6,17 @@ if (!Number.isFinite(major) || major < 24) {
 	process.exit(1);
 }
 
+// Limen runs its TypeScript sources by Node's type stripping. Drop only that one warning; others still print.
+const printers = process.listeners("warning");
+process.removeAllListeners("warning");
+process.on("warning", (warning) => {
+	if (warning.name === "ExperimentalWarning" && warning.message.startsWith("Type Stripping")) {
+		return;
+	}
+	for (const print of printers) {
+		print(warning);
+	}
+});
+
 const { main } = await import("../src/main.ts");
 await main(process.argv.slice(2));
