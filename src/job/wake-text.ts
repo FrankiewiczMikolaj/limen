@@ -66,7 +66,7 @@ export function completionWake(
 			: "Job done. Next step: land it, or name the check that still blocks landing. Done does not mean that review passed.";
 	}
 	let instruction =
-		"Inspect the job record, failure and log/session. Resume focused fixes and re-review if appropriate; do not treat this failure as a new-spawn or release signal. Keep the user informed; ask only when genuine product ambiguity, a scope or risk tradeoff, or an irreversible action needs a human decision.";
+		"Inspect the job record, failure and log/session. A repair handoff states the observed failure with its evidence and names a cause only when you verified it. Resume focused fixes and re-review if appropriate; do not treat this failure as a new-spawn or release signal. Keep the user informed; ask only when genuine product ambiguity, a scope or risk tradeoff, or an irreversible action needs a human decision.";
 	if (state === "done") {
 		// A route's own wording (the Herdr prompt to an OMP coordinator) replaces only the landing instruction.
 		instruction =
