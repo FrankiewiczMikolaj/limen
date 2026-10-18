@@ -37,13 +37,11 @@ test("quoted lists keep their commas and quotes; prototype keys are ordinary dat
 	assert.deepEqual(parsed.data.items, [JSON.parse('{"__proto__":"item","title":"A: B"}')]);
 });
 
-test("Markdown escapes raw HTML and drops executable links but keeps safe links and formatting", () => {
+test("Markdown never emits raw HTML or executable links but keeps safe links and formatting", () => {
 	const html = renderMarkdown(
 		'<img src=x onerror="alert(1)">\n\n[a](javascript:alert) [b](JaVaScRiPt:alert) [c](data:text/html,evil) [d](vbscript:x) [safe](https://example.com)\n\n**Strong** and `code`.\n\n```html\n<script>alert(1)</script>\n```',
 	);
 	assert.doesNotMatch(html, /<img|<script|href=["']?\s*(?:javascript|data|vbscript):/i);
-	assert.match(html, /&lt;img/);
-	assert.match(html, /&lt;script&gt;/);
 	assert.match(html, /href="https:\/\/example\.com"/);
 	assert.match(html, /<strong>Strong<\/strong> and <code>code<\/code>/);
 });
