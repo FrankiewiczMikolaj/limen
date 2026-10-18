@@ -37,7 +37,8 @@ export async function landCommand(args: readonly string[], cwd: string): Promise
 	if (!parsed.yes && process.stdin.isTTY === true && !(await confirm(`Land ${label || id} onto ${target}? [y/N] `))) {
 		throw new Error("land cancelled");
 	}
-	const subjects = (commitList(repository, base, branch) ?? "").split("\n").map((line) => line.replace(/^\S+ /, ""));
+	// The commits this land brings; a branch that merged main also holds main's own commits since its base.
+	const subjects = (commitList(repository, "HEAD", branch) ?? "").split("\n").map((line) => line.replace(/^\S+ /, ""));
 	let output: string;
 	try {
 		output = mergeBranch(repository, branch);

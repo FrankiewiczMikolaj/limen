@@ -188,14 +188,15 @@ export function closedJobFeatures(label: string, id: string, closed: ReadonlySet
 	return named.every((feature) => closed.has(feature)) ? named : [];
 }
 /**
- * The features a job works on: those its label, ID or `Ticket:` pointers name, and the `FNNN` that starts a commit subject.
- * `limen land` closes these tickets and `limen board` lists the job under them.
+ * The features a job works on: those its label, ID or `Ticket:` pointers name. A job that names none works on the
+ * `FNNN` that starts its commit subjects; a branch that merged main also carries other features' commits, so a named
+ * feature wins. `limen land` closes these tickets and `limen board` lists the job under them.
  */
 export function jobFeatures(label: string, id: string, task: string, subjects: readonly string[]): ReadonlySet<string> {
 	const pointers = [...task.matchAll(/\bTicket:\s+\S*?\b(F\d+)-/g)].map((match) => match[1] ?? "");
-	const prefixes = subjects.map((subject) => /^(F\d+)\b/i.exec(subject)?.[1] ?? "");
-	const named = `${label}\n${id}`.match(/\bF\d+\b/gi) ?? [];
-	return new Set([...named, ...pointers, ...prefixes].filter(Boolean).map((feature) => feature.toUpperCase()));
+	const named = [...(`${label}\n${id}`.match(/\bF\d+\b/gi) ?? []), ...pointers];
+	const features = named.length ? named : subjects.map((subject) => /^(F\d+)\b/i.exec(subject)?.[1] ?? "");
+	return new Set(features.filter(Boolean).map((feature) => feature.toUpperCase()));
 }
 export function renderJob(job: Job, view: JobView): string {
 	const facts = [

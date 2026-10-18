@@ -126,28 +126,19 @@ async function readJobs(root: string): Promise<BoardJob[]> {
 	return Promise.all(
 		ids.map(async (id) => {
 			const dir = join(jobsRoot, id);
-			const [
-				state = "",
-				label = "",
-				task = "",
-				commits = "",
-				branch = "",
-				base = "",
-				repo = "",
-				started = "",
-				finished = "",
-			] = await Promise.all([
-				shownState(dir),
-				...["label", "task.md", "commits", "branch", "base", "repo", "started-at", "finished-at"].map((name) =>
-					readFile(join(dir, name), "utf8").then(
-						(value) => value.trim(),
-						() => "",
+			const [state = "", label = "", task = "", commits = "", branch = "", repo = "", started = "", finished = ""] =
+				await Promise.all([
+					shownState(dir),
+					...["label", "task.md", "commits", "branch", "repo", "started-at", "finished-at"].map((name) =>
+						readFile(join(dir, name), "utf8").then(
+							(value) => value.trim(),
+							() => "",
+						),
 					),
-				),
-			]);
+				]);
 			const repository = repo ? workspaceRepository(root, repo) : root;
-			// A running job has not recorded its commits yet; read them from its branch.
-			const log = state === "running" && branch && base ? (commitList(repository, base, branch) ?? "") : commits;
+			// A running job has not recorded its commits yet; read the ones its branch holds beyond this checkout.
+			const log = state === "running" && branch ? (commitList(repository, "HEAD", branch) ?? "") : commits;
 			const subjects = log.split("\n").map((line) => line.replace(/^\S+ /, ""));
 			return {
 				id,
