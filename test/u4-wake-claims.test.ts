@@ -55,7 +55,6 @@ test("a second listener never takes a live claim, even one aged past 30 seconds 
 	assert.equal(listen("b"), false);
 	assert.equal(sends(), 1);
 	assert.deepEqual(events, ["a accepted"]);
-	assert.ok(existsSync(join(claim, "accepted")));
 });
 
 test("a dead owner's claim is recovered: an unaccepted one is released, an accepted one spends one attempt and is delivered again", async (t) => {

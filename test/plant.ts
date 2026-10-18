@@ -22,7 +22,6 @@ export type Run = { readonly stdout: string; readonly stderr: string; readonly s
 export type RunOptions = {
 	readonly cwd?: string;
 	readonly env?: Readonly<Record<string, string>>;
-	readonly input?: string;
 };
 
 export const TICKET = "spec/features/active/F001-demo/ticket.md";
@@ -127,7 +126,6 @@ export function limen(plant: Plant, args: readonly string[], options: RunOptions
 		cwd: options.cwd ?? plant.root,
 		encoding: "utf8",
 		env: { ...plant.env, ...options.env },
-		...(options.input !== undefined ? { input: options.input } : {}),
 	});
 	if (result.error) {
 		throw result.error;

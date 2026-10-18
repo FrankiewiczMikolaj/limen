@@ -46,7 +46,6 @@ const commands = new Map();
 const queued = [];
 let idle = true;
 let turns = Promise.resolve();
-let shutdown = false;
 const fire = async (event, payload) => {
 	const results = [];
 	for (const handler of handlers.get(event) ?? []) {
@@ -64,15 +63,11 @@ const ui = new Proxy(
 const context = {
 	cwd: process.cwd(),
 	ui,
-	hasUI: true,
 	isIdle: () => idle,
 	sessionManager: {
 		getSessionId: () => process.env.PI_SESSION_ID ?? "fake",
 		getSessionFile: () => join(dir, "session.jsonl"),
 		getSessionName: () => "fake",
-	},
-	shutdown: () => {
-		shutdown = true;
 	},
 };
 // A steer joins the running turn. Other messages queue; every message queued before a turn starts enters that turn,
@@ -170,5 +165,5 @@ for (const line of task.split("\n")) {
 turns = turns.then(() => turn([{ role: "user", content: [{ type: "text", text: task }] }], reply, stopReason));
 await turns;
 await fire("session_shutdown", {});
-record({ event: "exit", code, shutdown });
+record({ event: "exit", code });
 process.exit(code);

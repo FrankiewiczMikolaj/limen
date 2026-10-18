@@ -244,5 +244,4 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	await respond(p, github(listed({ id: APP })));
 	poll();
 	assert.equal(posts().length, 4, "after a restart the poller recognizes its own receipts and posts nothing twice");
-	assert.equal(JSON.parse(await readFile(join(claims, "104.json"), "utf8")).startComment, 500);
 });

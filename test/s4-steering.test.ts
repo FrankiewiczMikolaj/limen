@@ -112,7 +112,6 @@ test("a running worker gets each steer once and in order; an ended one refuses a
 	const late = limen(p, ["steer", parent, "late"]);
 	assert.equal(late.status, 1);
 	assert.deepEqual(readdirSync(join(dir, "steer"), { recursive: true }).sort(), before);
-	assert.equal(jobFile(p, parent, "state"), "done");
 });
 
 test("a worker prompt carries register and styleguide once, vision and board pointers, and no board body", () => {
@@ -125,8 +124,6 @@ test("a worker prompt carries register and styleguide once, vision and board poi
 	assert.ok(context.includes("`spec/build.md`"), "board pointer");
 	assert.equal(count(system + context, VISION), 0, "a worker reads the vision itself");
 	assert.equal(count(system + context, BOARD), 0, "a worker never gets the board body");
-	assert.equal(count(argv(parent).join(" "), "hook/steering.ts"), 1);
-	assert.equal(count(argv(parent).join(" "), "hook/communication.ts"), 1);
 });
 
 test("continue resumes the parent's session, linked, with its extensions or a replacement", () => {

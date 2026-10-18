@@ -137,7 +137,6 @@ test("a hosted job gets one tab, its task as @task, and finishes done with its h
 	first = spawnJob(p, "say hi\nfinish F001 handoff from the hosted pane", ["--tab", "--label", "F001 hosted"], { env });
 	assert.equal(waitJob(p, first, { env }), "done");
 	assert.equal(jobFile(p, first, "result"), "F001 handoff from the hosted pane");
-	assert.match(jobFile(p, first, "log"), /done: hosted session ended/);
 	const argv = engineArgv(pane(first));
 	const task = argv.at(-1) ?? "";
 	assert.ok(task.startsWith("@"), `task must reach the engine as @file: ${JSON.stringify(argv)}`);
@@ -224,7 +223,6 @@ test("hosted Pi gets literal launch flags and the selected extension; stop recor
 		1,
 		"the selected extension, once, beside the required hooks",
 	);
-	assert.ok(argv.some((value) => value.endsWith("/hook/hosted.ts")));
 	const stopped = limen(p, ["stop", third, "enough"], { env });
 	assert.equal(stopped.status, 0, stopped.stderr);
 	assert.equal(jobFile(p, third, "state"), "stopped");

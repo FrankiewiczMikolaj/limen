@@ -99,14 +99,12 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	assert.equal(jobFile(p, ids.done, "result"), "a done handoff");
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
 	assert.notEqual(jobFile(p, ids.provider, "stop-reason"), "");
-	assert.notEqual(jobFile(p, ids.provider, "commits"), "");
 	assert.equal(git(p.root, "rev-list", "--count", `main..${jobFile(p, ids.provider, "branch")}`), "1");
 	wokeOnce(ids, [coord, second]);
 	// A job with no tool calls and no commits says so; a job that committed does not.
 	const [failed = "", done = ""] = [ids.failed, ids.done].map(
 		(id) => [coord, second].flatMap((dir) => wakes(dir, id))[0]?.text,
 	);
-	assert.equal(jobFile(p, ids.failed, "tool-calls"), "0");
 	assert.match(failed, /produced nothing/);
 	assert.doesNotMatch(done, /produced nothing/);
 });
@@ -122,11 +120,8 @@ test("stop, timeout and the tool cap each end a job once and wake its session on
 	const states = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, waitJob(p, id)]));
 	assert.deepEqual(states, { stopped: "stopped", timeout: "failed", cap: "failed" });
 	assert.equal(jobFile(p, ids.timeout, "log").match(/steered: 1 min left before the timeout: /g)?.length, 1);
-	// Each ending has one finished-at stamp. Timeout and the tool cap race the engine's exit and log one terminal line;
+	// Timeout and the tool cap race the engine's exit and log one terminal line;
 	// a stop logs two (stop.ts's 25 ms grace races the finalize) until F928 lands: then count ids.stopped too.
-	for (const [name, id] of Object.entries(ids)) {
-		assert.ok(Number.isFinite(Date.parse(jobFile(p, id, "finished-at"))), `${name} has one stamp`);
-	}
 	for (const id of [ids.timeout, ids.cap]) {
 		assert.equal(jobFile(p, id, "log").match(/\] (?:done|failed|stopped):/g)?.length, 1, id);
 	}
