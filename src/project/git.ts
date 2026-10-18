@@ -205,6 +205,10 @@ export function removeWorktree(cwd: string, path: string): void {
 export function pruneWorktrees(cwd: string): void {
 	requireGit(cwd, ["worktree", "prune"]);
 }
+/** Deletes a local branch whatever its merge state; the caller has proven it landed. */
+export function deleteBranch(cwd: string, branch: string): void {
+	requireGit(cwd, ["branch", "-D", "--", branch]);
+}
 export function headCommit(cwd: string): string {
 	return requireGit(cwd, ["rev-parse", "HEAD"]).stdout.trim();
 }

@@ -19,6 +19,7 @@ import {
 	workspaceRepository,
 } from "../project/git.ts";
 import { parseFlags } from "./flags.ts";
+import { deleteLandedBranches } from "./prune.ts";
 
 export async function landCommand(args: readonly string[], cwd: string): Promise<void> {
 	if (process.env.LIMEN_GROUP_ID) {
@@ -31,7 +32,7 @@ export async function landCommand(args: readonly string[], cwd: string): Promise
 	const target = landTarget(repository, parsed.onto, branch);
 	const dirty = checkCheckoutBeside(repository, target, { id, branch, base });
 	await checkLandGates(repository, root, branch, id);
-	if (!parsed.yes && !(await confirm(`Land ${label || id} onto ${target}? [y/N] `))) {
+	if (!parsed.yes && process.stdin.isTTY === true && !(await confirm(`Land ${label || id} onto ${target}? [y/N] `))) {
 		throw new Error("land cancelled");
 	}
 	let output: string;
@@ -48,6 +49,10 @@ export async function landCommand(args: readonly string[], cwd: string): Promise
 		console.log(output);
 	}
 	console.log(`landed ${id} onto ${target}`);
+	// The merge put every branch commit in the target, so the branch is landed.
+	for (const { branch: name, kept } of await deleteLandedBranches(root, [{ repository, branch }])) {
+		console.log(kept ? `kept branch ${name}: ${kept}` : `deleted branch ${name}`);
+	}
 }
 /** The job's recorded branch, base, repo and label; only a done job with a branch and a base lands. */
 async function readDoneJob(
@@ -384,9 +389,6 @@ function parseLandArgs(args: readonly string[]): {
 }
 
 async function confirm(question: string): Promise<boolean> {
-	if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
-		throw new Error("land requires a TTY confirm, or pass --yes");
-	}
 	const rl = createInterface({ input: process.stdin, output: process.stdout });
 	try {
 		return /^(y|yes)$/i.test((await rl.question(question)).trim());

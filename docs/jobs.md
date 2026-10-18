@@ -128,10 +128,10 @@ Finished jobs keep their files in `.limen/jobs/`, but not their worktrees. The n
 | Command | Effect |
 |---|---|
 | `limen prune` | Removes finished worktrees, as the next spawn does. |
-| `limen prune --retire` | Deletes finished, failed, or stopped job records whose branch is landed (ancestor or cherry-pick) or deleted. |
+| `limen prune --retire` | Deletes finished, failed, or stopped job records whose branch is landed (ancestor or cherry-pick) or deleted, and the landed local `limen/*` branches of those records. |
 | `limen prune --retire --dry-run` | Prints the IDs and removes nothing. |
 
-Spawn and sweep never retire records.
+Spawn and sweep never retire records. A branch stays while any job that names it is still running or starting, or while a checkout other than a finished job's worktree holds it. Remote branches stay.
 
 ### Continue a finished job
 
@@ -141,7 +141,7 @@ To keep the conversation of a finished job, run:
 limen continue <job-id> "Follow-up instruction"
 ```
 
-Limen copies the saved session into a new linked job. The new job keeps the worktree safe from prune. If prune removed the old checkout before then, Limen restores it at the recorded path from the local branch. If Limen cannot create the new job, the parent job and its saved session do not change.
+Limen copies the saved session into a new linked job. The new job keeps the worktree safe from prune. If prune removed the old checkout before then, Limen restores it at the recorded path from the local branch. A landed job has no local branch left, because `land` and `prune --retire` delete it; to continue one, first recreate the branch at its landed commit (`git branch <branch> <commit>`). If Limen cannot create the new job, the parent job and its saved session do not change.
 
 **Only committed branch contents come back.** Uncommitted files that prune removed are lost. Recovery is not possible without the branch or the transcript. Limen does not take over a branch that is checked out in a different place.
 

@@ -3,6 +3,9 @@ import { basename, dirname, resolve } from "node:path";
 import { retainedGroupJob } from "../job/group-cabinet.ts";
 import { isTerminal } from "../job/job.ts";
 import {
+	branchExists,
+	deleteBranch,
+	type GitWorktree,
 	limenRoot,
 	listWorktrees,
 	pruneWorktrees,
@@ -28,7 +31,7 @@ export async function pruneCommand(args: readonly string[], cwd: string): Promis
 		);
 		return;
 	}
-	const ids = await retireFinishedJobs(limenRoot(cwd), dryRun);
+	const { ids, branches } = await retireFinishedJobs(limenRoot(cwd), dryRun);
 	if (dryRun && ids.length) {
 		console.log(ids.map((id) => `would retire ${id}`).join("\n"));
 	} else {
@@ -36,11 +39,17 @@ export async function pruneCommand(args: readonly string[], cwd: string): Promis
 			ids.length === 0 ? "no finished jobs to retire" : `retired ${ids.length} job${ids.length === 1 ? "" : "s"}`,
 		);
 	}
+	if (branches) {
+		console.log(`deleted ${branches} landed branch${branches === 1 ? "" : "es"}`);
+	}
 }
 
-async function retireFinishedJobs(root: string, dryRun: boolean): Promise<readonly string[]> {
+async function retireFinishedJobs(
+	root: string,
+	dryRun: boolean,
+): Promise<{ readonly ids: readonly string[]; readonly branches: number }> {
 	const jobsRoot = `${root}/.limen/jobs`,
-		retired: string[] = [],
+		retired: { id: string; repository: string; branch: string }[] = [],
 		finished: { id: string; repository: string; branch: string }[] = [],
 		repositories = new Map<string, string>();
 	for (const id of (await jobIds(jobsRoot)).sort()) {
@@ -78,17 +87,22 @@ async function retireFinishedJobs(root: string, dryRun: boolean): Promise<readon
 			unlanded.set(repository, undefined);
 		}
 	}
-	for (const { id, repository, branch } of finished) {
-		const pending = unlanded.get(repository);
-		if (!pending || pending.has(branch)) {
-			continue;
+	for (const job of finished) {
+		const pending = unlanded.get(job.repository);
+		if (pending && !pending.has(job.branch)) {
+			retired.push(job);
 		}
-		if (!dryRun) {
-			await rm(`${jobsRoot}/${id}`, { recursive: true, force: true });
-		}
-		retired.push(id);
 	}
-	return retired;
+	if (dryRun) {
+		return { ids: retired.map((job) => job.id), branches: 0 };
+	}
+	// Branches go before records: a record names the finished worktree that may still hold its branch.
+	const landed = new Map(retired.filter((job) => job.branch).map((job) => [`${job.repository}\0${job.branch}`, job]));
+	const deleted = (await deleteLandedBranches(root, [...landed.values()])).filter((result) => !result.kept).length;
+	for (const { id } of retired) {
+		await rm(`${jobsRoot}/${id}`, { recursive: true, force: true });
+	}
+	return { ids: retired.map((job) => job.id), branches: deleted };
 }
 
 export async function pruneFinishedWorktrees(root: string, keep: readonly string[] = []): Promise<number> {
@@ -104,6 +118,71 @@ export async function pruneFinishedWorktrees(root: string, keep: readonly string
 		removed += await pruneRepositoryWorktrees(repository, keepPaths);
 	}
 	return removed;
+}
+type LandedBranch = { readonly repository: string; readonly branch: string };
+/**
+ * Deletes each landed `limen/*` branch and the finished worktree that holds it, since Git keeps a checked-out branch.
+ * The caller has proven every branch landed. A branch stays while a job record that names it is not finished or is
+ * a retained group job, or while a checkout no job recorded holds it. Returns why each kept branch stays.
+ */
+export async function deleteLandedBranches(
+	root: string,
+	landed: readonly LandedBranch[],
+): Promise<{ readonly branch: string; readonly kept?: string }[]> {
+	const uses = await branchUses(`${root}/.limen/jobs`);
+	const checkouts = new Map<string, readonly GitWorktree[]>();
+	const results: { branch: string; kept?: string }[] = [];
+	for (const { repository, branch } of landed) {
+		const use = uses.get(branch);
+		if (!branch.startsWith("limen/") || use?.busy || !branchExists(repository, branch)) {
+			results.push({ branch, kept: use?.busy ? `job ${use.busy} still uses it` : "not a present limen/ branch" });
+			continue;
+		}
+		if (!checkouts.has(repository)) {
+			pruneWorktrees(repository);
+			checkouts.set(repository, listWorktrees(repository));
+		}
+		const holder = checkouts.get(repository)?.find((worktree) => worktree.branch === branch);
+		const path = holder ? await resolved(holder.path) : undefined;
+		if (path && !use?.worktrees.has(path)) {
+			results.push({ branch, kept: `it is checked out at ${path}` });
+			continue;
+		}
+		try {
+			if (path) {
+				removeWorktree(repository, path);
+			}
+			deleteBranch(repository, branch);
+			results.push({ branch });
+		} catch (error) {
+			// A locked checkout keeps its branch until the next land or retire.
+			results.push({ branch, kept: error instanceof Error ? error.message.trim() : String(error) });
+		}
+	}
+	return results;
+}
+/** For each recorded branch: a job that still uses it, and the worktrees its finished jobs left. */
+async function branchUses(jobsRoot: string): Promise<Map<string, { busy?: string; worktrees: Set<string> }>> {
+	const uses = new Map<string, { busy?: string; worktrees: Set<string> }>();
+	for (const id of await jobIds(jobsRoot)) {
+		const jobDir = `${jobsRoot}/${id}`;
+		const [branch, state, worktree] = await Promise.all([
+			text(`${jobDir}/branch`),
+			text(`${jobDir}/state`),
+			text(`${jobDir}/worktree`),
+		]);
+		if (!branch) {
+			continue;
+		}
+		const use = uses.get(branch) ?? { worktrees: new Set<string>() };
+		uses.set(branch, use);
+		if (!isTerminal(state) || (await retainedGroupJob(jobDir))) {
+			use.busy ??= id;
+		} else if (worktree) {
+			use.worktrees.add(await resolved(worktree));
+		}
+	}
+	return uses;
 }
 /**
  * Keeps retained group worktrees, removes a record that never got a state once its startup grace is over, and names

@@ -13,7 +13,7 @@ import {
 	teamRoute,
 } from "../job/group-cabinet.ts";
 import { syncLifecycle } from "../job/group-events.ts";
-import { hostedAgentName, isTerminal, makeJobId } from "../job/job.ts";
+import { hostedAgentName, isTerminal, makeJobId, parseDuration } from "../job/job.ts";
 import { resolveJob } from "../job/lookup.ts";
 import { publishJob } from "../job/publication.ts";
 import { atomicWrite, finalizeJob } from "../job/record.ts";
@@ -68,6 +68,7 @@ type ContinueOptions = {
 	readonly provider: string | undefined;
 	readonly thinking: string | undefined;
 	readonly engine: string | undefined;
+	readonly timeoutMs: number | undefined;
 	readonly selected: readonly string[];
 	readonly query: string;
 	readonly instruction: string;
@@ -85,12 +86,13 @@ function parseContinueArgs(args: readonly string[]): ContinueOptions {
 			provider: { type: "string" },
 			thinking: { type: "string" },
 			engine: { type: "string" },
+			timeout: { type: "string" },
 			extension: { type: "string", multiple: true },
 		} as const,
 		{
 			unknown: (word) => `unknown continue option ${word}`,
 			missing: (flag) => `${flag} requires a value`,
-			dashValues: ["label", "model", "provider", "thinking", "engine"],
+			dashValues: ["label", "model", "provider", "thinking", "engine", "timeout"],
 			endOfFlags: false,
 		},
 	);
@@ -118,6 +120,7 @@ function parseContinueArgs(args: readonly string[]): ContinueOptions {
 		provider,
 		thinking,
 		engine,
+		timeoutMs: values.timeout === undefined ? undefined : parseDuration(values.timeout),
 		selected: values.extension ?? [],
 		query,
 		instruction,
@@ -165,15 +168,24 @@ type Continuation = {
 	readonly thinking: string | undefined;
 	readonly versions: Promise<void>;
 	readonly group: ContinuationGroup | undefined;
+	readonly timeoutMs: number | undefined;
 };
-async function continueJob(args: readonly string[], cwd: string, locked = false): Promise<void> {
-	const options = parseContinueArgs(args);
-	const { review, tab, detached, label, model, provider, thinking } = options;
+/** True for a Herdr pane, false for a detached wrapper. */
+function chooseHostedContinue(options: ContinueOptions): boolean {
 	const herdr = herdrAvailable();
-	const hosted = detached ? false : tab || herdr;
-	if (tab && !herdr) {
+	const hosted = options.detached ? false : options.tab || herdr;
+	if (options.tab && !herdr) {
 		throw new Error("hosted continue requires Herdr (HERDR_ENV=1); use --detached for an ordinary job");
 	}
+	if (hosted && options.timeoutMs) {
+		throw new Error("hosted jobs have no timeout; omit --timeout or use --detached");
+	}
+	return hosted;
+}
+async function continueJob(args: readonly string[], cwd: string, locked = false): Promise<void> {
+	const options = parseContinueArgs(args);
+	const { review, label, model, provider, thinking } = options;
+	const hosted = chooseHostedContinue(options);
 	const chosenModel = model ?? defaultModel(review);
 
 	// A job that continues from its own worktree resolves jobs in its canonical root.
@@ -241,6 +253,7 @@ async function continueJob(args: readonly string[], cwd: string, locked = false)
 		provider,
 		thinking,
 		group,
+		timeoutMs: options.timeoutMs,
 	};
 	await launchContinuation(continuation, profile, hosted, membership?.run);
 }
@@ -269,6 +282,9 @@ async function launchContinuation(
 async function checkGroupContinuation(membership: GroupIdentity, cwd: string, options: ContinueOptions): Promise<void> {
 	if (membership.member?.role === "coordinator") {
 		throw new Error("group coordinator continuation is not supported; inspect and stop before --new-run");
+	}
+	if (options.timeoutMs) {
+		throw new Error("group continuations keep the recorded deadline; omit --timeout");
 	}
 	const caller = await groupIdentity(cwd, membership.run.id);
 	if (
@@ -494,6 +510,9 @@ async function startDetachedContinuation(continuation: Continuation): Promise<vo
 		environment.LIMEN_GROUP_ID = group.id;
 		environment.LIMEN_TEAM_ID = group.team;
 		environment.LIMEN_TIMEOUT_MS = String(Math.max(1, group.deadline - Date.now()));
+	}
+	if (continuation.timeoutMs) {
+		environment.LIMEN_TIMEOUT_MS = String(continuation.timeoutMs);
 	}
 	if (continuation.model) {
 		environment.LIMEN_MODEL = continuation.model;

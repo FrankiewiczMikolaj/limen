@@ -80,10 +80,9 @@ test("a running, an empty and a failed job are refused", async () => {
 	refused(job.failed);
 });
 
-test("an unconfirmed land, another target, a group member, a staged target and a dirty file in the merge are refused", async () => {
+test("another target, a group member, a staged target and a dirty file in the merge are refused", async () => {
 	job.a = done("commit");
-	// Without a TTY only --yes confirms; --onto names a branch that is not checked out.
-	refused(job.a, {}, []);
+	// --onto names a branch that is not checked out.
 	git(p.root, "branch", "other");
 	refused(job.a, {}, ["--onto", "other", "--yes"]);
 	assert.equal(git(p.root, "rev-parse", "other"), main);
@@ -139,15 +138,22 @@ test("a done job fast-forwards, and a branch that removes test lines merges besi
 	job.b = done("commit");
 	await amend(job.b, { "test/old.test.ts": lines(6) });
 	const a = git(p.root, "rev-parse", jobFile(p, job.a, "branch"));
-	const first = limen(p, ["land", job.a, "--yes"]);
+	// Without a TTY land asks nothing, so --yes is not needed.
+	const first = limen(p, ["land", job.a]);
 	assert.equal(first.status, 0, first.stderr);
 	assert.equal(git(p.root, "rev-parse", "main"), a);
 
 	await writeFile(join(p.root, "draft.txt"), "another session drafts\n");
 	const status = git(p.root, "status", "--porcelain");
 	const b = git(p.root, "rev-parse", jobFile(p, job.b, "branch"));
+	assert.ok(existsSync(jobFile(p, job.b, "worktree")));
 	const second = limen(p, ["land", job.b, "--yes"]);
 	assert.equal(second.status, 0, second.stderr);
+	// A landed branch is deleted, and so is the finished worktree that held it.
+	for (const id of [job.a, job.b]) {
+		assert.equal(git(p.root, "branch", "--list", jobFile(p, id, "branch")), "");
+	}
+	assert.ok(!existsSync(jobFile(p, job.b, "worktree")));
 	assert.deepEqual(git(p.root, "log", "-1", "--format=%P", "main").split(" "), [a, b]);
 	assert.equal(git(p.root, "show", "main:test/old.test.ts"), lines(6).trim());
 	assert.equal(git(p.root, "status", "--porcelain"), status);
