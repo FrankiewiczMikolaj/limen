@@ -123,7 +123,7 @@ Read it once as the owner who just sat down.
 
 ## Turn cue convention
 
-Keep the stable register above the first `## Cue: ...` section. The hook selects the bodies of the plain Markdown sections below, without injecting their headings. Shared applies to every reply; Human or Agent selects the audience. Wake applies to a job notification. Failure applies once after an unsuccessful assistant turn and replaces `{{failure}}` with its recorded reason. Specs recalls the register after a spec write or edit. Search enters the system prompt only when `jg` identifies itself as Jevgrep. Omitted sections add no cue; a project register never falls back to package cue text.
+Keep the stable register above the first `## Cue: ...` section. The hook selects the bodies of the plain Markdown sections below, without injecting their headings. Shared applies to every reply; Human or Agent selects the audience. Wake applies to a job notification. Failure applies once after an unsuccessful assistant turn and replaces `{{failure}}` with its recorded reason. Search enters the system prompt only when `jg` identifies itself as Jevgrep. Omitted sections add no cue; a project register never falls back to package cue text. After a write or edit under `spec/`, the hook asks the agent to read the `## Specs` section above by its line numbers.
 
 ## Cue: Shared
 
@@ -148,10 +148,6 @@ This turn was opened by a job wake, not by the human. They have not seen the job
 ## Cue: Failure
 
 The previous turn failed with {{failure}} and nothing reached the human.
-
-## Cue: Specs
-
-[limen] Specs: a ticket is about 300 words: outcome, scope, out of scope, acceptance. No status line, no progress markers. Another feature is named by what it does, then its number: not `consumes F373`, but `builds on the shared transcript renderer (F373)`. Title is `FNNN · what becomes true`.
 
 ## Cue: Search
 

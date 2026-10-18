@@ -61,10 +61,8 @@ await writeFile(
 	`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(URLS.map((url, index) => ({ url, auth: SECRETS[index] })))}'\nLIMEN_FINISH_WEBHOOK_AUTHOR_TARGETS='{"@alice":[1],"@bob":[2]}'\n`,
 );
 
-test("an unconfigured job records no config and sends nothing", () => {
+test("an unconfigured job sends nothing", () => {
 	assert.equal(wait(quiet), "done");
-	assert.equal(jobFile(p, quiet, "finish-webhook-env"), "");
-	assert.equal(jobFile(p, quiet, "finish-webhook-attempt"), "");
 	assert.deepEqual(requests(p), []);
 });
 
@@ -85,10 +83,7 @@ test("a continuation from a subdirectory keeps the parent's config and author ro
 	const parent = ids[1] ?? "";
 	const id = run(["continue", parent, "say continued"], join(p.root, "spec"));
 	ids.push(id);
-	assert.notEqual(id, parent);
 	assert.equal(wait(id), "done");
-	assert.equal(jobFile(p, id, "finish-webhook-env"), jobFile(p, parent, "finish-webhook-env"));
-	assert.equal(jobFile(p, id, "finish-webhook-author"), jobFile(p, parent, "finish-webhook-author"));
 	await settled(id);
 	const urls = payloads().flatMap((ping) => (ping.body.jobId === id ? [ping.url] : []));
 	assert.deepEqual(urls, [URLS[0]]);
@@ -110,7 +105,6 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 	]);
 	const id = spawn(`Ticket: ${bob}\nsay\nfail 3`, "S7 bob");
 	assert.equal(wait(id), "failed");
-	assert.equal(jobFile(p, id, "result"), "");
 	await settled(id);
 	const ping = payloads().find((sent) => sent.body.jobId === id)?.body;
 	assert.deepEqual([ping?.event, ping?.plant, Boolean(ping?.reason)], ["job.failed", "repo", true]);

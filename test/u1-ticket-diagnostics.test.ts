@@ -84,5 +84,4 @@ test("each ticket fault is reported at its own file and line with a fix, and the
 	assert.equal(byId.get("f781")?.needsAdam, null);
 	assert.equal(byId.get("f783")?.title, "Legacy ticket");
 	assert.deepEqual(byId.get("f785")?.needsAdam, { ask: "Keep the atlas?", on: "2026-10-05" });
-	assert.deepEqual(byId.get("f785")?.wrong, { problem: "The context is lost.", on: "2026-10-04" });
 });

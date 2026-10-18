@@ -63,7 +63,7 @@ footer { margin-top: 40px; color: var(--gray); font-size: 13px; }
 <div class="tops">
 <div><h3>Tweak</h3><ol><li>Wake records tell the truth and do not resend</li><li>Spawn returns the job ID in seconds</li><li>A detached job hears its deadline before the timeout</li></ol></div>
 <div><h3>Build</h3><ol><li>Seat admission: a cap on running jobs, with a queue</li><li>One landing path that records proof</li><li>Starting a coordinator is one Limen command</li></ol></div>
-<div><h3>Remove</h3><ol><li><s>Remove the group runtime; keep teams as prose</s> (rejected: fix groups instead)</li><li>Drop the per-edit styleguide reminder</li><li>Move rare recipes out of the always-on shop manual</li></ol></div>
+<div><h3>Remove</h3><ol><li><s>Remove the group runtime; keep teams as prose</s> (rejected: fix groups instead)</li><li><s>Drop the per-edit styleguide reminder</s> (rejected: make agents re-read it)</li><li>Move rare recipes out of the always-on shop manual</li></ol></div>
 </div>
 
 <section id="core">
@@ -194,11 +194,12 @@ footer { margin-top: 40px; color: var(--gray); font-size: 13px; }
 <p class="meta"><span>Size <b>1 slice + review, 2–3 h</b></span><span>Confidence <b>medium (Adam asked for groups by name)</b></span></p>
 </article>
 <article class="card">
-<h3><span class="n">2</span>Drop the per-edit styleguide reminder</h3>
+<h3><span class="n">2</span><s>Drop the per-edit styleguide reminder</s> · rejected</h3>
 <dl>
 <dt>Evidence</dt><dd>Appended 3,662 times to code-edit results, failed edits included; a styleguide read followed within 5 calls 17 times (0.5%). The vision reminder: 499 appends, 7 reads. Both files already ride the system prompt on every call.</dd>
 <dt>Why</dt><dd>Rule retention held for 30 h at 600k+ tokens. A heading list repeated inside tool results is data the model parses on every later call.</dd>
 <dt>Effect</dt><dd>Remove the styleguide reminder; fire the vision reminder once per session. Cleaner tool results.</dd>
+<dt>Decision</dt><dd><b>Rejected by Adam, 2026-10-18 (relayed): &quot;No drop. Improve the prompt to make the agents actually re-read that to gather context!&quot;</b> Built instead: after a successful code edit, the reminder names the unread styleguide lines for the edited path (path and language headings scope their sections) and asks for that read as the next tool call, once per area until the agent reads them or the context compacts. The Specs and vision reminders ask the same way for the register&#x27;s Specs section and spec/vision.md. In an A/B on OMP with small edit tasks, a read of the named lines came before the next edit after 14 of 14 styleguide reminders (old text: 1 of 14) and 4 of 4 Specs reminders (old: 0 of 8).</dd>
 </dl>
 <p class="meta"><span>Size <b>under 1 h</b></span><span>Confidence <b>medium (no behavior A/B)</b></span></p>
 </article>
