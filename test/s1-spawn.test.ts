@@ -76,8 +76,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.notEqual(tree, p.root);
 	assert.equal(git(tree, "branch", "--show-current"), `limen/${id}`);
 	assert.equal(git(tree, "rev-parse", "HEAD"), base);
-	// The picture nests this job under its spawner job by `spawned-by`; `jobs` below reads it as a pre-`spawner` record.
-	await rm(join(dir, "spawner"));
+	await rm(join(dir, "spawner")); // `jobs` below reads the picture's link to the spawner job, `spawned-by`, alone.
 
 	// Plain `git status` on stale stat data rewrites the index under the worker's own `git add` (43c01cf).
 	const index = join(git(tree, "rev-parse", "--absolute-git-dir"), "index");
