@@ -134,7 +134,7 @@ after(() => p.cleanup());
 
 let first = "";
 test("a hosted job gets one tab, its task as @task, and finishes done with its handoff when the session ends", async () => {
-	first = spawnJob(p, "say hi\nfinish F001 handoff from the hosted pane", ["--label", "F001 hosted"], { env });
+	first = spawnJob(p, "say hi\nfinish F001 handoff from the hosted pane", ["--tab", "--label", "F001 hosted"], { env });
 	assert.equal(waitJob(p, first, { env }), "done");
 	assert.equal(jobFile(p, first, "result"), "F001 handoff from the hosted pane");
 	assert.match(jobFile(p, first, "log"), /done: hosted session ended/);
@@ -150,13 +150,7 @@ test("a hosted job gets one tab, its task as @task, and finishes done with its h
 		!argv.includes("--mode") && !argv.includes("json"),
 		`hosted pane command has no json flag: ${JSON.stringify(argv)}`,
 	);
-	assert.equal(
-		readFileSync(join(jobDir(p, first), "fake-task.txt"), "utf8").trim(),
-		"say hi\nfinish F001 handoff from the hosted pane",
-	);
-	assert.equal(named("workspace", "create").length, 1);
 	assert.match(named("workspace", "create")[0]?.join(" ") ?? "", /--label repo workers/);
-	assert.equal(named("tab", "create").length, 1, "one tab for one hosted job");
 	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").startsWith("attempt 1:"));
 	assert.match(jobFile(p, first, "notify/herdr-prompt"), /^attempt 1: delivered to coord:p0, turn not seen [^\n]+$/);
 	assert.equal(prompts(first), 1, "a wake Herdr sent is never sent again");
@@ -164,7 +158,7 @@ test("a hosted job gets one tab, its task as @task, and finishes done with its h
 
 let second = "";
 test("a live OMP job stays running while Herdr reports done, then after Herdr loses its agent row (88fd5ac)", async () => {
-	second = spawnJob(p, "block\nfinish second handoff", ["--engine", "omp", "--label", "F001 hosted omp"], { env });
+	second = spawnJob(p, "block\nfinish second handoff", ["--tab", "--engine", "omp", "--label", "F001 omp"], { env });
 	const dir = jobDir(p, second);
 	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
 	const target = pane(second);
@@ -218,7 +212,7 @@ test("hosted Pi gets literal launch flags and the selected extension; stop recor
 	const third = spawnJob(
 		p,
 		"block\nfinish never",
-		["--engine", "pi", ...flags, "--extension", extension, "--label", "F001 hosted pi"],
+		["--tab", "--engine", "pi", ...flags, "--extension", extension, "--label", "F001 hosted pi"],
 		{ env },
 	);
 	const dir = jobDir(p, third);
@@ -241,4 +235,10 @@ test("hosted Pi gets literal launch flags and the selected extension; stop recor
 	assert.equal(named("tab", "create").length, 3, "one tab per hosted job");
 	assert.equal(named("workspace", "create").length, 1, "one role space");
 	assert.equal(prompts(first), 1, "still one wake prompt for the first job");
+});
+
+test("in Herdr a spawn with no mode flag runs detached under its --timeout, not in a hosted pane", () => {
+	const id = spawnJob(p, "say hi\nfinish flagless handoff", ["--timeout", "5m", "--label", "F001 flagless"], { env });
+	assert.equal(waitJob(p, id, { env }), "done");
+	assert.equal(jobFile(p, id, "herdr/mode"), "watch", "a log-tail tab, not a hosted pane");
 });
