@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { appendFile, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { jobMembership } from "../job/group-cabinet.ts";
-import { enqueueSteer } from "../job/steer-inbox.ts";
 import {
 	appendLimenLog,
 	atomicWrite,
@@ -11,6 +10,7 @@ import {
 	textFile,
 	writeHandshake,
 } from "../job/record.ts";
+import { enqueueSteer } from "../job/steer-inbox.ts";
 import {
 	containEscapedDescendants,
 	discoverEscapedDescendants,
