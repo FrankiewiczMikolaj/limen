@@ -503,7 +503,8 @@ async function printGroupStatus(identity: GroupIdentity, rest: readonly string[]
 	);
 	console.log(`Stopped: ${run.stopped ? "yes" : "no"} · Closed: ${run.closed ? "yes" : "no"}`);
 	for (const member of members) {
-		const place = member.role === "coordinator" ? `round ${(member.round ?? 0) + 1}` : "worker";
+		const place =
+			member.role === "coordinator" ? `round ${(member.round ?? 0) + 1} ${run.rounds[member.round ?? 0]}` : "worker";
 		console.log(`${member.team} ${place} (${member.id}): ${member.state}`);
 	}
 	if (!run.finishedAt && !run.stopped) {
