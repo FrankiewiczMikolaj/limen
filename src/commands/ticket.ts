@@ -5,12 +5,16 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPicture } from "../picture/picture-build.ts";
 import { ID_PATTERN } from "../picture/picture-model.ts";
+import { closeTickets } from "../project/board.ts";
 import { currentBranch, limenRoot, repoRoot } from "../project/git.ts";
 import { parseFlags } from "./flags.ts";
 import { landTicketCheck } from "./land.ts";
 
-const HELP =
-	'limen ticket new "what becomes true" [--lane planned|active] [--touches id,id]\nlimen ticket check [BRANCH]  # the land gate for tickets BRANCH adds or changes against the plant branch; default: this checkout\'s branch';
+const HELP = [
+	'limen ticket new "what becomes true" [--lane planned|active] [--touches id,id]',
+	"limen ticket check [BRANCH]  # the land gate for tickets BRANCH adds or changes against the plant branch; default: this checkout's branch",
+	"limen ticket done FNNN [FNNN ...]  # landed without limen land: move the active ticket to done/ with a landed date; NOW and PROVEN follow",
+].join("\n");
 const PLACE_ID = ID_PATTERN;
 
 async function directories(path: string): Promise<string[]> {
@@ -62,6 +66,9 @@ async function nextFeatureNumber(root: string, plant: string): Promise<number> {
 export async function ticketCommand(args: readonly string[], cwd: string): Promise<void> {
 	if (args[0] === "check") {
 		return ticketCheck(args.slice(1), cwd);
+	}
+	if (args[0] === "done") {
+		return ticketDone(args.slice(1), cwd);
 	}
 	const [mode, title, ...options] = args;
 	if (mode !== "new" || !title || title.startsWith("--") || /[\r\n]/.test(title) || !title.trim()) {
@@ -137,6 +144,22 @@ export async function ticketCommand(args: readonly string[], cwd: string): Promi
 	await mkdir(join(root, "spec", "features", lane, `${code}-${slug}`));
 	await writeFile(join(root, path), text, { flag: "wx" });
 	console.log(path);
+}
+
+/** The close `limen land` makes, for work that landed by a hand merge or needed no code. */
+async function ticketDone(codes: readonly string[], cwd: string): Promise<void> {
+	if (codes.length === 0 || !codes.every((code) => /^F\d+$/i.test(code))) {
+		throw new Error(HELP);
+	}
+	const root = limenRoot(cwd);
+	const closed = await closeTickets(root, codes, "landed");
+	const missing = codes.filter((code) => !closed.moved.some((path) => path.includes(`/${code.toUpperCase()}-`)));
+	for (const path of closed.moved) {
+		console.log(`closed ${path}${closed.commit ? ` in ${closed.commit}` : ""}`);
+	}
+	if (missing.length) {
+		throw new Error(`no active ticket for ${missing.join(", ")} in ${root}/spec/features/active/`);
+	}
 }
 
 /** The land gate on demand, so a hand merge or a keeper can check a branch before it reaches the plant branch. */

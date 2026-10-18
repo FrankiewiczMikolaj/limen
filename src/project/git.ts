@@ -288,6 +288,12 @@ export function commitList(cwd: string, base: string, branch: string): string | 
 	const result = git(cwd, ["log", "--oneline", `${base}..${branch}`]);
 	return result.status === 0 ? result.stdout.trimEnd() : undefined;
 }
+/** Commits only `paths`, as they are in the working tree, beside whatever else is staged or changed; returns the short SHA. */
+export function commitPaths(cwd: string, paths: readonly string[], message: string): string {
+	requireGit(cwd, ["add", "-A", "--", ...paths]);
+	requireGit(cwd, ["commit", "--quiet", "-m", message, "--", ...paths]);
+	return requireGit(cwd, ["rev-parse", "--short", "HEAD"]).stdout.trim();
+}
 export function cleanWorktree(cwd: string): boolean {
 	if (!existsSync(cwd)) {
 		return false;

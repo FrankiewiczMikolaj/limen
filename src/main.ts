@@ -1,3 +1,4 @@
+import { boardCommand } from "./commands/board.ts";
 import { closeCommand } from "./commands/close.ts";
 import { continueCommand } from "./commands/continue.ts";
 import { diffCommand } from "./commands/diff.ts";
@@ -40,6 +41,7 @@ const COMMANDS = {
 	stop: stopCommand,
 	wait: waitCommand,
 	land: landCommand,
+	board: boardCommand,
 	keeper: keeperCommand,
 	jobs: jobsCommand,
 	status: statusCommand,
@@ -67,6 +69,7 @@ const COMMANDS = {
 	| "stop"
 	| "wait"
 	| "land"
+	| "board"
 	| "keeper"
 	| "jobs"
 	| "status"
@@ -106,7 +109,7 @@ usage:
   limen steer <id|suffix|label> | --running "correction"
   limen diff <id|suffix|label>
   limen wait <id|suffix|label>
-  limen land <id|suffix|label> [--onto BRANCH] [--yes]  # merge a done job onto the current branch
+  limen land <id|suffix|label> [--onto BRANCH] [--yes] [--keep-open]  # merge a done job onto the current branch and close its active ticket; --keep-open when more slices remain
   limen keeper <ticket-path> (--job ID [--job ID ...] | --group GROUP-ID) [--candidate BRANCH] --engine E --provider P --model M --thinking T [--timeout D]  # after the work: a short job fixes ticket, board and map links on its own branch
   limen stop <id|suffix|label> [reason]
   limen jobs [--running|--active|--all|--label PREFIX|<id|suffix|label>]
@@ -119,6 +122,8 @@ usage:
   limen ticket-author <ticket-path>                 # creation-commit author, following Git renames
   limen ticket new "what becomes true" [--lane planned|active] [--touches id,id]  # next unused F number across lanes, limen/* branches and job labels
   limen ticket check [BRANCH]                    # land gate on demand: tickets BRANCH adds or changes; run before a hand git merge
+  limen ticket done FNNN [FNNN ...]             # landed without limen land: active ticket moves to done/ with a landed date
+  limen board [--write]                          # the board with NOW and PROVEN from the lanes and each ticket's jobs; --write rewrites them in spec/build.md
   limen sweep [--install|--uninstall]
   limen webhook test                             # send one test ping to this plant's finish webhook targets
   limen webhook deliver <receipt-folder>         # internal: send one queued ping, retrying with backoff

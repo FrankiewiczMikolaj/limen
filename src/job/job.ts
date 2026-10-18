@@ -187,6 +187,16 @@ export function closedJobFeatures(label: string, id: string, closed: ReadonlySet
 	const named = [...new Set(`${label}\n${id}`.match(/\bF\d+\b/gi)?.map((feature) => feature.toUpperCase()))];
 	return named.every((feature) => closed.has(feature)) ? named : [];
 }
+/**
+ * The features a job works on: those its label, ID or `Ticket:` pointers name, and the `FNNN` that starts a commit subject.
+ * `limen land` closes these tickets and `limen board` lists the job under them.
+ */
+export function jobFeatures(label: string, id: string, task: string, subjects: readonly string[]): ReadonlySet<string> {
+	const pointers = [...task.matchAll(/\bTicket:\s+\S*?\b(F\d+)-/g)].map((match) => match[1] ?? "");
+	const prefixes = subjects.map((subject) => /^(F\d+)\b/i.exec(subject)?.[1] ?? "");
+	const named = `${label}\n${id}`.match(/\bF\d+\b/gi) ?? [];
+	return new Set([...named, ...pointers, ...prefixes].filter(Boolean).map((feature) => feature.toUpperCase()));
+}
 export function renderJob(job: Job, view: JobView): string {
 	const facts = [
 		`${PHASE_LABELS[job.phase]} ${job.label}`,

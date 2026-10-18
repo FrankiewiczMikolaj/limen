@@ -1,13 +1,14 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { jobFeatures } from "../job/job.ts";
 import { resolveJob } from "../job/lookup.ts";
-import { type BoardEntry, readBoard } from "../picture/board.ts";
 import { readPicture } from "../picture/picture-build.ts";
 import { checkTickets, readTickets } from "../picture/tickets.ts";
+import { closeTickets } from "../project/board.ts";
 import {
 	abortMerge,
 	commitList,
@@ -26,7 +27,8 @@ export async function landCommand(args: readonly string[], cwd: string): Promise
 		throw new Error("group members cannot land; the owner-facing lead owns landing");
 	}
 	const parsed = parseLandArgs(args);
-	const { id, branch, base, repo, label } = await readDoneJob(cwd, parsed.query);
+	const job = await readDoneJob(cwd, parsed.query);
+	const { id, branch, base, repo, label } = job;
 	const root = limenRoot(cwd);
 	const repository = repo ? workspaceRepository(root, repo) : root;
 	const target = landTarget(repository, parsed.onto, branch);
@@ -35,6 +37,7 @@ export async function landCommand(args: readonly string[], cwd: string): Promise
 	if (!parsed.yes && process.stdin.isTTY === true && !(await confirm(`Land ${label || id} onto ${target}? [y/N] `))) {
 		throw new Error("land cancelled");
 	}
+	const subjects = (commitList(repository, base, branch) ?? "").split("\n").map((line) => line.replace(/^\S+ /, ""));
 	let output: string;
 	try {
 		output = mergeBranch(repository, branch);
@@ -53,19 +56,38 @@ export async function landCommand(args: readonly string[], cwd: string): Promise
 	for (const { branch: name, kept } of await deleteLandedBranches(root, [{ repository, branch }])) {
 		console.log(kept ? `kept branch ${name}: ${kept}` : `deleted branch ${name}`);
 	}
+	if (parsed.keepOpen) {
+		return;
+	}
+	await closeLandedTickets(root, id, [...jobFeatures(label, id, job.task, subjects)]);
 }
-/** The job's recorded branch, base, repo and label; only a done job with a branch and a base lands. */
+/** The tickets the job works on leave active/ with the land; a ticket that cannot move says why and stays. */
+async function closeLandedTickets(root: string, id: string, features: readonly string[]): Promise<void> {
+	try {
+		const closed = await closeTickets(root, features, `landed by ${id}`);
+		for (const path of closed.moved) {
+			console.log(`land: closed ${path}${closed.commit ? ` in ${closed.commit}` : ""}; NOW and PROVEN regenerated`);
+		}
+		if (closed.moved.length === 0) {
+			console.log(`land: no active ticket for ${features.join(", ") || "this job"}; nothing closed`);
+		}
+	} catch (error) {
+		console.log(`land: tickets stay active: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+/** The job's recorded branch, base, repo, label and task; only a done job with a branch and a base lands. */
 async function readDoneJob(
 	cwd: string,
 	query: string,
-): Promise<{ id: string; branch: string; base: string; repo: string; label: string }> {
+): Promise<{ id: string; branch: string; base: string; repo: string; label: string; task: string }> {
 	const { id, jobDir } = await resolveJob(cwd, query, "control");
-	const [state, branch, base, repo, label] = await Promise.all([
+	const [state, branch, base, repo, label, task] = await Promise.all([
 		text(`${jobDir}/state`),
 		text(`${jobDir}/branch`),
 		text(`${jobDir}/base`),
 		text(`${jobDir}/repo`),
 		text(`${jobDir}/label`),
+		text(`${jobDir}/task.md`),
 	]);
 	if (state !== "done") {
 		throw new Error(`job ${id} is ${state || "missing"}; land requires a done job`);
@@ -73,7 +95,7 @@ async function readDoneJob(
 	if (!branch || !base) {
 		throw new Error(`job ${id} has no recorded ${branch ? "base" : "branch"}`);
 	}
-	return { id, branch, base, repo, label };
+	return { id, branch, base, repo, label, task };
 }
 /** Land merges onto the checked-out branch, never onto the job's own branch. */
 function landTarget(repository: string, onto: string | undefined, branch: string): string {
@@ -203,8 +225,7 @@ export async function landTicketCheck(
 	const placeIds = await checkPictureSources(repository, root, branch, tickets, lines);
 	const tip = await mkdtemp(join(tmpdir(), "limen-land-"));
 	try {
-		const entries = await extractTicketsAtTip(repository, branch, tip);
-		checkBoardLines(tickets, entries, lines);
+		extractTicketsAtTip(repository, branch, tip);
 		const read = await readTickets(tip);
 		const diagnostics = [...read.diagnostics, ...(placeIds ? checkTickets(read.tickets, placeIds) : [])].filter(
 			(d) => d.source !== null && changed.has(d.source),
@@ -282,55 +303,13 @@ async function checkPictureSources(
 	}
 	return placeIds;
 }
-/** Writes the branch's tickets and board into `tip`; returns the board entries, undefined when it has no board. */
-async function extractTicketsAtTip(
-	repository: string,
-	branch: string,
-	tip: string,
-): Promise<Map<string, BoardEntry> | undefined> {
+/** Writes the branch's tickets into `tip`. */
+function extractTicketsAtTip(repository: string, branch: string, tip: string): void {
 	const archive = execFileSync("git", ["archive", branch, "--", ":(glob)spec/features/**/ticket.md"], {
 		cwd: repository,
 		maxBuffer: 256 * 1024 * 1024,
 	});
 	execFileSync("tar", ["-x", "-C", tip], { input: archive });
-	const board = spawnSync("git", ["show", `${branch}:spec/build.md`], {
-		cwd: repository,
-		maxBuffer: 64 * 1024 * 1024,
-	});
-	if (board.status === 0) {
-		await writeFile(join(tip, "spec/build.md"), board.stdout);
-	}
-	// A branch with no board at its tip gets no board warnings.
-	return board.status === 0 ? await readBoard(tip) : undefined;
-}
-/** Warns when an active or done ticket has no board line, or a board state that does not match its lane. */
-function checkBoardLines(
-	tickets: readonly string[],
-	entries: ReadonlyMap<string, BoardEntry> | undefined,
-	lines: string[],
-): void {
-	for (const path of tickets) {
-		const lane = path.split("/")[2];
-		const folder = path.split("/").at(-2) ?? "";
-		const code = TICKET_PATH.exec(path)?.[1] ?? "";
-		const want =
-			lane === "active"
-				? { state: "ACTIVE", line: `- \`${folder}\` (🟠 ACTIVE): <one clause> under ## NOW` }
-				: lane === "done"
-					? { state: "PROVEN", line: `- \`${folder}\` (🟢 PROVEN): <one clause> under ## PROVEN` }
-					: undefined;
-		if (!want || !entries) {
-			continue;
-		}
-		const entry = entries.get(code.toLowerCase());
-		if (!entry) {
-			lines.push(`warn spec/build.md: no board line for ${code}; fix: add ${want.line}`);
-		} else if (entry.state !== want.state) {
-			lines.push(
-				`warn spec/build.md:${entry.line}: ${code} is ${entry.state} on the board but its folder is in ${lane}; fix: mark it ${want.state} in the ${lane === "active" ? "NOW" : "PROVEN"} section`,
-			);
-		}
-	}
 }
 /** An added ticket whose F number another ticket at the branch already uses. */
 function duplicateTicketErrors(
@@ -368,14 +347,19 @@ function gitOk(cwd: string, args: readonly string[]): boolean {
 function parseLandArgs(args: readonly string[]): {
 	readonly query: string;
 	readonly yes: boolean;
+	readonly keepOpen: boolean;
 	readonly onto?: string;
 } {
-	const { values, positionals } = parseFlags(args, { yes: { type: "boolean" }, onto: { type: "string" } } as const, {
-		unknown: (word) => `unknown land option ${word}`,
-		missing: () => "--onto requires a branch",
-		repeated: (flag) => (flag === "--onto" ? "--onto may be supplied only once" : undefined),
-		endOfFlags: false,
-	});
+	const { values, positionals } = parseFlags(
+		args,
+		{ yes: { type: "boolean" }, "keep-open": { type: "boolean" }, onto: { type: "string" } } as const,
+		{
+			unknown: (word) => `unknown land option ${word}`,
+			missing: () => "--onto requires a branch",
+			repeated: (flag) => (flag === "--onto" ? "--onto may be supplied only once" : undefined),
+			endOfFlags: false,
+		},
+	);
 	// An empty word, such as an unset shell variable, was never a job id.
 	const [query, ...extra] = positionals.filter((word) => word !== "");
 	if (!query) {
@@ -384,8 +368,8 @@ function parseLandArgs(args: readonly string[]): {
 	if (extra.length > 0) {
 		throw new Error("land requires exactly one job id");
 	}
-	const yes = values.yes ?? false;
-	return values.onto !== undefined ? { query, yes, onto: values.onto } : { query, yes };
+	const flags = { query, yes: values.yes ?? false, keepOpen: values["keep-open"] ?? false };
+	return values.onto !== undefined ? { ...flags, onto: values.onto } : flags;
 }
 
 async function confirm(question: string): Promise<boolean> {
