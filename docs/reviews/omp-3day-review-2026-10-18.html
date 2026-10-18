@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limen: three days of OMP sessions — tweak, build, remove</title>
+<style>
+:root { --ink: #000; --gray: #707070; --line: #000; --soft: #f3f3f3; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #fff; color: var(--ink); font: 16px/1.55 Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 48px 56px 80px; }
+h1 { font-size: 34px; font-weight: 650; margin: 0 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 24px; font-weight: 650; margin: 0 0 6px; }
+h3 { font-size: 17px; font-weight: 650; margin: 0 0 10px; }
+h4 { font-size: 15px; font-weight: 650; margin: 28px 0 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+p { margin: 0 0 10px; }
+.sub { color: var(--gray); margin: 0 0 28px; }
+section { border-top: 1px solid var(--line); padding: 32px 0 8px; margin-top: 32px; }
+.lead { color: var(--gray); max-width: 820px; }
+nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 15px; margin: 0 0 8px; }
+nav a { color: var(--ink); }
+.nums { display: grid; grid-template-columns: repeat(6, 1fr); border: 1px solid var(--line); margin: 24px 0 0; }
+.nums div { padding: 14px 16px; }
+.nums div + div { border-left: 1px solid var(--line); }
+.nums b { display: block; font-size: 26px; font-weight: 650; }
+.nums span { font-size: 13px; color: var(--gray); }
+.verdict { font-size: 18px; max-width: 900px; margin: 28px 0 0; }
+.tops { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); margin-top: 24px; }
+.tops div { padding: 16px 20px; }
+.tops div + div { border-left: 1px solid var(--line); }
+.tops ol { margin: 0; padding-left: 20px; }
+.tops li { margin: 0 0 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px 10px 0; border-bottom: 1px solid #d0d0d0; }
+th { font-weight: 650; border-bottom: 1px solid var(--line); }
+td.rt { font-weight: 600; width: 24%; }
+td.nw { white-space: nowrap; color: var(--gray); }
+.lens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 16px; }
+.lens div { border: 1px solid var(--line); padding: 18px 20px; }
+.cards { display: grid; gap: 18px; margin-top: 18px; }
+.card { border: 1px solid var(--line); padding: 20px 24px 16px; }
+.card h3 { display: flex; align-items: center; gap: 12px; font-size: 18px; }
+.n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+dl { display: grid; grid-template-columns: 92px 1fr; gap: 6px 16px; margin: 0; font-size: 15px; }
+dt { font-weight: 650; color: var(--gray); text-transform: uppercase; font-size: 12px; letter-spacing: 0.06em; padding-top: 3px; }
+dd { margin: 0; }
+.meta { display: flex; gap: 28px; margin: 14px 0 0; padding-top: 10px; border-top: 1px solid #d0d0d0; font-size: 14px; color: var(--gray); }
+.meta b { color: var(--ink); font-weight: 600; }
+code { font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--soft); padding: 1px 4px; }
+ul.plain { margin: 8px 0 0; padding-left: 20px; }
+ul.plain li { margin: 0 0 6px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+footer { margin-top: 40px; color: var(--gray); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Three days of OMP sessions: tweak, build, remove</h1>
+<p class="sub">Limen review · 2026-10-18 · sessions from 2026-10-15 19:30 to 2026-10-18 19:30 UTC · research only, no code changed</p>
+<nav><a href="#core">Core map</a><a href="#lens">Lens</a><a href="#tweak">Tweak</a><a href="#build">Build</a><a href="#remove">Remove</a><a href="#keep">Keep</a><a href="#method">Method</a></nav>
+<div class="nums"><div><b>429</b><span>OMP session files read (504 MB)</span></div><div><b>273</b><span>jobs; 26 coordinator sessions; 6 plants</span></div><div><b>343 h</b><span>job wall time (171 h active)</span></div><div><b>289</b><span>wakes into coordinators</span></div><div><b>114</b><span>steers delivered</span></div><div><b>177</b><span>coordinator inputs, 0 typed by Adam</span></div></div>
+<p class="verdict">The core loop works: jobs, worktrees, steers, finish and review carried 273 jobs. The losses come from the harness under load and from one assumption that no longer holds: one coordinator per plant. Alice ran up to 19 coordinators at once, started and shepherded by Tony. The models held rules and negotiated well; Limen's records, timeouts and landing did not keep up.</p>
+<div class="tops">
+<div><h3>Tweak</h3><ol><li>Wake records tell the truth and do not resend</li><li>Spawn returns the job ID in seconds</li><li>A detached job hears its deadline before the timeout</li></ol></div>
+<div><h3>Build</h3><ol><li>Seat admission: a cap on running jobs, with a queue</li><li>One landing path that records proof</li><li>Starting a coordinator is one Limen command</li></ol></div>
+<div><h3>Remove</h3><ol><li>Remove the group runtime; keep teams as prose</li><li>Drop the per-edit styleguide reminder</li><li>Move rare recipes out of the always-on shop manual</li></ol></div>
+</div>
+
+<section id="core">
+<h2>Core map</h2>
+<p class="lead">Limen lets one human run many focused agent sessions through one coordinator conversation. Intent, job state and decisions live in plain files and Git; each job gets one worktree; evidence comes before claims; the harness informs and does not gate. Use counts are from this window.</p>
+<table><thead><tr><th>Feature</th><th>What it does</th><th>Use in 3 days</th><th>Load-bearing</th></tr></thead><tbody><tr><td class='rt'>Jobs: spawn, worktree, record</td><td>One job, one branch, one worktree, files under .limen/jobs.</td><td class='nw'>273 jobs</td><td class='nw'>yes</td></tr><tr><td class='rt'>Wakes</td><td>A finished job prompts its coordinator (Pi session or Herdr pane).</td><td class='nw'>289 wakes</td><td class='nw'>yes</td></tr><tr><td class='rt'>finish tool and finish pings</td><td>A job ends itself; a queued webhook tells the outside assistant.</td><td class='nw'>171 finish calls</td><td class='nw'>yes</td></tr><tr><td class='rt'>steer, stop, continue</td><td>Correct, end, or extend a job between tool calls.</td><td class='nw'>114 steers, 22 continues</td><td class='nw'>yes</td></tr><tr><td class='rt'>land, status, jobs</td><td>Merge a done job; the plant inbox; job detail.</td><td class='nw'>29 land, 87 jobs, 9 status</td><td class='nw'>partly</td></tr><tr><td class='rt'>Reviews (--review)</td><td>A fresh session gives PASS or FAIL with evidence.</td><td class='nw'>52 reviews</td><td class='nw'>yes</td></tr><tr><td class='rt'>Board and tickets</td><td>spec/build.md and numbered feature folders.</td><td class='nw'>hand-kept; drifts</td><td class='nw'>partly</td></tr><tr><td class='rt'>Injection hooks</td><td>Capability frame, register, vision, styleguide, board digest, per-turn cue, tool-result reminders.</td><td class='nw'>every call</td><td class='nw'>yes</td></tr><tr><td class='rt'>Engines Pi and OMP</td><td>One wrapper, one parser, two auth stores.</td><td class='nw'>385 OMP job sessions</td><td class='nw'>yes</td></tr><tr><td class='rt'>Groups</td><td>Team coordinators with peer messages and deadlines.</td><td class='nw'>0 starts</td><td class='nw'>no</td></tr><tr><td class='rt'>Keeper, picture, doorbell, Linear</td><td>Spec links, local map, GitHub requests, mirror.</td><td class='nw'>keeper 0, picture 16, doorbell 0, Linear 0</td><td class='nw'>no</td></tr></tbody></table>
+</section>
+
+<section id="lens">
+<h2>Lens</h2>
+<p class="lead">Each item is judged on what models do well today, what they still cannot do, and what stays true when they get better.</p>
+<div class="lens"><div><h3>Native now</h3><p>Opus 5.5 coordinators kept every standing rule for 30 h at 600k+ tokens, with no slower replies. Coordinators split file ownership in plain text (about 41 peer messages, 0 lost). Workers found the real cause in 4 of 4 briefs that guessed wrong. Steers were obeyed within seconds.</p></div><div><h3>Still a limit</h3><p>A model has no wall clock: 270 reviewer-minutes ended with no verdict at the 90-minute limit. A model&#x27;s &quot;landed&quot; is a claim, not proof (F1047). Models retry a refused shared resource (64 lease attempts in one job). A hand-written mask leaked three secret values.</p></div><div><h3>Fast takeoff</h3><p>Remove what compensates for weak instruction-following or weak coordination: those weaknesses did not show. Build what stays true at any model strength: deadlines, finite machines, proof of landing, ownership records, and one place for Adam&#x27;s decisions.</p></div></div>
+</section>
+
+<section id="tweak">
+<h2>Tweak</h2>
+<p class="lead">Small changes to behavior that exists. Top 5 first.</p>
+<div class="cards"><article class="card">
+<h3><span class="n">1</span>Wake records tell the truth and do not resend</h3>
+<dl>
+<dt>Evidence</dt><dd>49 of 240 job wakes reached the coordinator twice, 0–3 min apart. 21 jobs logged &quot;automatic delivery stopped after 2 unsuccessful attempts&quot;; 20 of them were in fact delivered, twice. Causes in the logs: <code>herdr exceeded 15000ms</code> (37), <code>timed out waiting for agent status</code> (13), <code>submitted; no turn observed</code> (22). Tony then told a coordinator &quot;The limen wake did not reach you&quot;; the session shows it had arrived 40 s earlier.</dd>
+<dt>Why</dt><dd>Under load the Herdr CLI times out after it has delivered the text, and OMP queues text into a busy turn, so &quot;no turn observed&quot; is normal. The record reads a slow CLI as a lost wake. Models handle a queued message well; only the harness guesses wrong.</dd>
+<dt>Effect</dt><dd>Check the pane before any resend; record &quot;delivered, turn not seen&quot;; never resend the same text. No duplicate turns; a record bots and people can trust.</dd>
+</dl>
+<p class="meta"><span>Size <b>1 slice, 1–2 h</b></span><span>Confidence <b>high</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">2</span>Spawn returns the job ID in seconds</h3>
+<dl>
+<dt>Evidence</dt><dd>Timed spawn calls in coordinators: median 58 s, p75 5 min, p90 10 min, max 19 min. Detached and review spawns: median about 3 min. 16 logs show <code>prepare failed: spawnSync /bin/sh ETIMEDOUT</code> (300 s cap). A 200 s shell limit killed one spawn mid-setup (exit 143). Worktree add, prune of finished worktrees, and <code>--prepare</code> all run before the ID prints (src/commands/spawn.ts:437–443).</dd>
+<dt>Why</dt><dd>The vision says spawn returns the ID in seconds and hands the job to a supervisor. Under load the synchronous path breaks that promise and can leave a job the caller cannot name.</dd>
+<dt>Effect</dt><dd>Print the ID right after publication; run prune and prepare in the supervisor and log the result. Coordinators stop blocking for minutes.</dd>
+</dl>
+<p class="meta"><span>Size <b>1 slice, 2–3 h</b></span><span>Confidence <b>medium-high</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">3</span>A detached job hears its deadline before the timeout</h3>
+<dl>
+<dt>Evidence</dt><dd>3 detached reviews ran the full 90 min with no verdict: 270 reviewer-minutes, 70–77 min of each spent in waits on builds and the GUI lease. No reviewer mentions its limit; templates/reviewer.md has no time wording. Coordinators sent time steers by hand (&quot;wrap up now&quot;, &quot;You hit the time limit. Do NOT run new model calls&quot;). <code>limen continue --timeout</code> is refused (&quot;unknown continue option&quot;).</dd>
+<dt>Why</dt><dd>A model cannot see the clock. This does not fade as models improve; only the harness knows the deadline.</dd>
+<dt>Effect</dt><dd>At 80% of the timeout, one steer through the existing hook: &quot;N min left: write the verdict or commit now; mark unrun checks unverified.&quot; A timeout ends with a verdict or a commit.</dd>
+</dl>
+<p class="meta"><span>Size <b>small slice, about 1 h</b></span><span>Confidence <b>high</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">4</span>Detached is the default when nobody types in the tab</h3>
+<dl>
+<dt>Evidence</dt><dd>141 hosted jobs; 0 messages typed by a person into a worker tab (all in-tab text came from coordinators, steers or bots). Hosted cost: 49 &quot;timed out waiting for agent startup&quot; warnings, 13 hosted start failures, 12 &quot;another tab took focus during hosted start&quot;. No timeout: hosted wall p90 5.4 h, max 11 h; Tony sent 21 nudges about long or silent work.</dd>
+<dt>Why</dt><dd>The hosted tab exists so the owner can type. Adam works through Tony, so the tab costs without use. Detached keeps a visible log tab and adds a timeout, a tool cap and process containment.</dd>
+<dt>Effect</dt><dd>Default to <code>--detached</code> with a board-set timeout (23% of hosted jobs ran over 90 active minutes, so not 90 min); <code>--tab</code> stays opt-in. Fewer start failures, no focus theft, bounded runs.</dd>
+</dl>
+<p class="meta"><span>Size <b>small slice + board line</b></span><span>Confidence <b>medium (changes an owner default)</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">5</span>Fix the CLI papercuts agents route around</h3>
+<dl>
+<dt>Evidence</dt><dd>Node prints <code>ExperimentalWarning: Type Stripping</code> on every limen call: 90 of 481 limen calls add a grep filter, 68 tool results carry it. <code>limen land</code> asks for a TTY confirm; agents pass <code>--yes</code> every time after one refusal. <code>continue</code> refuses <code>--timeout</code>.</dd>
+<dt>Why</dt><dd>Each workaround costs a token-heavy retry or a longer command, every time, in every session.</dd>
+<dt>Effect</dt><dd>Silence the warning in bin/limen; skip the confirm when stdin is not a TTY; accept <code>--timeout</code> on continue.</dd>
+</dl>
+<p class="meta"><span>Size <b>under 1 h</b></span><span>Confidence <b>high</b></span></p>
+</article></div>
+<h4>Also</h4>
+<table class='rest'><thead><tr><th>Item</th><th>Evidence and change</th><th>Size</th><th>Confidence</th></tr></thead><tbody><tr><td class='rt'>Stall observer logs changes only</td><td>4,387 &quot;tool stall observation uncertain&quot; lines in recent job logs, about 2 per minute in detached jobs on macOS; coordinators tail these logs.</td><td class='nw'>under 1 h</td><td class='nw'>high</td></tr><tr><td class='rt'>A landed job branch goes away</td><td>Alice audit: 517 local branches not in alice-v6; 310 deleted by hand on Adam&#x27;s order, then 1,667 remote branches in a later cleanup. Land or <code>prune --retire</code> should delete landed <code>limen/*</code> branches.</td><td class='nw'>1 h</td><td class='nw'>medium-high</td></tr><tr><td class='rt'>Prune explains each worktree it removes</td><td>3 live jobs lost their worktree mid-run (F1061: &quot;1,796 unstaged deletions… no longer listed&quot;; F1045 S5; F1044). Cause not confirmed; the pattern fits <code>git worktree remove --force</code>, which prune uses. Log path, job and reason; skip dirty or young worktrees.</td><td class='nw'>1 h</td><td class='nw'>medium</td></tr><tr><td class='rt'>Hook updates announce themselves</td><td>F946, F947 and F948 each ended with &quot;restart or /reload every running coordinator&quot;; 19 coordinator tabs were live in Alice. The hook can compare loaded and installed versions and add one line to the next cue.</td><td class='nw'>1 h</td><td class='nw'>medium</td></tr><tr><td class='rt'>Handoffs carry symptoms, not guessed causes</td><td>4 of 4 bot-written Limen briefs carried a wrong cause (receiver rate limit, old hooks, the willContinue gate, &quot;tool results get nothing&quot;); workers refuted all 4, one after a refactor it had to revert. One line in the handoff rules and in Tony&#x27;s brief template.</td><td class='nw'>minutes</td><td class='nw'>medium</td></tr><tr><td class='rt'>Every job records who spawned it</td><td>Mega: 17 of 26 jobs have no spawned-by file and no wake route; the finish author says &quot;missing Ticket: pointer&quot;.</td><td class='nw'>under 1 h</td><td class='nw'>medium</td></tr></tbody></table>
+</section>
+<section id="build">
+<h2>Build</h2>
+<p class="lead">New capability that stays valuable as models improve. Top 5 first.</p>
+<div class="cards"><article class="card">
+<h3><span class="n">1</span>Seat admission: a cap on running jobs, with a queue</h3>
+<dl>
+<dt>Evidence</dt><dd>Load averages 80–320 on a 16-core Mac with 15 jobs running; <code>git status</code> took 18 s; 8 detached starts failed (&quot;detached wrapper did not become ready&quot;); one review spent 28 min on a prebuild; a lab check failed at 5.2 s against a 5 s window &quot;under load&quot;. One worker made 64 GUI-lease attempts (63 refused); check batches re-ran 5–13 times. Tony&#x27;s rule &quot;at most 2 workers at a time&quot; is per coordinator, and 19 coordinators ran at once.</dd>
+<dt>Why</dt><dd>Machines stay finite as agent count grows. Prose limits per coordinator cannot add up across coordinators; only the seat sees the total.</dd>
+<dt>Effect</dt><dd>A board-set <code>max running</code>: spawn records the job as queued and the supervisor starts it when a slot frees; an optional named lease (<code>--needs gui</code>) for one shared resource; status shows queue and load. Fewer timeouts and reruns.</dd>
+</dl>
+<p class="meta"><span>Size <b>2 slices, 4–6 h</b></span><span>Confidence <b>medium-high</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">2</span>One landing path that records proof</h3>
+<dl>
+<dt>Evidence</dt><dd>Coordinators ran <code>git merge</code> 143 times and <code>limen land</code> 29 times; land hit 6 conflicts in the shared checkout, worked around with <code>git update-ref</code> 3 times. F1047&#x27;s outcome said &quot;landed&quot; for a merge that never reached alice-v6; a drift audit found it 8 h later. Three coordinators would not push alice-v6 because it held another coordinator&#x27;s unpushed commits. A landed F1044 slice still showed as a waiting candidate and caused a false nudge.</dd>
+<dt>Why</dt><dd>A model&#x27;s &quot;landed&quot; is a claim; the plant branch is the proof. With many coordinators on one branch, landing must be serialized and checkable at any model strength.</dd>
+<dt>Effect</dt><dd><code>limen land</code> takes a plant lock, resolves conflicts in an integration worktree (<code>land --continue</code>), pushes when the board says so, and records the merge SHA in the job record. Status flags any outcome that claims a landing the branch does not have.</dd>
+</dl>
+<p class="meta"><span>Size <b>2 slices, 4–6 h</b></span><span>Confidence <b>high (need), medium (shape)</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">3</span>Starting a coordinator is one Limen command</h3>
+<dl>
+<dt>Evidence</dt><dd>Tony started 26 Alice coordinator sessions in 3 days by hand (open a tab, type &quot;Read /tmp/tony-briefs/X.md and follow it fully&quot;). The first turn failed in 26 of 26 Alice coordinator sessions (&quot;No conversation found with session ID&quot;, pi-claude bridge); 24 needed a typed &quot;Retry: do the task above now.&quot; 9 of 19 coordinator tabs have no handle; the briefs live in /tmp.</dd>
+<dt>Why</dt><dd>Agents starting coordinators is the trend. The coordinator owns the work but has no record, while every job has one.</dd>
+<dt>Effect</dt><dd><code>limen coordinator start --brief FILE --label L</code> stores the brief under .limen/coordinators/, opens the tab, waits for ready, sends the brief, confirms a turn, retries once on a first-turn provider error, and records pane, label and starter. Status and wakes read that record.</dd>
+</dl>
+<p class="meta"><span>Size <b>2 slices, 4–6 h</b></span><span>Confidence <b>medium-high</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">4</span>One list of open owner decisions</h3>
+<dl>
+<dt>Evidence</dt><dd>Tony asked coordinators to write their open questions into /tmp/tony-briefs/*-decisions.md, relayed answers by hand (&quot;Adam&#x27;s answers on F1074 (verbatim intent): Q1 YES…&quot;), and once relayed a wrong one: &quot;Adam confirms…&quot;, then &quot;Adam has NOT confirmed&quot; 35 s later. Tickets already carry a <code>needs-adam</code> field.</dd>
+<dt>Why</dt><dd>Adam&#x27;s attention is the scarce resource. One list read once beats questions spread over 19 panes and /tmp files.</dd>
+<dt>Effect</dt><dd><code>limen status</code> and a <code>decision.open</code> webhook event list every <code>needs-adam</code> ask in the plant with feature and question; an answer clears it.</dd>
+</dl>
+<p class="meta"><span>Size <b>1 slice, 2–3 h</b></span><span>Confidence <b>medium</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">5</span>Durable notes and claims between coordinators</h3>
+<dl>
+<dt>Evidence</dt><dd>On 10-18, 8 coordinators exchanged about 41 messages with raw <code>herdr pane send-text</code>, <code>pane run</code> and <code>agent prompt</code>: 0 lost, but delays up to 4 min, one stuck in an input box, 11 commands backgrounded and 4 waits skipped by incoming text. Ownership deals lived in /tmp files and in ledger edits that were promised, not applied. One duplicate rename was caught by chance.</dd>
+<dt>Why</dt><dd>Negotiation is native: the models did it well. What fails is the record: pane text and /tmp do not survive.</dd>
+<dt>Effect</dt><dd><code>limen note &lt;coordinator&gt; &quot;text&quot;</code> routed like a wake, with a receipt, under .limen/notes/; a plant claims file (path glob, owner, feature) that status shows and spawn checks for overlap.</dd>
+</dl>
+<p class="meta"><span>Size <b>2 slices, 4–6 h</b></span><span>Confidence <b>medium</b></span></p>
+</article></div>
+<h4>Also</h4>
+<table class='rest'><thead><tr><th>Item</th><th>Evidence and change</th><th>Size</th><th>Confidence</th></tr></thead><tbody><tr><td class='rt'>A plant digest for the outside assistant</td><td>21 shepherd nudges from Tony. In the two longest coordinators 1 nudge found a real miss and 1 was false because Limen&#x27;s candidate state was wrong. Build after the landing path: one event when a candidate waits while its coordinator is idle, or a job is quiet past a limit.</td><td class='nw'>1 slice</td><td class='nw'>low-medium</td></tr></tbody></table>
+</section>
+<section id="remove">
+<h2>Remove</h2>
+<p class="lead">Scaffolding that compensates for weaknesses the sessions did not show. Top 5 first.</p>
+<div class="cards"><article class="card">
+<h3><span class="n">1</span>Remove the group runtime; keep teams as prose</h3>
+<dl>
+<dt>Evidence</dt><dd>0 <code>limen group start</code> in 3 days. Adam asked to &quot;spin limen group of agents&quot; (F1048); the coordinator found the command &quot;can&#x27;t express mixed team configurations&quot; and ran 7 plain spawns with draft and critique rounds. Board cleanup (4 teams), F1042 (3 groups × 3 models) and F1048 all ran as plain spawns and delivered.</dd>
+<dt>Why</dt><dd>Rounds and cross-reading are native model work. The runtime (src/commands/group.ts 663 lines, hook/group-peer.ts 259, two templates, docs/groups.md, about 400 words in every coordinator prompt) compensates for a weakness models did not show. The seat cap bounds fan-out better.</dd>
+<dt>Effect</dt><dd>About 1,100 fewer lines, a shorter coordinator prompt, one way to run teams.</dd>
+</dl>
+<p class="meta"><span>Size <b>1 slice + review, 2–3 h</b></span><span>Confidence <b>medium (Adam asked for groups by name)</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">2</span>Drop the per-edit styleguide reminder</h3>
+<dl>
+<dt>Evidence</dt><dd>Appended 3,662 times to code-edit results, failed edits included; a styleguide read followed within 5 calls 17 times (0.5%). The vision reminder: 499 appends, 7 reads. Both files already ride the system prompt on every call.</dd>
+<dt>Why</dt><dd>Rule retention held for 30 h at 600k+ tokens. A heading list repeated inside tool results is data the model parses on every later call.</dd>
+<dt>Effect</dt><dd>Remove the styleguide reminder; fire the vision reminder once per session. Cleaner tool results.</dd>
+</dl>
+<p class="meta"><span>Size <b>under 1 h</b></span><span>Confidence <b>medium (no behavior A/B)</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">3</span>Move rare recipes out of the always-on shop manual</h3>
+<dl>
+<dt>Evidence</dt><dd>templates/agents.md is 7,260 words and rides every coordinator call. Not used in 3 days: groups (396 words), GitHub doorbell (254), picture (256), keeper (182), personal routes (132), quality (104), workspace (91), Linear. Window uses: keeper 0, judge 0, quality 0, doorbell 0, Linear 0, diff 0, open 0.</dd>
+<dt>Why</dt><dd>Models read a named doc on demand well. A long manual dilutes the rules that matter on every turn: spawn, wake, land, recovery.</dd>
+<dt>Effect</dt><dd>One pointer line per recipe (&quot;Teams: read docs/groups.md&quot;); about 1,700 fewer words per coordinator call.</dd>
+</dl>
+<p class="meta"><span>Size <b>1 slice, 1–2 h</b></span><span>Confidence <b>medium-high</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">4</span>Stop hand-keeping NOW and PROVEN on the board</h3>
+<dl>
+<dt>Evidence</dt><dd>F946, F947 and F948 landed on main, but the board has 0 lines for them and their folders are still in active/. Alice&#x27;s board said S23c was running after its job had failed. Workers may not edit the board, and bot-driven coordinators skip the ritual.</dd>
+<dt>Why</dt><dd>Lanes and job records already hold this state. A hand copy drifts; a generated view stays true.</dd>
+<dt>Effect</dt><dd>Generate NOW and PROVEN from lanes and landed jobs; keep TRACK (owner decisions) by hand.</dd>
+</dl>
+<p class="meta"><span>Size <b>1–2 slices, 3–4 h</b></span><span>Confidence <b>medium (the vision names the board coordinator-kept)</b></span></p>
+</article>
+<article class="card">
+<h3><span class="n">5</span>Drop count rules that models ignore</h3>
+<dl>
+<dt>Evidence</dt><dd>worker.md: &quot;Ten reads without a changed file means make the probe edit.&quot; 82% of 148 Alice workers made more than 10 reads before their first edit (median 25; 39% over 30). No sign these jobs did worse.</dd>
+<dt>Why</dt><dd>An ignored rule costs tokens and teaches that rules are optional. Orientation reading is cheap at 1M context.</dd>
+<dt>Effect</dt><dd>Keep the outcome rules (commit the first coherent piece early, leave residue); remove the count.</dd>
+</dl>
+<p class="meta"><span>Size <b>minutes</b></span><span>Confidence <b>medium</b></span></p>
+</article></div>
+<h4>Also</h4>
+<table class='rest'><thead><tr><th>Item</th><th>Evidence and change</th><th>Size</th><th>Confidence</th></tr></thead><tbody><tr><td class='rt'>Use engine subagents, not jobs, for read-only fan-out</td><td>Mega: 9 worktrees and branches for 9 two-minute jobs that wrote only to /tmp; all left behind, each re-read vision and board. The examples-map job did the same split with in-process subagents. Keep jobs for edits and for isolation.</td><td class='nw'>minutes (manual line)</td><td class='nw'>low-medium</td></tr></tbody></table>
+</section>
+
+<section id="keep">
+<div class="two">
+<div><h2>Keep</h2><ul class="plain"><li>Job records and Git as truth: every scout traced events from job files without gaps.</li><li>Worktree isolation: 273 jobs in 3 days, conflicts only at merge.</li><li>Steer: 114 delivered; obeyed within seconds in every traced case but one bound.</li><li>finish tool and the durable finish outbox (F946): Tony&#x27;s shepherding depends on it.</li><li>Review where a mistake is expensive: 4 proven FAILs in 43 verdicts (a sync cut race, a 20 MP photo that breaks older replicas, an MCP scenario, a red test).</li></ul></div>
+<div><h2>Not Limen</h2><p class="lead">Engine and bridge faults seen in the window. Route them to OMP and the pi-claude bridge.</p><ul class="plain"><li>pi-claude bridge: first turn &quot;No conversation found with session ID&quot; in 26 of 26 Alice coordinators and 3 of 4 probes.</li><li>Codex lane: 24 &quot;native turn lane cannot accept stateful WebSocket messages&quot; errors (recovered).</li><li>OMP hashline edits: 237 edits anchored on lines never shown, 58 stale hashes; loops of 10–14 in one session.</li><li>Secrets: a coordinator&#x27;s sed mask covered only TAURI_* lines and printed three values (APPLE_PASSWORD, APPLE_CERTIFICATE_PASSWORD, ELEVEN_LABS_API_KEY, 10-16 14:49 UTC); <code>ps aux</code> printed a Cursor key. No Limen surface carried them. Output redaction belongs in the engine.</li></ul></div>
+</div>
+</section>
+
+<section id="method">
+<h2>Method and limits</h2>
+<ul class="plain"><li>Source: every OMP session file modified 2026-10-15 19:30 to 2026-10-18 19:30 UTC: 385 job sessions under &lt;plant&gt;/.limen/jobs/*/session, 33 coordinator and probe sessions and 11 subagent sessions under ~/.omp/agent/sessions. The 1.1 GB figure in the ask is the whole sessions folder; the 3-day slice is 504 MB.</li><li>Index: one Python pass for plant, role, model, duration, tools, errors, wakes, steers and inputs; job logs and notify records for wake and start outcomes. Seven read-only scouts traced chosen sessions; I checked their key claims in the files.</li><li>Durations exclude parent history copied into continue jobs. Active time caps gaps at 5 min.</li><li>Not read: Pi sessions (78 files, not OMP), Tony&#x27;s and Johnny&#x27;s own transcripts, Claude Code mirrors except to remove leaked values.</li><li>Adam&#x27;s words reach OMP only through Tony and Johnny; every quote attributed to Adam is a relay.</li><li>One scout copied the three leaked values into this review&#x27;s own transcripts; I replaced them with &lt;redacted&gt; in both files (24 places) and found no other copy.</li><li>Size is agent time for one worker plus review. Confidence is mine.</li></ul>
+<footer>docs/reviews/omp-3day-review-2026-10-18.html · summary: omp-3day-review-2026-10-18.md</footer>
+</section>
+</main>
+</body>
+</html>
