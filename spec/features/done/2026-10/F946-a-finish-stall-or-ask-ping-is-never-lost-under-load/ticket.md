@@ -4,6 +4,7 @@ touches:
   - limen.integrations.seat
   - limen.commands
 opened: 2026-10-16
+landed: 2026-10-16
 ---
 
 # F946 · A finish, stall or Ask ping is never lost under load
