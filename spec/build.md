@@ -28,8 +28,6 @@
 
 <!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
-- `F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system` (🟠 ACTIVE): Every agent knows it works inside a highly capable agent system
-- `F947-a-coordinator-s-end-of-turn-always-sends-one-ping` (🟠 ACTIVE): A coordinator's end of turn always sends one ping
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
@@ -57,6 +55,8 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system` (🟢 PROVEN): Every agent knows it works inside a highly capable agent system; landed 2026-10-17
+- `F947-a-coordinator-s-end-of-turn-always-sends-one-ping` (🟢 PROVEN): A coordinator's end of turn always sends one ping; landed 2026-10-17
 - `F946-a-finish-stall-or-ask-ping-is-never-lost-under-load` (🟢 PROVEN): A finish, stall or Ask ping is never lost under load; landed 2026-10-16
 - `F945-short-pi-claude-model-form-starts-the-job-instead-of-killing-it` (🟢 PROVEN): Short pi-claude model form starts the job instead of killing it; landed 2026-10-13
 - `F943-the-coordinator-sweep-does-not-start-a-process-for-each-running-job-every-half-second` (🟢 PROVEN): The coordinator sweep does not start a process for each running job every half second; landed 2026-10-13
@@ -65,8 +65,6 @@
 - `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
 - `F932-live-picture-activity` (🟢 PROVEN): The picture shows what each running job is doing now; landed 2026-10-08
 - `F931-optchat-prompt-cache-compare` (🟢 PROVEN): The OptChat explainer shows what the prompt cache reads and what is paid in full, for a typical thread and for OptChat; landed 2026-10-07
-- `F930-optchat-vs-typical-context` (🟢 PROVEN): The OptChat explainer shows plainly how OptChat differs from typical context management; landed 2026-10-07
-- `F929-biome-enforces-readable-code-and-the-styleguide-says-the-same` (🟢 PROVEN): Biome enforces readable code and the styleguide says the same; landed 2026-10-06
-- 2026-10: 50 landed. spec/features/done/2026-10/
+- 2026-10: 52 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/

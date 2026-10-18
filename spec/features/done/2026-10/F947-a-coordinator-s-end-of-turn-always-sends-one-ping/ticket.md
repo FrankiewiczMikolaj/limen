@@ -4,6 +4,7 @@ touches:
   - limen.sessions.wake
   - limen.runtime.detached
 opened: 2026-10-16
+landed: 2026-10-17
 ---
 
 # F947 · A coordinator's end of turn always sends one ping

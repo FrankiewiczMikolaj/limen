@@ -2,6 +2,7 @@
 opened: 2026-10-17
 touches:
   - limen.sessions.guidance
+landed: 2026-10-17
 ---
 
 # F948 · Every agent knows it works inside a highly capable agent system
