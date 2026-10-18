@@ -4,6 +4,7 @@ touches:
   - limen.picture.build
   - limen.cabinet.records
 opened: 2026-10-08
+landed: 2026-10-08
 ---
 
 # F932 · The picture shows what each running job is doing now
