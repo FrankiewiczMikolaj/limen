@@ -172,10 +172,10 @@ type Continuation = {
 	readonly group: ContinuationGroup | undefined;
 	readonly timeoutMs: number | undefined;
 };
-/** True for a Herdr pane, false for a detached wrapper. */
-function chooseHostedContinue(options: ContinueOptions): boolean {
+/** True for a Herdr pane, false for a detached wrapper. Only --tab hosts; a group member without a mode flag keeps Herdr's pane. */
+function chooseHostedContinue(options: ContinueOptions, grouped: boolean): boolean {
 	const herdr = herdrAvailable();
-	const hosted = options.detached ? false : options.tab || herdr;
+	const hosted = options.detached ? false : options.tab || (grouped && herdr);
 	if (options.tab && !herdr) {
 		throw new Error("hosted continue requires Herdr (HERDR_ENV=1); use --detached for an ordinary job");
 	}
@@ -187,7 +187,6 @@ function chooseHostedContinue(options: ContinueOptions): boolean {
 async function continueJob(args: readonly string[], cwd: string, locked = false, round?: number): Promise<void> {
 	const options = parseContinueArgs(args);
 	const { review, label, model, provider, thinking } = options;
-	const hosted = chooseHostedContinue(options);
 	const chosenModel = model ?? defaultModel(review);
 
 	// A job that continues from its own worktree resolves jobs in its canonical root.
@@ -195,6 +194,7 @@ async function continueJob(args: readonly string[], cwd: string, locked = false,
 	const root = inherited?.root ?? (await commandRoot(cwd));
 	const { id: parentId, jobDir: parentDir } = await resolveJob(root, options.query, "control");
 	const membership = await jobMembership(parentDir);
+	const hosted = chooseHostedContinue(options, membership !== undefined);
 	if (membership) {
 		await checkGroupContinuation(membership, cwd, options, round);
 		if (!locked) {
