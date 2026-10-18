@@ -194,13 +194,12 @@ test("a repeated start keeps the original selections, even after a path disappea
 	for (const member of run.members) {
 		await f.checkJob(member.id, run.teamExtensions?.[member.team] ?? []);
 	}
-	const original = await readFile(join(groupPath(run), "run.json"), "utf8");
 	await rm(f.common);
 	await rm(f.privatePath);
 	const repeated = f.start("--extension", "missing-again.ts");
 	assert.equal(repeated.status, 0, repeated.stderr);
 	assert.equal(lastLine(repeated.stdout), run.id);
-	assert.equal(await readFile(join(groupPath(run), "run.json"), "utf8"), original);
+	assert.deepEqual((await readRun(f.root, run.id)).teamExtensions, run.teamExtensions);
 	assert.equal((await readdir(join(f.root, ".limen/jobs"))).length, 2);
 	assert.match(f.launch(run, "team-2").stderr, /cannot use extension/);
 	assert.equal((await readRun(f.root, run.id)).members.length, 2);

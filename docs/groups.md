@@ -22,7 +22,7 @@ limen group start spec/features/active/FNNN-name \
 - `--timeout D` (default 90m): one wall-clock deadline for the whole group, with a 60-second wrap-up reserve.
 - `--detached` forces background jobs; `--tab` requires Herdr; omit both for the environment's default. The final output line is the group ID. Activation selects the root from the feature and working directory, not an inherited `LIMEN_CONTEXT_ROOT`.
 
-Each feature holds one open group; several features run groups at the same time ("3 groups × 3 models" is three `group start` commands on three tickets). Repeating `group start` while the feature's group is still running returns its ID and launches nothing. Once that group has finished, been stopped or been closed, and none of its jobs is live, the next `group start` records a new run.
+Each feature holds one open group; several features run groups at the same time ("3 groups × 3 models" is three `group start` commands on three tickets). Repeating `group start` returns the feature's group ID and launches nothing until that group is closed or stopped, also after it finished, so a retried command never pays for a second run. Once it is closed or stopped and none of its jobs is live, the next `group start` records a new run.
 
 The packet is the feature's `ticket.md`, committed. A shared `group/brief.md` and a per-team approach note `group/teams/team-N.md` are optional; when they exist, they must be committed too. Markdown is not executable configuration.
 

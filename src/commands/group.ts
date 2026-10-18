@@ -170,7 +170,7 @@ function groupFeature(root: string, cwd: string, featureArgument: string): strin
 /** A repeated start resumes the feature's open run, so it keeps that run's planning source. */
 async function groupPlanningSource(root: string, feature: string, featureArgument: string): Promise<PlanningSource> {
 	const latest = (await runs(root)).filter((run) => run.feature === feature).at(-1);
-	const open = latest && !latest.stopped && !latest.closed && !latest.finishedAt ? latest : undefined;
+	const open = latest && !latest.stopped && !latest.closed ? latest : undefined;
 	const source = open ? (open.planningSource ?? "committed") : planningSource(root);
 	if (source === "private" && featureArgument.split(/[\\/]/).includes("..")) {
 		throw new Error(
@@ -267,7 +267,8 @@ async function activateGroup(
 	return groupLock(`${root}/.limen/groups`, async () => {
 		const previous = (await runs(root)).filter((run) => run.feature === feature);
 		const latest = previous.at(-1);
-		if (latest && !latest.stopped && !latest.closed && !latest.finishedAt) {
+		// A finished group still holds its result for the lead; only stop or close makes room for a new paid run.
+		if (latest && !latest.stopped && !latest.closed) {
 			return { run: latest, created: false };
 		}
 		await assertPriorRunsEnded(root, previous);
