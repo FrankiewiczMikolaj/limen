@@ -34,7 +34,7 @@ The core loop works: jobs, worktrees, steers, finish and review carried 273 jobs
 1. **Remove the group runtime; keep teams as prose** (1 slice + review, 2–3 h; confidence medium (Adam asked for groups by name)). 0 `limen group start` in 3 days.
 2. **Drop the per-edit styleguide reminder** (under 1 h; confidence medium (no behavior A/B)). Appended 3,662 times to code-edit results, failed edits included; a styleguide read followed within 5 calls 17 times (0.5%).
 3. **Move rare recipes out of the always-on shop manual** (1 slice, 1–2 h; confidence medium-high). templates/agents.md is 7,260 words and rides every coordinator call.
-4. **Stop hand-keeping NOW and PROVEN on the board** (1–2 slices, 3–4 h; confidence medium (the vision names the board coordinator-kept)). F946, F947 and F948 landed on main, but the board has 0 lines for them and their folders are still in active/.
+4. **Stop hand-keeping NOW and PROVEN on the board** (1–2 slices, 3–4 h; confidence medium (the vision names the board coordinator-kept)). F946, F947 and F948 landed on main, but the board has 0 lines for them and their folders are still in active/. **Approved by Adam, 2026-10-18 (relayed): "fix the proper handling of this!!!!"** Built: `limen land` closes the job's ticket and regenerates NOW and PROVEN; `limen ticket done` and `limen board` cover hand merges.
 5. **Drop count rules that models ignore** (minutes; confidence medium). worker.md: "Ten reads without a changed file means make the probe edit." 82% of 148 Alice workers made more than 10 reads before their first edit (median 25; 39% over 30).
 - Use engine subagents, not jobs, for read-only fan-out (minutes (manual line); low-medium).
 
