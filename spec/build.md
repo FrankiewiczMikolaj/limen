@@ -31,8 +31,6 @@
 - `F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system` (🟠 ACTIVE): Every agent knows it works inside a highly capable agent system
 - `F947-a-coordinator-s-end-of-turn-always-sends-one-ping` (🟠 ACTIVE): A coordinator's end of turn always sends one ping
 - `F946-a-finish-stall-or-ask-ping-is-never-lost-under-load` (🟠 ACTIVE): A finish, stall or Ask ping is never lost under load
-- `F945-short-pi-claude-model-form-starts-the-job-instead-of-killing-it` (🟠 ACTIVE): Short pi-claude model form starts the job instead of killing it
-- `F943-the-coordinator-sweep-does-not-start-a-process-for-each-running-job-every-half-second` (🟠 ACTIVE): The coordinator sweep does not start a process for each running job every half second
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
@@ -60,6 +58,8 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F945-short-pi-claude-model-form-starts-the-job-instead-of-killing-it` (🟢 PROVEN): Short pi-claude model form starts the job instead of killing it; landed 2026-10-13
+- `F943-the-coordinator-sweep-does-not-start-a-process-for-each-running-job-every-half-second` (🟢 PROVEN): The coordinator sweep does not start a process for each running job every half second; landed 2026-10-13
 - `F935-a-real-group-shows-as-one-tree-on-the-live-picture` (🟢 PROVEN): A real group shows as one tree on the live picture; landed 2026-10-09
 - `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
 - `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
@@ -68,8 +68,6 @@
 - `F930-optchat-vs-typical-context` (🟢 PROVEN): The OptChat explainer shows plainly how OptChat differs from typical context management; landed 2026-10-07
 - `F929-biome-enforces-readable-code-and-the-styleguide-says-the-same` (🟢 PROVEN): Biome enforces readable code and the styleguide says the same; landed 2026-10-06
 - `F927-test-reset-build` (🟢 PROVEN): Limen's tests are rebuilt from scratch and held under a 3,500-line cap; landed 2026-10-06
-- `F926-fleet-leads-start-reviews-wait-and-land-without-workarounds` (🟢 PROVEN): fleet leads start reviews, wait and land without workarounds; landed 2026-10-06
-- `F925-test-reset-decision` (🟢 PROVEN): Adam has a decision on how to reset Limen's tests to the few seams that matter; landed 2026-10-06
-- 2026-10: 47 landed. spec/features/done/2026-10/
+- 2026-10: 49 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/

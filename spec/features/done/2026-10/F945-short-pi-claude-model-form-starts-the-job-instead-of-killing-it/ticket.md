@@ -3,6 +3,7 @@ touches:
   - limen.runtime.engine
   - limen.commands
 opened: 2026-10-13
+landed: 2026-10-13
 ---
 
 # F945 · Short pi-claude model form starts the job instead of killing it

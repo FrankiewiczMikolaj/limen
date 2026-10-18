@@ -4,6 +4,7 @@ touches:
   - limen.sessions.wake
   - limen.runtime.detached
 opened: 2026-10-13
+landed: 2026-10-13
 ---
 
 # F943 · The coordinator sweep does not start a process for each running job every half second
