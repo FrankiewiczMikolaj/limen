@@ -1,9 +1,8 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { jobMembership, leadHookLive } from "../job/group-cabinet.ts";
-import { isTerminal } from "../job/job.ts";
+import { jobMembership } from "../job/group-cabinet.ts";
 import { appendLimenLog, atomicWrite, textFile } from "../job/record.ts";
-import { completionWake, groupLeadWake, keeperHint } from "../job/wake-text.ts";
+import { completionWake, keeperHint } from "../job/wake-text.ts";
 import { herdrBinary } from "./herdr.ts";
 
 const PROMPT_MS = 15_000;
@@ -13,8 +12,8 @@ const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found
 
 /**
  * Start a turn on the Herdr pane that spawned this job. Only jobs whose coordinator had no Pi session record
- * `origin-pane`; Pi coordinators keep their in-process wake. A group member's finish travels as a group event instead,
- * except a team coordinator's finish while the lead's group hook is not running: then this wakes the lead pane.
+ * `origin-pane`; Pi coordinators keep their in-process wake. A group member never wakes anyone: the group tells its
+ * lead once, after its last round (`limen group advance`).
  * Claimed once per job by `notify/herdr-prompt`, which keeps one line per attempt. Only an attempt Herdr refused before
  * it sent any input is tried again, at most twice; text that may have reached the pane is never sent again, so a
  * coordinator hears its wake once. `notify/delivered/_herdr` is written only when Herdr observed the pane working after
@@ -22,7 +21,7 @@ const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found
  */
 export async function promptCoordinator(jobDir: string, shutdownDeadline = Number.POSITIVE_INFINITY): Promise<void> {
 	const pane = await textFile(`${jobDir}/origin-pane`);
-	const message = await wakeMessage(jobDir, pane);
+	const message = await wakeMessage(jobDir);
 	const herdr = herdrBinary();
 	if (!message || !pane || !herdr || shutdownDeadline - Date.now() < 1_000) {
 		return;
@@ -80,7 +79,7 @@ export async function promptCoordinator(jobDir: string, shutdownDeadline = Numbe
 	await atomicWrite(`${jobDir}/notify/herdr-prompt`, `${lines.join("\n")}\n`);
 }
 
-async function wakeMessage(jobDir: string, pane: string): Promise<string | undefined> {
+async function wakeMessage(jobDir: string): Promise<string | undefined> {
 	const [label = "", state = "", branch = "", repo = ""] = await Promise.all(
 		["label", "state", "branch", "repo"].map((name) => textFile(`${jobDir}/${name}`)),
 	);
@@ -91,34 +90,11 @@ async function wakeMessage(jobDir: string, pane: string): Promise<string | undef
 		const instruction = `Start with \`limen jobs ${id}\`. Inspect its diff, commits, final message, and checks before landing. If a check blocks landing, name that check and resume a focused fix.${keeper} Keep the user informed; ask only when a genuine product decision needs them.`;
 		return completionWake(jobDir, label || id, state, id, branch, repo, false, instruction);
 	}
-	const { run, member } = membership;
-	if (member?.role !== "coordinator") {
-		return;
-	}
-	if (await leadHookLive(run.root, run.lead)) {
-		await appendLimenLog(
-			jobDir,
-			`coordinator wake via Herdr: not sent; the lead group hook for session ${run.lead} is live and group events carry this finish`,
-		);
-		return;
-	}
 	await appendLimenLog(
 		jobDir,
-		pane
-			? `lead group hook for session ${run.lead} is not running; waking the lead pane ${pane} through Herdr`
-			: `lead group hook for session ${run.lead} is not running and no lead pane is recorded; the lead was not woken`,
+		`coordinator wake via Herdr: not sent; group ${membership.run.id} tells its lead once, after its last round`,
 	);
-	const coordinators = run.members.filter((entry) => entry.role === "coordinator");
-	const states = await Promise.all(coordinators.map((entry) => textFile(`${run.root}/.limen/jobs/${entry.id}/state`)));
-	const finished = states.filter(isTerminal).length;
-	return groupLeadWake(jobDir, label || id, state, id, branch, {
-		group: run.id,
-		feature: run.feature,
-		lead: run.lead,
-		team: member.team,
-		finished,
-		total: coordinators.length,
-	});
+	return;
 }
 
 function run(

@@ -4,7 +4,7 @@ import { deliverFinishWebhook } from "../integrations/finish-webhook.ts";
 import { settleJobTab } from "../integrations/herdr.ts";
 import { commitList, headCommit } from "../project/git.ts";
 import { processAlive, processInfo } from "../runtime/contain.ts";
-import { jobMembership, saveJson } from "./group-cabinet.ts";
+import { jobMembership, saveJson, startGroupAdvance } from "./group-cabinet.ts";
 import { syncLifecycle } from "./group-events.ts";
 import { isTerminal, type TerminalState } from "./job.ts";
 
@@ -56,6 +56,9 @@ export async function finalizeJob(
 		const membership = await jobMembership(jobDir);
 		if (membership) {
 			await syncLifecycle(membership.run, "skip").catch(() => {});
+		}
+		if (membership?.member?.role === "coordinator") {
+			startGroupAdvance(membership.run);
 		}
 	}
 	await rm(`${jobDir}/pid`, { force: true });

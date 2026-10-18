@@ -9,8 +9,8 @@ import { git, jobDir, limen, plant, type RunOptions, TICKET, waitJob } from "./p
 
 const lead = { PI_SESSION_ID: "extension-lead" };
 const route = ["--engine", "pi", "--provider", "fixture", "--model", "fixture", "--thinking", "high"];
-const limits = ["--teams", "2", "--workers-per-team", "3", "--timeout", "30m", "--worker-timeout", "20m"];
-const settings = [...limits, ...route, "--worker-thinking", "high"];
+const team = "pi:fixture/fixture:high";
+const settings = ["--team", team, "--team", team, "--workers", "3", "--timeout", "30m"];
 // Exercise the hosted supervisor and its real launch argv without a GUI or provider.
 const herdr = `#!/usr/bin/env node
 const fs = require('node:fs');
@@ -147,7 +147,7 @@ for (const hosted of [false, true]) {
 			assert.equal(review.status, 0, review.stderr);
 			await f.checkJob(lastLine(review.stdout), expected);
 			assert.equal(f.resume(continuedId).status, 1, "continuation uses the total launch allowance");
-			assert.match(f.resume(coordinator.id).stderr, /coordinator continuation/);
+			assert.match(f.resume(coordinator.id).stderr, /next group round/);
 		}
 	});
 }
@@ -171,7 +171,7 @@ test("invalid group selections never activate or consume jobs, including later t
 		"group",
 		"start",
 		f.feature,
-		...settings.map((arg) => (arg === "pi" ? "omp" : arg)),
+		...settings.map((arg) => arg.replace(/^pi:/, "omp:")),
 		f.mode,
 		"--team-extension",
 		`team-2=${f.common}`,
@@ -194,20 +194,18 @@ test("a repeated start keeps the original selections, even after a path disappea
 	for (const member of run.members) {
 		await f.checkJob(member.id, run.teamExtensions?.[member.team] ?? []);
 	}
-	const original = await readFile(join(groupPath(run), "run.json"), "utf8");
 	await rm(f.common);
 	await rm(f.privatePath);
 	const repeated = f.start("--extension", "missing-again.ts");
 	assert.equal(repeated.status, 0, repeated.stderr);
 	assert.equal(lastLine(repeated.stdout), run.id);
-	assert.equal(await readFile(join(groupPath(run), "run.json"), "utf8"), original);
+	assert.deepEqual((await readRun(f.root, run.id)).teamExtensions, run.teamExtensions);
 	assert.equal((await readdir(join(f.root, ".limen/jobs"))).length, 2);
 	assert.match(f.launch(run, "team-2").stderr, /cannot use extension/);
 	assert.equal((await readRun(f.root, run.id)).members.length, 2);
-	assert.equal(f.start("--new-run").status, 1);
 });
 
-test("malformed new maps fail closed; legacy groups keep explicit spawn and parent replacement", async (context) => {
+test("malformed extension maps fail closed", async (context) => {
 	const f = await fixture();
 	context.after(f.cleanup);
 	const started = f.start();
@@ -223,18 +221,4 @@ test("malformed new maps fail closed; legacy groups keep explicit spawn and pare
 		await assert.rejects(readRun(f.root, run.id), /invalid teamExtensions/);
 		assert.match(f.launch(run, "team-1").stderr, /invalid teamExtensions/);
 	}
-	delete run.teamExtensions;
-	await saveJson(join(groupPath(run), "run.json"), run);
-	const child = f.launch(run, "team-1", "--extension", f.common);
-	assert.equal(child.status, 0, child.stderr);
-	const id = lastLine(child.stdout);
-	await f.checkJob(id, [f.common]);
-	const inherited = f.resume(id);
-	assert.equal(inherited.status, 0, inherited.stderr);
-	await f.checkJob(lastLine(inherited.stdout), [f.common]);
-	await rm(f.common);
-	const replaced = f.resume(id, "--extension", f.privatePath);
-	assert.equal(replaced.status, 0, replaced.stderr);
-	await f.checkJob(lastLine(replaced.stdout), [f.privatePath]);
-	assert.equal("teamExtensions" in (await readRun(f.root, run.id)), false);
 });

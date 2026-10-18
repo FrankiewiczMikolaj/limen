@@ -29,7 +29,6 @@ import {
 import {
 	inheritedPlanning,
 	type PlanningSource,
-	privatePlanningFile,
 	privatePlanningTask,
 	recordedPlanningSource,
 	ticketPointers,
@@ -55,9 +54,12 @@ import {
 	waitForHandshake,
 } from "./spawn.ts";
 
-/** Resume a finished job's own engine session; restore a pruned checkout from its branch. */
-export async function continueCommand(args: readonly string[], cwd: string): Promise<void> {
-	await continueJob(args, cwd);
+/**
+ * Resume a finished job's own engine session; restore a pruned checkout from its branch.
+ * `round` is set only by the group round driver, which holds the launch lock and continues a team's own job.
+ */
+export async function continueCommand(args: readonly string[], cwd: string, round?: number): Promise<void> {
+	await continueJob(args, cwd, round !== undefined, round);
 }
 type ContinueOptions = {
 	readonly review: boolean;
@@ -182,7 +184,7 @@ function chooseHostedContinue(options: ContinueOptions): boolean {
 	}
 	return hosted;
 }
-async function continueJob(args: readonly string[], cwd: string, locked = false): Promise<void> {
+async function continueJob(args: readonly string[], cwd: string, locked = false, round?: number): Promise<void> {
 	const options = parseContinueArgs(args);
 	const { review, label, model, provider, thinking } = options;
 	const hosted = chooseHostedContinue(options);
@@ -194,7 +196,7 @@ async function continueJob(args: readonly string[], cwd: string, locked = false)
 	const { id: parentId, jobDir: parentDir } = await resolveJob(root, options.query, "control");
 	const membership = await jobMembership(parentDir);
 	if (membership) {
-		await checkGroupContinuation(membership, cwd, options);
+		await checkGroupContinuation(membership, cwd, options, round);
 		if (!locked) {
 			await groupLock(`${groupPath(membership.run)}/launch`, () => continueJob(args, cwd, true), "wait");
 			return;
@@ -205,14 +207,15 @@ async function continueJob(args: readonly string[], cwd: string, locked = false)
 	const extensions = await continuationExtensions(parentDir, membership, options.selected, cwd, profile.id);
 	preflightEngine(profile, chosenModel, provider);
 	const source = recordedPlanningSource(parentDir);
-	const followUp = await continuationTask(root, parentDir, options.instruction, source, membership);
+	const followUp = await continuationTask(root, parentDir, options.instruction, source);
 	const finalLabel = label ?? `${(await text(`${parentDir}/label`)) || parentId} · continue`;
 	const id = makeJobId(finalLabel);
 	const jobDir = `${root}/.limen/jobs/${id}`;
 	const role = review ? "reviewer" : (await text(`${parentDir}/role`)) || "worker";
 	const preamble = resolvePreamble(root, role);
+	const slot = round === undefined ? "worker" : "coordinator";
 	const member = membership?.member
-		? await claimMember(membership.run, membership.member.team, "worker", id, parentId)
+		? await claimMember(membership.run, membership.member.team, slot, id, parentId, round)
 		: undefined;
 	const repository = parent.repo ? workspaceRepository(root, parent.repo) : root;
 	if (!existsSync(parent.worktree) && !branchExists(repository, parent.branch)) {
@@ -278,27 +281,36 @@ async function launchContinuation(
 	}
 	await startDetachedContinuation({ ...continuation, versions });
 }
-/** A group worker continues only from its team's coordinator or the lead, on the recorded route. */
-async function checkGroupContinuation(membership: GroupIdentity, cwd: string, options: ContinueOptions): Promise<void> {
-	if (membership.member?.role === "coordinator") {
-		throw new Error("group coordinator continuation is not supported; inspect and stop before --new-run");
+/** A group worker continues only from its team's coordinator or the lead; a team's own job only through the round driver. */
+async function checkGroupContinuation(
+	membership: GroupIdentity,
+	cwd: string,
+	options: ContinueOptions,
+	round: number | undefined,
+): Promise<void> {
+	if ((membership.member?.role === "coordinator") !== (round !== undefined)) {
+		throw new Error(
+			"a team's own job continues only into its next group round, which Limen starts; continue a worker instead",
+		);
 	}
 	if (options.timeoutMs) {
 		throw new Error("group continuations keep the recorded deadline; omit --timeout");
 	}
-	const caller = await groupIdentity(cwd, membership.run.id);
-	if (
-		!caller ||
-		(caller.member && (caller.member.role !== "coordinator" || caller.member.team !== membership.member?.team))
-	) {
-		throw new Error("only this team's coordinator or the recorded lead may continue its worker");
+	if (round === undefined) {
+		const caller = await groupIdentity(cwd, membership.run.id);
+		if (
+			!caller ||
+			(caller.member && (caller.member.role !== "coordinator" || caller.member.team !== membership.member?.team))
+		) {
+			throw new Error("only this team's coordinator or the recorded lead may continue its worker");
+		}
 	}
 	const route = teamRoute(membership.run, membership.member?.team ?? "");
 	if (
-		options.engine !== membership.run.engine ||
+		options.engine !== route.engine ||
 		options.model !== route.model ||
 		options.provider !== route.provider ||
-		options.thinking !== membership.run.workerThinking
+		options.thinking !== route.thinking
 	) {
 		throw new Error("group continuation requires recorded engine/provider/model/reasoning explicitly");
 	}
@@ -385,7 +397,6 @@ async function continuationTask(
 	parentDir: string,
 	instruction: string,
 	source: PlanningSource,
-	membership: GroupIdentity | undefined,
 ): Promise<string> {
 	let followUp = instruction;
 	if (source !== "private") {
@@ -396,12 +407,6 @@ async function continuationTask(
 		followUp += `\n\nTicket: ${parentTicket}`;
 	}
 	followUp = await privatePlanningTask(root, followUp);
-	if (membership?.member) {
-		const feature = membership.run.feature;
-		const brief = await privatePlanningFile(root, `${feature}/group/brief.md`);
-		const note = await privatePlanningFile(root, `${feature}/group/teams/${membership.member.team}.md`);
-		followUp += `\nBrief: ${brief}\nApproach note: ${note}`;
-	}
 	return followUp;
 }
 /** Writes the starting record: the parent's session, branch and worktree, and where its finish is reported. */

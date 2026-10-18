@@ -63,7 +63,7 @@ footer { margin-top: 40px; color: var(--gray); font-size: 13px; }
 <div class="tops">
 <div><h3>Tweak</h3><ol><li>Wake records tell the truth and do not resend</li><li>Spawn returns the job ID in seconds</li><li>A detached job hears its deadline before the timeout</li></ol></div>
 <div><h3>Build</h3><ol><li>Seat admission: a cap on running jobs, with a queue</li><li>One landing path that records proof</li><li>Starting a coordinator is one Limen command</li></ol></div>
-<div><h3>Remove</h3><ol><li>Remove the group runtime; keep teams as prose</li><li>Drop the per-edit styleguide reminder</li><li>Move rare recipes out of the always-on shop manual</li></ol></div>
+<div><h3>Remove</h3><ol><li><s>Remove the group runtime; keep teams as prose</s> (rejected: fix groups instead)</li><li>Drop the per-edit styleguide reminder</li><li>Move rare recipes out of the always-on shop manual</li></ol></div>
 </div>
 
 <section id="core">
@@ -184,7 +184,8 @@ footer { margin-top: 40px; color: var(--gray); font-size: 13px; }
 <h2>Remove</h2>
 <p class="lead">Scaffolding that compensates for weaknesses the sessions did not show. Top 5 first.</p>
 <div class="cards"><article class="card">
-<h3><span class="n">1</span>Remove the group runtime; keep teams as prose</h3>
+<h3><span class="n">1</span><s>Remove the group runtime; keep teams as prose</s> (rejected)</h3>
+<p><b>Rejected by Adam, 2026-10-18:</b> &quot;I don&#x27;t want groups to be removed. I need them fixed.&quot; Groups were fixed instead: each <code>--team</code> carries its own engine, provider, model and reasoning level, Limen runs draft, critique, revise and final rounds, and the lead hears the result once. See docs/groups.md.</p>
 <dl>
 <dt>Evidence</dt><dd>0 <code>limen group start</code> in 3 days. Adam asked to &quot;spin limen group of agents&quot; (F1048); the coordinator found the command &quot;can&#x27;t express mixed team configurations&quot; and ran 7 plain spawns with draft and critique rounds. Board cleanup (4 teams), F1042 (3 groups × 3 models) and F1048 all ran as plain spawns and delivered.</dd>
 <dt>Why</dt><dd>Rounds and cross-reading are native model work. The runtime (src/commands/group.ts 663 lines, hook/group-peer.ts 259, two templates, docs/groups.md, about 400 words in every coordinator prompt) compensates for a weakness models did not show. The seat cap bounds fan-out better.</dd>

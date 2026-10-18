@@ -1,8 +1,10 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import { hostedAgentStatus } from "../integrations/herdr.ts";
 import { limenRoot } from "../project/git.ts";
 import type { PlanningSource } from "../project/planning.ts";
@@ -15,35 +17,51 @@ export type GroupMember = {
 	role: "coordinator" | "worker";
 	parent?: string;
 	deadline: number;
+	/** The round a team's own job works; workers carry none. */
+	round?: number;
 };
+/** One team's model route: every job of that team runs on it. */
+export type TeamRoute = { engine: string; provider: string; model: string; thinking: string };
 export type GroupRun = {
 	id: string;
 	root: string;
 	feature: string;
 	planningSource?: PlanningSource;
 	lead: string;
+	/** The Herdr pane the lead started the group from; the group result goes there when the lead hook is not running. */
+	leadPane?: string;
 	startedAt: number;
 	teams: string[];
+	routes: Record<string, TeamRoute>;
 	workersPerTeam: number;
-	engine: string;
-	provider: string;
-	model: string;
-	thinking: string;
-	workerThinking: string;
+	/** Round names in order; the first is every team's first job. */
+	rounds: string[];
+	/** Index of the round now running. */
+	round: number;
+	/** Set once the last round ended; the lead hears the result once. */
+	finishedAt?: number;
 	deadline: number;
-	workerTimeoutMs: number;
 	reserveMs: number;
 	stopped: boolean;
 	closed: boolean;
 	mode: "auto" | "detached" | "tab";
 	members: GroupMember[];
-	teamModels?: Record<string, { provider: string; model: string }>;
 	teamExtensions?: Record<string, string[]>;
 };
 export type GroupIdentity = { run: GroupRun; member?: GroupMember; recipient: string };
 export const groupPath = (run: Pick<GroupRun, "root" | "id">): string => `${run.root}/.limen/groups/${run.id}`;
-export const teamRoute = (run: GroupRun, team: string): { provider: string; model: string } =>
-	run.teamModels?.[team] ?? { provider: run.provider, model: run.model };
+export function teamRoute(run: GroupRun, team: string): TeamRoute {
+	const route = run.routes?.[team];
+	if (!route) {
+		throw new Error(
+			`group ${run.feature} (${run.id}) has no recorded route for ${team}; it predates per-team routes, so stop it and start a new run`,
+		);
+	}
+	return route;
+}
+/** The team's own jobs in one round, newest last. */
+export const roundJobs = (run: GroupRun, round: number): GroupMember[] =>
+	run.members.filter((member) => member.role === "coordinator" && (member.round ?? 0) === round);
 export async function readRun(root: string, id: string): Promise<GroupRun> {
 	if (!/^[a-zA-Z0-9-]+$/.test(id)) {
 		throw new Error(`invalid group ID ${JSON.stringify(id)}; run limen group start FEATURE with the group settings`);
@@ -58,6 +76,9 @@ export async function readRun(root: string, id: string): Promise<GroupRun> {
 		throw new Error(`no group record for ${id}; run limen group start FEATURE with the group settings`);
 	}
 	const run = JSON.parse(record) as GroupRun;
+	// A run recorded before rounds had one round of team jobs; without routes it never advances.
+	run.rounds ??= ["draft"];
+	run.round ??= 0;
 	if ("teamExtensions" in run) {
 		const selections = run.teamExtensions;
 		if (
@@ -227,12 +248,14 @@ export async function leadHookLive(root: string, session: string, now = Date.now
 export async function commandRoot(cwd: string): Promise<string> {
 	return (await groupIdentity(cwd))?.run.root ?? limenRoot(cwd);
 }
+/** Claims a launch slot: one team job per round, and the recorded number of workers per team. */
 export async function claimMember(
 	run: GroupRun,
 	team: string,
 	role: GroupMember["role"],
 	id: string,
 	parent?: string,
+	round = 0,
 ): Promise<GroupMember> {
 	return groupLock(
 		groupPath(run),
@@ -248,28 +271,73 @@ export async function claimMember(
 					`${team} is not in group ${current.feature} (${current.id})'s roster; run limen group status ${current.id}`,
 				);
 			}
-			const used = current.members.filter((entry) => entry.team === team && entry.role === role).length;
+			const used = current.members.filter(
+				(entry) => entry.team === team && entry.role === role && (role === "worker" || (entry.round ?? 0) === round),
+			).length;
 			if (used >= (role === "coordinator" ? 1 : current.workersPerTeam)) {
 				throw new Error(
-					`${team} has used its ${role} job allowance; run limen group status ${current.id} before asking the lead`,
+					`${team} has used its ${role === "coordinator" ? `round ${round + 1} job` : "worker"} allowance; run limen group status ${current.id} before asking the lead`,
 				);
 			}
-			const deadline =
-				role === "coordinator"
-					? current.deadline
-					: Math.min(Date.now() + current.workerTimeoutMs, current.deadline - current.reserveMs);
+			const deadline = role === "coordinator" ? current.deadline : current.deadline - current.reserveMs;
 			if (deadline <= Date.now()) {
 				throw new Error(
-					`group ${current.feature} (${current.id}) has no worker time left before the coordinator wraps up; run limen group status ${current.id}`,
+					`group ${current.feature} (${current.id}) has no worker time left before the team wraps up; run limen group status ${current.id}`,
 				);
 			}
-			const member: GroupMember = { id, team, role, deadline, ...(parent ? { parent } : {}) };
+			const member: GroupMember = {
+				id,
+				team,
+				role,
+				deadline,
+				...(parent ? { parent } : {}),
+				...(role === "coordinator" ? { round } : {}),
+			};
 			current.members.push(member);
 			await saveJson(`${groupPath(run)}/run.json`, current);
 			return member;
 		},
 		"wait",
 	);
+}
+// A child that inherits these would act as the finished job: claim its membership, run it again, or wake its pane.
+const JOB_ENVIRONMENT = [
+	"LIMEN_INTERNAL_RUN",
+	"LIMEN_INTERNAL_HOSTED",
+	"LIMEN_HOSTED_START",
+	"LIMEN_HOSTED_RECOVER",
+	"LIMEN_JOB",
+	"LIMEN_JOB_ID",
+	"LIMEN_JOB_DIR",
+	"LIMEN_GROUP_ID",
+	"LIMEN_TEAM_ID",
+	"LIMEN_CONTEXT_ROOT",
+	"LIMEN_ROLE",
+	"LIMEN_LABEL",
+	"LIMEN_MODEL",
+	"LIMEN_PROVIDER",
+	"LIMEN_THINKING",
+	"LIMEN_TIMEOUT_MS",
+	"PI_SESSION_ID",
+	"HERDR_PANE_ID",
+	"HERDR_TAB_ID",
+];
+/** Runs `limen group advance` in its own process: a team job that ended may start the next round or finish the group. */
+export function startGroupAdvance(run: GroupRun): void {
+	const environment = { ...process.env };
+	for (const name of JOB_ENVIRONMENT) {
+		delete environment[name];
+	}
+	const limen = fileURLToPath(new URL("../../bin/limen", import.meta.url));
+	const child = spawn(process.execPath, [limen, "group", "advance", run.id], {
+		cwd: run.root,
+		detached: true,
+		stdio: "ignore",
+		env: environment,
+	});
+	// An advance that cannot start leaves the round for the next finish or `limen group status`.
+	child.once("error", () => {});
+	child.unref();
 }
 export async function jobMembership(jobDir: string): Promise<GroupIdentity | undefined> {
 	const id = (await readFile(`${jobDir}/group`, "utf8").catch(() => "")).trim();

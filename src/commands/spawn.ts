@@ -8,6 +8,7 @@ import { herdrAvailable, herdrBinary, openHostedTab, openWatchTab } from "../int
 import type { GroupMember, GroupRun } from "../job/group-cabinet.ts";
 import { claimMember, groupIdentity, groupLock, groupPath, teamRoute } from "../job/group-cabinet.ts";
 import { syncLifecycle } from "../job/group-events.ts";
+import { memberPacket, routeFlags } from "../job/group-packet.ts";
 import { hostedAgentName, makeJobId, parseDuration, SESSION_ID } from "../job/job.ts";
 import { publishJob } from "../job/publication.ts";
 import { appendLimenLog, atomicWrite, finalizeJob } from "../job/record.ts";
@@ -29,7 +30,6 @@ import {
 	inheritedPlanning,
 	type PlanningSource,
 	planningSource,
-	privatePlanningFile,
 	privatePlanningTask,
 	ticketPointers,
 } from "../project/planning.ts";
@@ -135,7 +135,6 @@ type SpawnLaunch = {
 	readonly coordinatorPane: string | undefined;
 	readonly place: SpawnPlace;
 	readonly task: string;
-	readonly privatePacket: string;
 };
 type SpawnRecord = {
 	readonly jobDir: string;
@@ -177,7 +176,7 @@ async function spawnJob(args: readonly string[], cwd: string, group?: SpawnGroup
 	// A group member never subscribes a session, so its pane stays recorded even under Pi: it is the lead's route when the group hook is not running.
 	const coordinatorPane = herdrWakePane(group ? undefined : notificationSession);
 	const place = resolveSpawnPlace(cwd, group, options.repo);
-	const { task, privatePacket } = await spawnTaskText(loaded, options.repo, place, group);
+	const task = await spawnTaskText(loaded, options.repo, place);
 	await recordSpawnedJob({
 		cwd,
 		options,
@@ -192,7 +191,6 @@ async function spawnJob(args: readonly string[], cwd: string, group?: SpawnGroup
 		coordinatorPane,
 		place,
 		task,
-		privatePacket,
 	});
 }
 /** Outside a group no job may claim the owner-facing lead; a group launch keeps its recorded route and branches. */
@@ -207,12 +205,12 @@ async function checkLaunchAuthority(parsed: SpawnOptions, group: SpawnGroup | un
 	const run = group.run;
 	const route = teamRoute(run, group.team);
 	if (
-		parsed.engine !== run.engine ||
+		parsed.engine !== route.engine ||
 		parsed.provider !== route.provider ||
 		parsed.model !== route.model ||
-		parsed.thinking !== (group.role === "coordinator" ? run.thinking : run.workerThinking)
+		parsed.thinking !== route.thinking
 	) {
-		throw new Error("group launches require the recorded engine/provider/model/reasoning explicitly");
+		throw new Error(`group launches require the team route explicitly: ${routeFlags(route)}`);
 	}
 	if (
 		parsed.repo ||
@@ -289,30 +287,17 @@ function resolveSpawnPlace(cwd: string, group: SpawnGroup | undefined, repoFlag:
 	}
 	return { workspace, currentRoot, root, source, repository, repo: repoFlag ?? inherited?.repo };
 }
-async function spawnTaskText(
-	loaded: SpawnTask,
-	repoFlag: string | undefined,
-	place: SpawnPlace,
-	group: SpawnGroup | undefined,
-): Promise<{ task: string; privatePacket: string }> {
+async function spawnTaskText(loaded: SpawnTask, repoFlag: string | undefined, place: SpawnPlace): Promise<string> {
 	const { root, source } = place;
 	let task = loaded.text;
 	if (!loaded.raw && place.workspace) {
 		task = workspaceTask(loaded.text, root, repoFlag ?? "");
 	}
 	// Private planning: check every pointer now, before a job record or worktree exists.
-	let privatePacket = "";
 	if (source === "private") {
 		task = await privatePlanningTask(root, task);
-		if (group) {
-			const feature = group.run.feature;
-			const ticket = await privatePlanningFile(root, `${feature}/ticket.md`);
-			const brief = await privatePlanningFile(root, `${feature}/group/brief.md`);
-			const note = await privatePlanningFile(root, `${feature}/group/teams/${group.team}.md`);
-			privatePacket = `Ticket: ${ticket}\nBrief: ${brief}\nApproach note: ${note}`;
-		}
 	}
-	return { task, privatePacket };
+	return task;
 }
 /** Plans the worktree, claims the member slot, writes the job record, creates the worktree, then starts the job. */
 async function recordSpawnedJob(launch: SpawnLaunch): Promise<void> {
@@ -399,11 +384,7 @@ async function jobTaskBody(
 		taskBody = `${task.trim()}\n\nCandidate commit: ${candidate}.\n`;
 	}
 	if (group && member) {
-		const guidance = await readFile(`${PACKAGE_ROOT}/templates/group-member.md`, "utf8");
-		const approach =
-			launch.privatePacket ||
-			`Approach note:\n${await readFile(`${place.root}/${group.run.feature}/group/teams/${group.team}.md`, "utf8")}`;
-		taskBody = `${guidance}\nCanonical root: ${place.root}\nGroup: ${group.run.id}\nTeam: ${group.team}\nFeature: ${group.run.feature}\n${memberRoute(group.run, group.team)}\n${approach}\n\n${taskBody}`;
+		taskBody = `${await memberPacket(group.run, group.team, member)}\n\n${taskBody}`;
 	}
 	return taskBody;
 }
@@ -821,11 +802,6 @@ export function normalizeLabel(value: string): string {
 		throw new Error("--label must be one non-empty line");
 	}
 	return label;
-}
-// The shell in a member's tab may put another installed Limen first on PATH; name the package that runs this group.
-function memberRoute(run: GroupRun, team: string): string {
-	const route = teamRoute(run, team);
-	return `Limen command (use this path for every limen command): ${resolve(PACKAGE_ROOT, "bin/limen")}\nTeam worker launch settings (pass exactly): --engine ${run.engine} --provider ${route.provider} --model ${route.model} --thinking ${run.workerThinking}${run.teamExtensions ? "\nTeam extensions are inherited automatically. Omit --extension; keep the model flags above explicit." : ""}`;
 }
 export function currentNotificationSession(): string | undefined {
 	const value = process.env.PI_SESSION_ID?.trim();

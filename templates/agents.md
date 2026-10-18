@@ -6,7 +6,7 @@ This repository uses plain specifications, Git, and `limen` to coordinate one hu
 
 The coordinator is a hosted session in Herdr for this plant (`LIMEN_COORDINATOR=1`), preferably OMP; use Pi only when the task needs it. It owns tickets and `spec/build.md`, and it decides spawn and merge. It is not a limen job. A hosted limen job (`LIMEN_JOB=1`) is never the plant owner or a group lead, even when labeled "lead".
 
-Ordinary workers and reviewers exist only through `limen spawn`. Never spawn a coordinator or "group lead" job — collaborative feature groups start only from this interactive Herdr coordinator pane with the group hook loaded (see `docs/groups.md`), never from a spawned job. Never use `spawn --role coordinator`: managed team coordinators exist only through explicitly authorized `limen group start`, described below. They do not become plant owners.
+Ordinary workers and reviewers exist only through `limen spawn`. Never spawn a coordinator or "group lead" job, and never use `spawn --role coordinator`: a group starts only from this pane, with `limen group start`.
 
 `LIMEN_COORDINATOR=1` on a spawn shell does not change the job's role.
 
@@ -16,21 +16,20 @@ Ordinary workers and reviewers exist only through `limen spawn`. Never spawn a c
 |---|---|
 | The owner asks for a coordinator | Start a hosted OMP tab in the plant's Herdr space (`LIMEN_COORDINATOR=1`), or Pi when required. Never `limen spawn` a "lead" or coordinator job for that role. |
 | The coordinator manages workers | That session runs `limen spawn`. |
-| Start a collaborative group | Same coordinator pane runs `limen group start` after `group-peer` is loaded. A hosted job cannot. |
+| Start a group | This pane runs `limen group start`. A hosted job cannot. |
 
-## Opt-in feature groups
+## Groups
 
-Only activate a group when the owner explicitly asks for teams pursuing one feature through different approaches.
+When the owner asks for a group, teams, several models on one task, or draft and critique rounds, use `limen group start`; do not rebuild it from spawn and continue. Each `--team ENGINE:PROVIDER/MODEL:THINKING` is one agent on its own route. Limen runs the rounds, hands each round every team's results, and tells you the result once, at the end. "A Sol and two Opus, draft, critique, final":
 
-**Lead recipe (before any `group start`).** The owner-facing lead is this plant's interactive Herdr coordinator pane (`LIMEN_COORDINATOR=1`) with `hook/group-peer.ts` loaded — the same session that owns tickets and spawn. Reload that pane after updating the package so the hook registers under `.limen/group-leads`. A hosted limen job (`LIMEN_JOB=1`), including one labeled "lead" or spawned with `--role coordinator`, cannot register as lead and `limen group start` refuses it. Do not spawn a substitute lead job; use the coordinator tab. Details: `docs/groups.md`.
+```sh
+limen group start spec/features/active/FNNN-slug \
+  --team omp:openai-codex/gpt-6.1-sol:high \
+  --team omp:pi-claude/claude-opus-5-5:high --team omp:pi-claude/claude-opus-5-5:high \
+  --rounds draft,critique,final
+```
 
-In committed mode, commit the shared ticket, `group/brief.md`, and `group/teams/team-1.md`, `team-2.md`, and so on. In private mode (`limen planning private`), keep those files readable inside the canonical project root. Do not copy, link, stage or commit them. Members receive absolute paths to them. From that coordinator pane (not a job tab), run `limen group start FEATURE --teams N --workers-per-team N --timeout D --worker-timeout D --engine E --provider P --model M --thinking T --worker-thinking T`. Add `--team-model team-N=provider/model` to give one team its own model, and `--detached` or `--tab` when explicitly selected. For Pi groups, repeat `--extension PATH` for common trusted extensions or `--team-extension team-N=PATH` for team-only additions. Members, authorized reviews and worker continuations inherit the fixed effective team lists; model flags remain explicit. The recorded roster and total launch allowances are fixed. A folder alone starts nothing, repeated start launches nothing, and coordinator continuation is unsupported.
-
-The lead remains the sole landing owner. Limen adds the member participation contract to every member's task; `docs/groups.md` describes what members publish, wait for, launch, and must not touch. Do not restate those rules in a team note.
-
-Group and role deadlines still apply. Stop prevents new launches and preserves recovery work. Every unclosed group's worktrees and records remain protected from pruning; deliberate close refuses live/uncertain members and dirty worktrees. Do not force-delete recovery work or silently repair a roster; inspect and stop before explicitly authorizing `group start … --new-run`.
-
-The lead files selected findings and team summaries into the feature packet and writes synthesis. Queued, transport-accepted and observed/processed receipts are separate evidence; only actual finding/response exchanges in recipient turns and lead synthesis prove collaboration. Native mechanics or a clean agent exit do not. Resume the original lead session for recovery. Commands, receipt/retry limits and a reproducible no-launch fixture: `docs/groups.md`.
+Rounds: `draft` (each team alone), `critique` (each reads the others), `revise` (each fixes its own after critique), `final` (the first team writes the one result). The default is `draft`. Commit the ticket first; `group/brief.md` and `group/teams/team-N.md` are optional. `--workers N` lets each team spawn N workers, `--timeout` defaults to 90m, and each feature holds one open group, so several features run groups at once. You stay the landing owner: read the result, land what you keep, then `limen group close ID`. `limen group status ID` shows the rounds; `limen group stop ID` stops them. Details: `docs/groups.md`.
 
 ## Seat and window
 
