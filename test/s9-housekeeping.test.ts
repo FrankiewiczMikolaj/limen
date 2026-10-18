@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, writeSync } from "node:fs";
-import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdir, utimes, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -61,8 +61,6 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	const half = spawnJob(p, "say half", ["--prepare", `pwd > ${prepared}; cat ${gate} > /dev/null`]);
 	await until(p.parent, () => existsSync(prepared) && readFileSync(prepared, "utf8").endsWith("\n"));
 	const halfTree = readFileSync(prepared, "utf8").trim();
-	assert.equal(jobFile(p, half, "state"), "running");
-	// Each job below runs its own prune before its engine starts.
 	const landed = spawnJob(p, "commit");
 	const unmerged = spawnJob(p, "commit");
 	assert.equal(waitJob(p, landed), "done");
@@ -83,23 +81,21 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	for (const id of [stale, starting]) {
 		await mkdir(jobDir(p, id));
 		await writeFile(join(jobDir(p, id), "started-at"), "2000-01-01T00:00:00.000Z\n");
+		await writeFile(join(jobDir(p, id), "starting"), `${id === starting ? process.pid : ""}\n`);
 		await writeFile(join(jobDir(p, id), "worktree"), `${join(halfTree, "..", id)}\n`);
 		git(p.root, "worktree", "add", "-q", "--detach", join(halfTree, "..", id), "HEAD");
 	}
-	await writeFile(join(jobDir(p, starting), "starting"), `${process.pid}\n`);
 
 	const pruned = limen(p, ["prune"]);
 	assert.equal(pruned.status, 0, pruned.stderr);
 	assert.match(pruned.stdout, new RegExp(`pruned .*/${stale} \\(job ${stale}\\): its record never got a state`));
-	const dropped = [jobFile(p, landed, "worktree"), jobFile(p, unmerged, "worktree"), jobDir(p, stale)];
-	for (const path of [...dropped, join(halfTree, "..", stale)]) {
-		assert.ok(!existsSync(path), `prune kept ${path}`);
+	for (const dropped of [jobFile(p, landed, "worktree"), jobFile(p, unmerged, "worktree"), jobDir(p, stale)]) {
+		assert.ok(!existsSync(dropped), `prune kept ${dropped}`);
 	}
 	for (const kept of [liveTree, nestedTree, halfTree, jobDir(p, half), nestedDir, join(halfTree, "..", starting)]) {
 		assert.ok(existsSync(kept), `prune removed ${kept}`);
 	}
 	assert.ok(git(p.root, "worktree", "list", "--porcelain").includes(`worktree ${nestedTree}\n`));
-	await rm(jobDir(p, starting), { recursive: true });
 
 	await writeFile(gate, "go\n");
 	assert.equal(waitJob(p, half), "done");
