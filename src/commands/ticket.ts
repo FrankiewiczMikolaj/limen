@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPicture } from "../picture/picture-build.ts";
 import { ID_PATTERN } from "../picture/picture-model.ts";
-import { closeTickets } from "../project/board.ts";
 import { currentBranch, limenRoot, repoRoot } from "../project/git.ts";
+import { closeTickets } from "../project/lanes.ts";
 import { parseFlags } from "./flags.ts";
 import { landTicketCheck } from "./land.ts";
 

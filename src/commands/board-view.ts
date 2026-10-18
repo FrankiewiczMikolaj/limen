@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { jobFeatures } from "../job/job.ts";
 import { formatAge } from "../job/view.ts";
 import { readTickets } from "../picture/tickets.ts";
-import { renderBoard, writeBoard } from "../project/board.ts";
 import { commitList, limenRoot, unlandedBranches, workspaceRepository } from "../project/git.ts";
+import { renderBoard, writeBoard } from "../project/lanes.ts";
 import { shownState } from "./jobs.ts";
 
 const HELP =

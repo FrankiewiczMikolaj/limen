@@ -8,7 +8,6 @@ import { jobFeatures } from "../job/job.ts";
 import { resolveJob } from "../job/lookup.ts";
 import { readPicture } from "../picture/picture-build.ts";
 import { checkTickets, readTickets } from "../picture/tickets.ts";
-import { closeTickets } from "../project/board.ts";
 import {
 	abortMerge,
 	commitList,
@@ -19,6 +18,7 @@ import {
 	mergePaths,
 	workspaceRepository,
 } from "../project/git.ts";
+import { closeTickets } from "../project/lanes.ts";
 import { parseFlags } from "./flags.ts";
 import { deleteLandedBranches } from "./prune.ts";
 

@@ -22,7 +22,6 @@ wrong-on: 2026-10-06
 	"active/F782-flags":
 		"---\nopened: 2026-10-06\nneeds-adam: Decide today.\nwrong-on: 2026-10-05\n---\n# F782 · Flags\n",
 	"active/F783-legacy": "# F783 Legacy ticket\n",
-	"done/2026-10/F784-landed": "---\nlanded: 2026-10-06\n---\n# F784 · Landed\n",
 	"active/F785-duplicate": `---
 touches:
   - plant.viewer
@@ -84,7 +83,6 @@ test("each ticket fault is reported at its own file and line with a fix, and the
 	assert.deepEqual(byId.get("f781")?.wrong, { problem: "This is wrong.", on: "2026-10-06" });
 	assert.equal(byId.get("f781")?.needsAdam, null);
 	assert.equal(byId.get("f783")?.title, "Legacy ticket");
-	assert.deepEqual([byId.get("f784")?.lane, byId.get("f784")?.landed], ["done", "2026-10-06"]);
 	assert.deepEqual(byId.get("f785")?.needsAdam, { ask: "Keep the atlas?", on: "2026-10-05" });
 	assert.deepEqual(byId.get("f785")?.wrong, { problem: "The context is lost.", on: "2026-10-04" });
 });

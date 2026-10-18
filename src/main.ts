@@ -1,4 +1,4 @@
-import { boardCommand } from "./commands/board.ts";
+import { boardCommand } from "./commands/board-view.ts";
 import { closeCommand } from "./commands/close.ts";
 import { continueCommand } from "./commands/continue.ts";
 import { diffCommand } from "./commands/diff.ts";
