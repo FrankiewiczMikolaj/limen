@@ -68,6 +68,7 @@ switch (noun + " " + verb) {
 		if (running) process.kill(running.pid, "SIGTERM");
 		ok({});
 	}
+	case "agent prompt": state.prompt ? fail(state.prompt) : ok({});
 	default: ok({});
 }
 `;
@@ -241,4 +242,15 @@ test("hosted Pi gets literal launch flags and the selected extension; stop recor
 	assert.equal(named("tab", "create").length, 3, "one tab per hosted job");
 	assert.equal(named("workspace", "create").length, 1, "one role space");
 	assert.equal(prompts(first), 1, "still one wake prompt for the first job");
+});
+
+test("a wake Herdr submitted without a seen turn is recorded as delivered and never sent twice", async () => {
+	await saveState({ ...state(), prompt: "agent_prompt_stalled" });
+	const id = spawnJob(p, "finish stalled handoff", ["--label", "F001 stalled wake"], { env });
+	assert.equal(waitJob(p, id, { env }), "done");
+	const receipt = () => jobFile(p, id, "notify/herdr-prompt");
+	await until(jobDir(p, id), () => receipt().startsWith("attempt 1:"));
+	assert.equal(prompts(id), 1, `a submitted wake is not resent: ${receipt()}`);
+	assert.match(receipt(), /^attempt 1: delivered to coord:p0, turn not seen/);
+	assert.ok(!existsSync(join(jobDir(p, id), "notify/delivered/_herdr")), "no turn was observed");
 });
