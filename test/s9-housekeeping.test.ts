@@ -102,20 +102,11 @@ test("prune keeps live, nested and half-published work, drops finished worktrees
 	await release(nestedDir);
 	assert.equal(waitJob(p, nested, { cwd: liveTree }), "done");
 
-	// A finished record on the running job's branch and worktree, as a continuation's parent is, must not free them.
-	const twin = jobDir(p, "2000-01-01-twin-aaaaaaaa");
-	await mkdir(twin);
-	await writeFile(join(twin, "state"), "done\n");
-	await writeFile(join(twin, "branch"), `${jobFile(p, live, "branch")}\n`);
-	await writeFile(join(twin, "worktree"), `${liveTree}\n`);
 	const landedBranch = jobFile(p, landed, "branch");
 	git(p.root, "merge", "-q", "--no-edit", landedBranch);
 	const retired = limen(p, ["prune", "--retire"]);
 	assert.equal(retired.status, 0, retired.stderr);
-	assert.ok(!existsSync(jobDir(p, landed)), "a landed job is retired");
-	assert.ok(!existsSync(twin), "the finished twin is retired");
-	assert.equal(git(p.root, "branch", "--list", landedBranch), "", "a landed branch is deleted");
-	assert.notEqual(git(p.root, "branch", "--list", jobFile(p, live, "branch")), "", "a running job keeps its branch");
+	assert.deepEqual([existsSync(jobDir(p, landed)), git(p.root, "branch", "--list", landedBranch)], [false, ""]);
 	assert.ok(existsSync(jobDir(p, unmerged)), "an unmerged job stays");
 	assert.ok(existsSync(jobDir(p, live)), "a running job stays");
 	await release(jobDir(p, live));

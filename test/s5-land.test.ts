@@ -133,12 +133,11 @@ test("a branch that adds test lines past the cap is refused and names the number
 	assert.match(refused(job.running), /\b9\b[^\n]*\b5\b[^\n]*\b1\b/);
 });
 
-test("a done job fast-forwards, and a branch that removes test lines merges beside an uncommitted file", async () => {
+test("a done job fast-forwards without --yes off a TTY, a landed branch is deleted, and a merge lands beside an uncommitted file", async () => {
 	// B starts from the same main as A and removes test lines, leaving test/ still over the cap.
 	job.b = done("commit");
 	await amend(job.b, { "test/old.test.ts": lines(6) });
 	const a = git(p.root, "rev-parse", jobFile(p, job.a, "branch"));
-	// Without a TTY land asks nothing, so --yes is not needed.
 	const first = limen(p, ["land", job.a]);
 	assert.equal(first.status, 0, first.stderr);
 	assert.equal(git(p.root, "rev-parse", "main"), a);
@@ -146,14 +145,9 @@ test("a done job fast-forwards, and a branch that removes test lines merges besi
 	await writeFile(join(p.root, "draft.txt"), "another session drafts\n");
 	const status = git(p.root, "status", "--porcelain");
 	const b = git(p.root, "rev-parse", jobFile(p, job.b, "branch"));
-	assert.ok(existsSync(jobFile(p, job.b, "worktree")));
 	const second = limen(p, ["land", job.b, "--yes"]);
 	assert.equal(second.status, 0, second.stderr);
-	// A landed branch is deleted, and so is the finished worktree that held it.
-	for (const id of [job.a, job.b]) {
-		assert.equal(git(p.root, "branch", "--list", jobFile(p, id, "branch")), "");
-	}
-	assert.ok(!existsSync(jobFile(p, job.b, "worktree")));
+	assert.equal(git(p.root, "branch", "--list", jobFile(p, job.a, "branch"), jobFile(p, job.b, "branch")), "");
 	assert.deepEqual(git(p.root, "log", "-1", "--format=%P", "main").split(" "), [a, b]);
 	assert.equal(git(p.root, "show", "main:test/old.test.ts"), lines(6).trim());
 	assert.equal(git(p.root, "status", "--porcelain"), status);

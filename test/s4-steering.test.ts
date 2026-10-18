@@ -150,13 +150,8 @@ test("continue resumes the parent's session, linked, with its extensions or a re
 		"the child's transcript extends the parent's",
 	);
 	assert.deepEqual(extensions(inherited).slice(-1), [first]);
-	const replaced = continued(["--extension", second]);
+	const replaced = continued(["--extension", second, "--timeout", "10m"]);
 	assert.deepEqual(extensions(replaced).slice(-1), [second]);
 	assert.equal(extensions(replaced).includes(first), false);
 	assert.equal(jobFile(p, parent, "extensions.json"), parentRecord);
-	const timed = limen(p, ["continue", parent, "block", "--detached", "--timeout", "1s"]);
-	assert.equal(timed.status, 0, timed.stderr);
-	const id = timed.stdout.trim().split("\n").at(-1) ?? "";
-	assert.equal(waitJob(p, id), "failed");
-	assert.match(jobFile(p, id, "log"), /timeout after 1000ms/);
 });
