@@ -90,6 +90,8 @@ limen prune [--retire [--dry-run]]
 
 `prune` prints one line for each worktree, leftover directory, or stateless record it removes: `pruned <path> (job <id>): <reason>`, with `job none` when no record names the path. The prune that a new job runs writes the same lines to its own log and to the log of the job whose worktree went.
 
+Prune and `land` never remove the worktree or record of a job that is starting, running, or in an open group, nor a worktree made inside such a job's worktree. A running job keeps its worktree even when its process looks gone; `limen sweep` finalizes it first. Prune lists what it may remove, then reads the job records under the lock that publishing a job record also takes, so a job started during a prune keeps its worktree. It moves each removal out of reach in one rename and deletes it after the lock. A Git-locked worktree stays.
+
 After the merge, `land` also closes the active tickets the job works on: the tickets its label, ID or `Ticket:` pointers name, or, when they name none, the feature that starts its commit subjects (`F946: …`). Each folder moves to `spec/features/done/YYYY-MM/` with a `landed` date, NOW and PROVEN in `spec/build.md` are regenerated, and both go in one commit, `Close FNNN: landed by <id>`. `--keep-open` keeps the tickets active while more slices remain. When the board or a ticket folder has uncommitted edits, the tickets stay active and `land` says so.
 
 ### Tickets and the board
