@@ -65,6 +65,10 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	const unmerged = spawnJob(p, "commit");
 	assert.equal(waitJob(p, landed), "done");
 	assert.equal(waitJob(p, unmerged), "done");
+	// A worktree gone when the engine would start fails the job at once, with that reason.
+	const lost = spawnJob(p, "say lost", ["--prepare", 'rm -rf "$PWD"']);
+	assert.equal(waitJob(p, lost), "failed");
+	assert.match(jobFile(p, lost, "log"), /failed: worktree \S+ is missing or is not a Git checkout/);
 	const live = spawnJob(p, "block");
 	await until(jobDir(p, live), () => jobFile(p, live, "log").includes("prune: removed"));
 	assert.match(jobFile(p, landed, "log"), new RegExp(`pruned .*/${landed} \\(job ${landed}\\): job done`));
@@ -76,15 +80,25 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	const nestedTree = readFileSync(join(nestedDir, "worktree"), "utf8").trim();
 	assert.ok(nestedTree.startsWith(`${join(liveTree, "..")}/.${basename(liveTree)}-limen-worktrees/`), nestedTree);
 	await until(nestedDir, () => readFileSync(join(nestedDir, "log"), "utf8").includes("prune: removed"));
-	// Two records with a worktree and no state: one whose spawner is alive (this test), one whose spawner died long ago.
-	const [stale, starting] = ["2000-01-01-stale-start-aaaaaaaa", "2000-01-01-live-start-bbbbbbbb"];
-	for (const id of [stale, starting]) {
+	// Records with a worktree: no state and a live spawner (this test), no state and a spawner gone long ago, and
+	// running with its process gone, which the sweep finalizes before any prune may take its worktree.
+	const [stale, starting, gone] = [
+		"2000-01-01-stale-start-aaaaaaaa",
+		"2000-01-01-live-start-bbbbbbbb",
+		"2000-01-01-gone-cccccccc",
+	];
+	for (const id of [stale, starting, gone]) {
 		await mkdir(jobDir(p, id));
 		await writeFile(join(jobDir(p, id), "started-at"), "2000-01-01T00:00:00.000Z\n");
 		await writeFile(join(jobDir(p, id), "starting"), `${id === starting ? process.pid : ""}\n`);
 		await writeFile(join(jobDir(p, id), "worktree"), `${join(halfTree, "..", id)}\n`);
 		git(p.root, "worktree", "add", "-q", "--detach", join(halfTree, "..", id), "HEAD");
 	}
+	await writeFile(join(jobDir(p, gone), "state"), "running\n");
+	await writeFile(join(jobDir(p, gone), "pid"), "999999\n");
+	// A scratch worktree the live job made inside its own worktree goes with that job, not before it.
+	const scratch = join(liveTree, "tmp", "scratch");
+	git(p.root, "worktree", "add", "-q", "--detach", scratch, "HEAD");
 
 	const pruned = limen(p, ["prune"]);
 	assert.equal(pruned.status, 0, pruned.stderr);
@@ -92,7 +106,8 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	for (const dropped of [jobFile(p, landed, "worktree"), jobFile(p, unmerged, "worktree"), jobDir(p, stale)]) {
 		assert.ok(!existsSync(dropped), `prune kept ${dropped}`);
 	}
-	for (const kept of [liveTree, nestedTree, halfTree, jobDir(p, half), nestedDir, join(halfTree, "..", starting)]) {
+	const starts = [starting, gone].map((id) => join(halfTree, "..", id));
+	for (const kept of [liveTree, nestedTree, halfTree, jobDir(p, half), nestedDir, scratch, ...starts]) {
 		assert.ok(existsSync(kept), `prune removed ${kept}`);
 	}
 	assert.ok(git(p.root, "worktree", "list", "--porcelain").includes(`worktree ${nestedTree}\n`));

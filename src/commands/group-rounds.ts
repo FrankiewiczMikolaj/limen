@@ -133,12 +133,18 @@ async function saveRoundResults(run: GroupRun, teams: readonly string[]): Promis
 		}
 		const result = await jobText(run, job, "result");
 		const state = await jobText(run, job, "state");
-		const reason = state === "done" ? "" : await jobText(run, job, "stop-reason");
+		const reason = state === "done" ? "" : await endReason(run, job);
 		await writeFile(
 			`${roundFolder(run, run.round)}/${team}.md`,
 			`${result || `(no final message; the job ended ${state || "without a state"}${reason ? `: ${reason}` : ""})`}\n`,
 		);
 	}
+}
+/** What ended a job that did not end done: its last failed or stopped log line, else its engine's stop reason. */
+async function endReason(run: GroupRun, member: GroupMember): Promise<string> {
+	const terminal = /^\[limen [^\]]*\] (failed|stopped): /;
+	const ended = (await jobText(run, member, "log")).split("\n").findLast((line) => terminal.test(line));
+	return ended?.replace(terminal, "") || jobText(run, member, "stop-reason");
 }
 /** Continues the team's last job in its own session and worktree, or records why it could not. */
 async function startRound(run: GroupRun, team: string, round: number): Promise<void> {
@@ -226,7 +232,7 @@ async function groupResult(run: GroupRun): Promise<string> {
 		const state = job ? await jobText(run, job, "state") : "not started";
 		const branch = job ? await jobText(run, job, "branch") : "";
 		// A team that did not finish reaches the lead once, here, with its reason.
-		const reason = job && state !== "done" ? (await jobText(run, job, "stop-reason")).split("\n")[0] : "";
+		const reason = job && state !== "done" ? (await endReason(run, job)).split("\n")[0] : "";
 		const ended = `${state} after round ${(job?.round ?? 0) + 1}${reason ? ` (${reason.slice(0, 240)})` : ""}`;
 		lines.push(`- ${team} · ${routeName(teamRoute(run, team))} · ${ended}${branch ? ` · ${branch}` : ""}`);
 	}
