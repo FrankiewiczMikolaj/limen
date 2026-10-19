@@ -1,6 +1,14 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { pruneForJob } from "../commands/prune.ts";
 import { appendLimenLog } from "../job/record.ts";
+
+/** Why the engine cannot start in the job's worktree: it is gone or is no Git checkout. Undefined when it can. */
+export function worktreeMissing(worktree: string): string | undefined {
+	return existsSync(`${worktree}/.git`)
+		? undefined
+		: `worktree ${worktree} is missing or is not a Git checkout, so the engine did not start`;
+}
 
 /**
  * The setup spawn hands to the job's owner after publication, so spawn returns before it: prune finished worktrees,

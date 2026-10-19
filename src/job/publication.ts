@@ -3,7 +3,16 @@ import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { basename, dirname } from "node:path";
 import type { EngineId } from "../runtime/engine.ts";
+import { groupLock } from "./group-cabinet.ts";
 import { SESSION_ID } from "./job.ts";
+
+/**
+ * Prune and land remove a worktree only while they hold this lock, deciding from job records they read inside it.
+ * Publication holds it too, so no job claims a worktree between that read and the removal.
+ */
+export function worktreeLock<T>(jobsRoot: string, operation: () => Promise<T>): Promise<T> {
+	return groupLock(`${dirname(jobsRoot)}/prune`, operation, "wait");
+}
 
 /**
  * One line naming who ran this spawn or continue, from what the environment shows: a Limen job, else a Pi session or
@@ -168,7 +177,7 @@ export async function publishJob(jobDir: string, job: NewJob): Promise<void> {
 			await copyFile(job.session.source, `${publishing}/session/${job.session.name}`);
 		}
 		await writeFile(`${publishing}/notify/ready`, "1\n", { flag: "wx", flush: true });
-		await rename(publishing, jobDir);
+		await worktreeLock(jobsRoot, () => rename(publishing, jobDir));
 	} catch (error) {
 		await rm(publishing, { recursive: true, force: true });
 		throw error;

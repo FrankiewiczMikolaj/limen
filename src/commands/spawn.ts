@@ -82,7 +82,7 @@ export function resolvePreamble(root: string, role: string): string {
 }
 type WorktreePlan =
 	| { readonly kind: "detach"; readonly path: string; readonly ref: string }
-	| { readonly kind: "reuse"; readonly path: string }
+	| { readonly kind: "reuse"; readonly path: string; readonly branch: string }
 	| { readonly kind: "add-branch"; readonly path: string; readonly branch: string }
 	| { readonly kind: "add-new"; readonly path: string; readonly branch: string };
 const HANDSHAKE_POLL_MS = 20;
@@ -608,13 +608,14 @@ async function planWorktree(input: {
 	if (await liveJobUsesBranch(input.jobsRoot, branch, input.repo)) {
 		throw new Error(`branch ${branch} already has a live job`);
 	}
-	return existing ? { kind: "reuse", path: existing.path } : { kind: "add-branch", path, branch };
+	return existing ? { kind: "reuse", path: existing.path, branch } : { kind: "add-branch", path, branch };
 }
 function executeWorktree(root: string, plan: WorktreePlan): string {
 	if (plan.kind === "detach") {
 		addDetachedWorktree(root, plan.path, plan.ref);
 	}
-	if (plan.kind === "add-branch") {
+	// A prune that decided before this job's record was published may have taken the reused worktree; restore it.
+	if (plan.kind === "add-branch" || (plan.kind === "reuse" && !existsSync(plan.path))) {
 		addBranchWorktree(root, plan.path, plan.branch);
 	}
 	if (plan.kind === "add-new") {

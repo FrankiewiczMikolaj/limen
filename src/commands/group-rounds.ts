@@ -133,9 +133,10 @@ async function saveRoundResults(run: GroupRun, teams: readonly string[]): Promis
 		}
 		const result = await jobText(run, job, "result");
 		const state = await jobText(run, job, "state");
+		const reason = state === "done" ? "" : await jobText(run, job, "stop-reason");
 		await writeFile(
 			`${roundFolder(run, run.round)}/${team}.md`,
-			`${result || `(no final message; the job ended ${state || "without a state"})`}\n`,
+			`${result || `(no final message; the job ended ${state || "without a state"}${reason ? `: ${reason}` : ""})`}\n`,
 		);
 	}
 }
@@ -224,9 +225,10 @@ async function groupResult(run: GroupRun): Promise<string> {
 		const job = run.members.findLast((member) => member.team === team && member.role === "coordinator");
 		const state = job ? await jobText(run, job, "state") : "not started";
 		const branch = job ? await jobText(run, job, "branch") : "";
-		lines.push(
-			`- ${team} · ${routeName(teamRoute(run, team))} · ${state} after round ${(job?.round ?? 0) + 1}${branch ? ` · ${branch}` : ""}`,
-		);
+		// A team that did not finish reaches the lead once, here, with its reason.
+		const reason = job && state !== "done" ? (await jobText(run, job, "stop-reason")).split("\n")[0] : "";
+		const ended = `${state} after round ${(job?.round ?? 0) + 1}${reason ? ` (${reason.slice(0, 240)})` : ""}`;
+		lines.push(`- ${team} · ${routeName(teamRoute(run, team))} · ${ended}${branch ? ` · ${branch}` : ""}`);
 	}
 	lines.push(
 		`All round results: ${groupPath(run)}/rounds/`,
