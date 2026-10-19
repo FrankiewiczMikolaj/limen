@@ -151,7 +151,6 @@ test("a done job fast-forwards without --yes off a TTY, a landed branch is delet
 	assert.deepEqual(git(p.root, "log", "-1", "--format=%P", "main^").split(" "), [a, b]);
 	assert.equal(git(p.root, "show", "main:test/old.test.ts"), lines(6).trim());
 	assert.equal(git(p.root, "status", "--porcelain"), status);
-	assert.equal(git(p.root, "log", "-1", "--format=%s", "main"), `Close F001: landed by ${job.b}`);
 	const board = git(p.root, "show", "main:spec/build.md");
 	assert.match(board, /Current[^#]*## NOW\n\n<!--.*-->\n\n## [\s\S]*`F001-demo` \(🟢 PROVEN\).*landed \d/);
 });

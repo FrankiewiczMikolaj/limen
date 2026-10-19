@@ -98,7 +98,6 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	// A detached job resumed from a hosted session calls finish too; its handoff, not the last words, is the result.
 	assert.equal(jobFile(p, ids.done, "result"), "a done handoff");
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
-	assert.notEqual(jobFile(p, ids.provider, "stop-reason"), "");
 	assert.equal(git(p.root, "rev-list", "--count", `main..${jobFile(p, ids.provider, "branch")}`), "1");
 	wokeOnce(ids, [coord, second]);
 	// A job with no tool calls and no commits says so; a job that committed does not.

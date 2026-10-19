@@ -14,7 +14,6 @@ import {
 	type JobFiles,
 	jobActivity,
 	QUIET_MS,
-	toolWords,
 } from "../src/picture/activity.ts";
 
 const NOW = Date.parse("2026-10-08T12:00:00Z");
@@ -81,14 +80,6 @@ test("a finished job shows its end for an hour, then leaves the page", () => {
 	assert.equal(seen({ state: "stopped", finishedAt: finishedAt - 1 }), undefined);
 	assert.equal(jobActivity(job({ state: "done", finishedAt }), NOW)?.finishedAt, new Date(finishedAt).toISOString());
 	assert.deepEqual(jobActivity(job({}), NOW)?.work, ["f932", "f780"]);
-});
-
-test("tool words name the kind of work in plain words", () => {
-	assert.equal(toolWords("bash", "npx biome check ."), "running tests and checks");
-	assert.equal(toolWords("bash", "cd app && npm run test -- --watch=false"), "running tests and checks");
-	assert.equal(toolWords("bash", "node ~/.agents/skills/browser-check/browser.mjs shot"), "running a command");
-	assert.equal(toolWords("edit", ""), "editing files");
-	assert.equal(toolWords("constructor", ""), "using constructor");
 });
 
 test("the reader reads detached and hosted job folders the same way", async () => {

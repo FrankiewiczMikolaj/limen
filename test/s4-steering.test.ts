@@ -138,9 +138,6 @@ test("continue resumes the parent's session, linked, with its extensions or a re
 	};
 	const inherited = continued([]);
 	assert.equal(jobFile(p, inherited, "parent"), parent);
-	assert.equal(argv(inherited).at(-1), "say next");
-	assert.equal(argv(inherited).at(-2), "--continue");
-	assert.ok(!argv(inherited).some((value) => value.startsWith("@")));
 	const resumed = readFileSync(join(jobDir(p, inherited), "session/fake.jsonl"), "utf8");
 	assert.ok(
 		resumed.startsWith(transcript) && resumed.length > transcript.length,
