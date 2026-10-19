@@ -1,7 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
-export type GitWorktree = { readonly path: string; readonly branch?: string; readonly detached: boolean };
+export type GitWorktree = {
+	readonly path: string;
+	readonly branch?: string;
+	readonly detached: boolean;
+	readonly locked?: boolean;
+};
 type GitResult = { readonly stdout: string; readonly stderr: string; readonly status: number };
 export function repoRoot(cwd: string): string {
 	const result = git(cwd, ["rev-parse", "--show-toplevel"]);
@@ -166,13 +171,15 @@ export function listWorktrees(cwd: string): readonly GitWorktree[] {
 	let path: string | undefined;
 	let branch: string | undefined;
 	let detached = false;
+	let locked = false;
 	const finish = () => {
 		if (path) {
-			worktrees.push({ path, detached, ...(branch ? { branch } : {}) });
+			worktrees.push({ path, detached, ...(branch ? { branch } : {}), ...(locked ? { locked } : {}) });
 		}
 		path = undefined;
 		branch = undefined;
 		detached = false;
+		locked = false;
 	};
 	for (const field of fields) {
 		if (field.startsWith("worktree ")) {
@@ -182,6 +189,8 @@ export function listWorktrees(cwd: string): readonly GitWorktree[] {
 			branch = field.slice("branch refs/heads/".length);
 		} else if (field === "detached") {
 			detached = true;
+		} else if (field === "locked" || field.startsWith("locked ")) {
+			locked = true;
 		}
 	}
 	finish();
@@ -198,9 +207,6 @@ export function addBranchWorktree(cwd: string, path: string, branch: string): vo
 }
 export function addDetachedWorktree(cwd: string, path: string, ref: string): void {
 	requireGit(cwd, ["worktree", "add", "--detach", path, ref]);
-}
-export function removeWorktree(cwd: string, path: string): void {
-	requireGit(cwd, ["worktree", "remove", "--force", path]);
 }
 export function pruneWorktrees(cwd: string): void {
 	requireGit(cwd, ["worktree", "prune"]);

@@ -19,7 +19,7 @@ import {
 	signalProcessGroup,
 } from "./contain.ts";
 import { argvFor, engineBinary, jobProfile, prepareSkillConfig } from "./engine.ts";
-import { setUpJob } from "./job-setup.ts";
+import { setUpJob, worktreeMissing } from "./job-setup.ts";
 import { observeToolStall, ownedToolDescendants, type ToolStallWatch, toolStallMs } from "./stalled-tool.ts";
 import { createStreamParser, type StreamEvent } from "./stream.ts";
 import { readWorkerExtensions } from "./worker-extensions.ts";
@@ -98,6 +98,11 @@ export async function runInternalJob(): Promise<void> {
 			await finalizeJob(jobDir, "stopped", "stopped during setup", shutdownDeadline);
 			return;
 		}
+	}
+	const missing = worktreeMissing(worktree);
+	if (missing) {
+		await finalizeJob(jobDir, "failed", missing, shutdownDeadline);
+		return;
 	}
 	let exhaustionTermination = Promise.resolve();
 	const exhaust = (reason: string, captured?: readonly JobProcess[]) => {

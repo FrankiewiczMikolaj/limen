@@ -38,7 +38,7 @@ import {
 	readHostedBinding,
 } from "./hosted-binding.ts";
 import { noteHostedUncertainty } from "./hosted-uncertainty.ts";
-import { setUpJob } from "./job-setup.ts";
+import { setUpJob, worktreeMissing } from "./job-setup.ts";
 import { prepareRecoveredOwner } from "./recovery.ts";
 import { observeToolStall, type ToolStallWatch } from "./stalled-tool.ts";
 import { assistantStopReason, assistantText } from "./stream.ts";
@@ -136,7 +136,12 @@ async function hostedTarget(jobDir: string, recovering: boolean): Promise<string
 		return target || requiredEnvironment("LIMEN_HOSTED_TARGET");
 	}
 	try {
-		await setUpJob(jobDir, requiredEnvironment("LIMEN_WORKTREE"));
+		const worktree = requiredEnvironment("LIMEN_WORKTREE");
+		await setUpJob(jobDir, worktree);
+		const missing = worktreeMissing(worktree);
+		if (missing) {
+			throw new Error(missing);
+		}
 		return await startHostedAgent(jobDir);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -444,6 +449,10 @@ export async function noteHostedIdle(
 	}
 	if (!errored && status !== "blocked" && text && tree && cleanWorktree(tree)) {
 		return "closed a clean idle session";
+	}
+	// Nobody types into a group member: when its turn ends, its round ends, clean or not. A failed turn fails the job.
+	if (status !== "blocked" && (text || errored) && (await textFile(`${jobDir}/group`))) {
+		return errored ? "closed a group session whose last turn failed" : "closed an idle group session that is not clean";
 	}
 	const tools = Number(await textFile(`${jobDir}/tool-calls`));
 	const count = Number.isSafeInteger(tools) && tools > 0 ? tools : 0;
