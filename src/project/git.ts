@@ -300,12 +300,19 @@ export function commitPaths(cwd: string, paths: readonly string[], message: stri
 	requireGit(cwd, ["commit", "--quiet", "-m", message, "--", ...paths]);
 	return requireGit(cwd, ["rev-parse", "--short", "HEAD"]).stdout.trim();
 }
-export function cleanWorktree(cwd: string): boolean {
-	if (!existsSync(cwd)) {
-		return false;
+/**
+ * A worktree's Git state, read without refreshing its index. `none`: no folder, or a folder that is no Git checkout (no
+ * `.git`, or one Git does not accept), so it holds no uncommitted Git work. Any other Git failure reads as dirty.
+ */
+export function worktreeState(cwd: string): "clean" | "dirty" | "none" {
+	if (!existsSync(`${cwd}/.git`)) {
+		return "none";
 	}
 	const result = git(cwd, ["--no-optional-locks", "status", "--porcelain"]);
-	return result.status === 0 && result.stdout.trim() === "";
+	if (result.status === 0) {
+		return result.stdout.trim() === "" ? "clean" : "dirty";
+	}
+	return result.stderr.includes("not a git repository") ? "none" : "dirty";
 }
 export function liveDiffstat(cwd: string, branch: string): string {
 	const result = git(cwd, ["diff", "--stat", `HEAD...${branch}`]);

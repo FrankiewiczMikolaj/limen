@@ -5,21 +5,21 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { cleanWorktree } from "../src/project/git.ts";
+import { worktreeState } from "../src/project/git.ts";
 import { noteHostedIdle } from "../src/runtime/supervisor.ts";
 import { repository } from "./plant.ts";
 
-test("cleanWorktree reads a tree with stale stat data without rewriting its index", async (context) => {
+test("worktreeState reads a tree with stale stat data without rewriting its index", async (context) => {
 	const root = await mkdtemp(join(tmpdir(), "limen-u10-"));
 	context.after(() => rm(root, { recursive: true, force: true }));
 	await repository(root);
 	const index = join(root, ".git/index");
 	const before = await readFile(index);
 	await utimes(join(root, "README.md"), new Date(0), new Date(0));
-	assert.equal(cleanWorktree(root), true);
+	assert.equal(worktreeState(root), "clean");
 	assert.deepEqual(await readFile(index), before);
 	await writeFile(join(root, "README.md"), "changed\n");
-	assert.equal(cleanWorktree(root), false);
+	assert.equal(worktreeState(root), "dirty");
 	assert.deepEqual(await readFile(index), before);
 });
 

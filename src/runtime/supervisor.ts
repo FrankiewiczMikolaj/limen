@@ -27,7 +27,7 @@ import {
 	writeHandshake,
 } from "../job/record.ts";
 import { noteKind } from "../job/view.ts";
-import { cleanWorktree } from "../project/git.ts";
+import { worktreeState } from "../project/git.ts";
 import { argvFor, type EngineId, type EngineProfile, jobProfile, prepareSkillConfig } from "./engine.ts";
 import {
 	hostedBindingInPane,
@@ -447,7 +447,7 @@ export async function noteHostedIdle(
 	if (await ownsLiveChildren(jobDir)) {
 		return;
 	}
-	if (!errored && status !== "blocked" && text && tree && cleanWorktree(tree)) {
+	if (!errored && status !== "blocked" && text && tree && worktreeState(tree) === "clean") {
 		return "closed a clean idle session";
 	}
 	// Nobody types into a group member: when its turn ends, its round ends, clean or not. A failed turn fails the job.

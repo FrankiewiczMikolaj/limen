@@ -73,6 +73,7 @@ test("a sweep reuses a matched birth for 30 s on macOS; the reaper still finaliz
 	assert.equal(await ownerAlive(stranger, t0, query), false, "a live pid with another birth is not the owner");
 	child.kill("SIGKILL");
 	await exited;
+	assert.equal((await processInfo(info.process.pid, 0)).kind, "absent", "a gone pid needs no helper and no time");
 	const seen = new Map<string, number>();
 	await reapDeadJobs(jobs, seen, t0 + 31_000);
 	assert.deepEqual([...seen.keys()].sort(), ["owner", "stranger"]);

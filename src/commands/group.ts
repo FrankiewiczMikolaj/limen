@@ -21,7 +21,7 @@ import {
 import { acceptBatch, acceptTransport, groupEvents, publishEvent, syncLifecycle } from "../job/group-events.ts";
 import { roundNames, routeFlags } from "../job/group-packet.ts";
 import { parseDuration, SESSION_ID } from "../job/job.ts";
-import { cleanWorktree, commitHasFile, headCommit, limenRoot, repoRoot } from "../project/git.ts";
+import { commitHasFile, headCommit, limenRoot, repoRoot, worktreeState } from "../project/git.ts";
 import { type PlanningSource, planningSource, privatePlanningFile } from "../project/planning.ts";
 import { preflightEngine, resolveSpawnEngine } from "../runtime/engine.ts";
 import { normalizeWorkerExtensions } from "../runtime/worker-extensions.ts";
@@ -290,9 +290,10 @@ async function activateGroup(
 async function assertPriorRunsEnded(root: string, previous: readonly GroupRun[]): Promise<void> {
 	for (const prior of previous) {
 		for (const member of prior.members) {
-			if (await memberLive(root, member)) {
+			const live = await memberLive(root, member);
+			if (live) {
 				throw new Error(
-					`group ${prior.feature} (${prior.id}) still has a live job or no job record yet for ${member.team} ${member.role} (${member.id}); run limen group status ${prior.id}`,
+					`group ${prior.feature} (${prior.id}): ${member.team} ${member.role} (${member.id}) is not over (${live}); run limen group status ${prior.id}`,
 				);
 			}
 		}
@@ -561,43 +562,55 @@ async function stopMemberJob(run: GroupRun, member: GroupMember): Promise<string
 	try {
 		await stopCommand([member.id, "group stopped by lead"], run.root);
 		const until = Date.now() + 6_000;
-		while ((await memberLive(run.root, member)) && Date.now() < until) {
+		let live = await memberLive(run.root, member);
+		while (live && Date.now() < until) {
 			await delay(100);
+			live = await memberLive(run.root, member);
 		}
-		if (await memberLive(run.root, member)) {
-			return `${member.team} ${member.role} (${member.id}): job is still live or its process cannot be confirmed stopped`;
-		}
+		return live ? `${member.team} ${member.role} (${member.id}): not confirmed stopped (${live})` : undefined;
 	} catch (error) {
 		return `${member.team} ${member.role} (${member.id}): ${error instanceof Error ? error.message : String(error)}`;
 	}
-	return;
 }
-/** Marks the run closed once no member job is live and every member worktree is clean. */
+/**
+ * Marks the run closed once every member job is over and no member worktree holds uncommitted Git work. A member
+ * whose worktree is gone or is no Git checkout has none; close names that folder, and prune removes it afterwards.
+ */
 async function closeGroup(identity: GroupIdentity): Promise<void> {
-	await groupLock(
+	const lost = await groupLock(
 		`${groupPath(identity.run)}/launch`,
 		async () => {
 			const run = await readRun(identity.run.root, identity.run.id);
+			const folders = new Map<string, string>();
 			for (const member of run.members) {
-				if (await memberLive(run.root, member)) {
-					const state = (await readFile(`${run.root}/.limen/jobs/${member.id}/state`, "utf8").catch(() => "")).trim();
+				const name = `${member.team} ${member.role} (${member.id})`;
+				const live = await memberLive(run.root, member);
+				if (live) {
 					throw new Error(
-						`cannot close group ${run.feature} (${run.id}): ${member.team} ${member.role} (${member.id}) ${state ? "is still live or its process cannot be confirmed stopped" : "has no job record yet"}; run limen group stop ${run.id}`,
+						`cannot close group ${run.feature} (${run.id}): ${name} is not over (${live}); run limen group stop ${run.id}`,
 					);
 				}
 				const tree = (await readFile(`${run.root}/.limen/jobs/${member.id}/worktree`, "utf8").catch(() => "")).trim();
-				if (tree && existsSync(tree) && !cleanWorktree(tree)) {
+				const state = tree ? worktreeState(tree) : "none";
+				if (state === "dirty") {
 					throw new Error(
-						`cannot close group ${run.feature} (${run.id}): ${member.team} ${member.role} (${member.id}) has uncommitted work in ${tree}; run git -C ${JSON.stringify(tree)} status --short before committing or recovering that work`,
+						`cannot close group ${run.feature} (${run.id}): ${name} has uncommitted work in ${tree}; run git -C ${JSON.stringify(tree)} status --short before committing or recovering that work`,
 					);
+				}
+				if (state === "none" && existsSync(tree) && !folders.has(tree)) {
+					folders.set(tree, `${name}: ${tree} is no Git checkout, so it holds no Git work; prune removes it`);
 				}
 			}
 			run.closed = true;
 			run.stopped = true;
 			await saveJson(`${groupPath(run)}/run.json`, run);
+			return [...folders.values()];
 		},
 		"wait",
 	);
+	for (const line of lost) {
+		console.log(line);
+	}
 	console.log("group closed; clean member paths released for ordinary pruning");
 }
 async function allReceipts(run: GroupRun): Promise<unknown[]> {

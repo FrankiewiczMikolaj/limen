@@ -214,6 +214,10 @@ export async function processInfo(
 				: { kind: "unavailable" };
 		}
 	}
+	// No process holds the pid: that is exact, and needs no helper, which misses its deadline under heavy load.
+	if (!processAlive(pid)) {
+		return { kind: "absent" };
+	}
 	try {
 		const value: unknown = JSON.parse(
 			await runBounded("/usr/bin/ruby", [PIDINFO_HELPER, String(pid)], "proc_pidinfo", deadline),
