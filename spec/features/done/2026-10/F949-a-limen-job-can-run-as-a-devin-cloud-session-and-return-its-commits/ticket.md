@@ -1,5 +1,6 @@
 ---
 opened: 2026-10-20
+landed: 2026-10-20
 ---
 
 # F949 · A limen job can run as a Devin cloud session and return its commits

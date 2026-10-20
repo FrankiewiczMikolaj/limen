@@ -55,6 +55,7 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F949-a-limen-job-can-run-as-a-devin-cloud-session-and-return-its-commits` (🟢 PROVEN): A limen job can run as a Devin cloud session and return its commits; landed 2026-10-20
 - `F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system` (🟢 PROVEN): Every agent knows it works inside a highly capable agent system; landed 2026-10-17
 - `F947-a-coordinator-s-end-of-turn-always-sends-one-ping` (🟢 PROVEN): A coordinator's end of turn always sends one ping; landed 2026-10-17
 - `F946-a-finish-stall-or-ask-ping-is-never-lost-under-load` (🟢 PROVEN): A finish, stall or Ask ping is never lost under load; landed 2026-10-16
@@ -64,7 +65,6 @@
 - `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
 - `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
 - `F932-live-picture-activity` (🟢 PROVEN): The picture shows what each running job is doing now; landed 2026-10-08
-- `F931-optchat-prompt-cache-compare` (🟢 PROVEN): The OptChat explainer shows what the prompt cache reads and what is paid in full, for a typical thread and for OptChat; landed 2026-10-07
-- 2026-10: 52 landed. spec/features/done/2026-10/
+- 2026-10: 53 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/
