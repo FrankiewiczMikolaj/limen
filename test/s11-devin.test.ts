@@ -4,22 +4,18 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { after, before, test } from "node:test";
+import { after, test } from "node:test";
 import * as plant from "./plant.ts";
 
 const { git, jobFile, requests, waitJob } = plant;
 const KEY = "cog_fake-key-never-logged";
 const env = { DEVIN_API_KEY: KEY, DEVIN_ORG_ID: "org-test", LIMEN_DEVIN_POLL_MS: "20" };
-let p: plant.Plant;
-let origin: string;
-before(async () => {
-	p = await plant.plant();
-	origin = join(p.parent, "remote/acme/demo.git");
-	git(p.parent, "init", "-q", "--bare", "-b", "main", origin);
-	git(p.root, "remote", "add", "origin", origin);
-	git(p.root, "push", "-q", "origin", "main");
-});
-after(() => p.cleanup());
+const p = await plant.plant();
+after(p.cleanup);
+const origin = join(p.parent, "remote/acme/demo.git");
+git(p.parent, "init", "-q", "--bare", "-b", "main", origin);
+git(p.root, "remote", "add", "origin", origin);
+git(p.root, "push", "-q", "origin", "main");
 
 /** The fake API: the next session created is `id`; it reports `status` and Devin's messages `said`. */
 async function session(id: string, status: string, detail: string, said: readonly string[] = []): Promise<void> {
@@ -93,6 +89,7 @@ test("a rewritten branch or a sleeping session fails the job; stop and timeout e
 	const timedOut = await devinJob("e", ["--timeout", "2s"]);
 	assert.equal(waitJob(p, timedOut), "failed");
 	assert.deepEqual([jobFile(p, stopped, "state"), jobFile(p, timedOut, "state")], ["stopped", "failed"]);
+	assert.equal(jobFile(p, stopped, "cleanup"), "", "a Devin wrapper has no engine child to search for escapes");
 	const ended = requests(p).flatMap((request) => (request.method === "DELETE" ? [request.url.split("/").at(-1)] : []));
 	assert.deepEqual(ended, ["d", "e"]);
 	const jobs = join(p.root, ".limen/jobs");

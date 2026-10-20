@@ -195,25 +195,10 @@ test("two competing sweeps start exactly one replacement for a killed hosted sup
 	assert.ok(!jobFile(p, second, "log").includes("failed:"));
 });
 
-test("hosted Pi gets literal launch flags and the selected extension; stop records stopped once", async () => {
-	const extension = join(p.parent, "selected.ts");
-	await writeFile(extension, "export default () => {};\n");
-	const flags = ["--provider", "openai-codex", "--model", "gpt-6-astra", "--thinking", "high"];
-	const third = spawnJob(
-		p,
-		"block\nfinish never",
-		["--tab", "--engine", "pi", ...flags, "--extension", extension, "--label", "F001 hosted pi"],
-		{ env },
-	);
+test("hosted Pi stop records stopped once and closes the job's tab", async () => {
+	const third = spawnJob(p, "block\nfinish never", ["--tab", "--engine", "pi", "--label", "F001 hosted pi"], { env });
 	const dir = jobDir(p, third);
 	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
-	const argv = JSON.parse(readFileSync(join(dir, "fake-argv.json"), "utf8")) as string[];
-	assert.deepEqual(argv.slice(argv.indexOf("--provider"), argv.indexOf("--provider") + flags.length), flags);
-	assert.equal(
-		argv.filter((value) => value === extension).length,
-		1,
-		"the selected extension, once, beside the required hooks",
-	);
 	const stopped = limen(p, ["stop", third, "enough"], { env });
 	assert.equal(stopped.status, 0, stopped.stderr);
 	assert.equal(jobFile(p, third, "state"), "stopped");

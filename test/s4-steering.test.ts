@@ -78,11 +78,7 @@ test("a second init removes old hook copies, so a coordinator gets each guidance
 	const child = spawn(
 		join(p.bin, "pi"),
 		["--session-dir", join(coord, "session"), ...loaded, `@${join(coord, "task.md")}`],
-		{
-			cwd: p.root,
-			env: { ...p.env, LIMEN_PACKAGE: PACKAGE },
-			stdio: "ignore",
-		},
+		{ cwd: p.root, env: { ...p.env, LIMEN_PACKAGE: PACKAGE }, stdio: "ignore" },
 	);
 	const { promise, resolve } = Promise.withResolvers<number | null>();
 	child.once("exit", resolve);

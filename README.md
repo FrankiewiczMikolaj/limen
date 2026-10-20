@@ -22,6 +22,7 @@ Experimental software. Commands, prompts, and project files can change.
 - macOS or Linux, with Node.js 24 or later and Git.
 - [Pi](https://pi.dev) or OMP, installed and authenticated.
 - Herdr is optional for interactive job tabs.
+- A Devin account is optional, for jobs that run as Devin cloud sessions (`--engine devin`).
 
 See the [setup guide](docs/setup.md) for engine and Herdr configuration.
 

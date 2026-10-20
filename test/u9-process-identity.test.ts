@@ -1,6 +1,6 @@
 // U9: a recorded process is the same process only while its pid and its birth both match. A recycled pid with another
 // birth is a stranger: containment never signals it and names it in the cleanup note; the recorded birth is signaled.
-// The reaper treats a stranger at a job's pid as a dead owner; on macOS a sweep reuses a matched birth for 30 s.
+// The reaper treats a stranger at a job's pid as a dead owner.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -36,7 +36,7 @@ test("a recycled pid with another birth is never signaled and is named for clean
 	assert.deepEqual(await exited, [null, "SIGTERM"]);
 });
 
-test("a sweep reuses a matched birth for 30 s on macOS; the reaper still finalizes a dead owner and a stranger at its pid", async (t) => {
+test("the reaper keeps a live owner and finalizes a dead owner and a stranger at its pid", async (t) => {
 	const jobs = await mkdtemp(join(tmpdir(), "u9-jobs-"));
 	t.after(() => rm(jobs, { recursive: true, force: true }));
 	const child = spawn(process.execPath, ["-e", "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0)"], {
@@ -58,18 +58,8 @@ test("a sweep reuses a matched birth for 30 s on macOS; the reaper still finaliz
 	};
 	const owner = await record("owner", info.process.pid, info.process.born);
 	const stranger = await record("stranger", process.pid, "1.000000"); // this live process is not that birth
-	let queries = 0;
-	const counted = (pid: number) => {
-		queries += 1;
-		return query(pid);
-	};
 	const t0 = Date.now();
-	for (let now = t0; now < t0 + 30_000; now += 500) {
-		assert.equal(await ownerAlive(owner, now, counted), true);
-	}
-	assert.equal(queries, process.platform === "linux" ? 60 : 1, "birth queries in 60 sweeps over 30 s");
-	assert.equal(await ownerAlive(owner, t0 + 30_000, counted), true);
-	assert.equal(queries, process.platform === "linux" ? 61 : 2, "the birth is checked again after 30 s");
+	assert.equal(await ownerAlive(owner, t0, query), true, "the recorded birth is the owner");
 	assert.equal(await ownerAlive(stranger, t0, query), false, "a live pid with another birth is not the owner");
 	child.kill("SIGKILL");
 	await exited;

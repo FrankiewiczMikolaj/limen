@@ -51,8 +51,10 @@ export async function stopCommand(args: readonly string[], cwd: string): Promise
 	if (!Number.isSafeInteger(pid) || pid <= 0) {
 		throw new Error(`running job ${id} has no valid pid`);
 	}
-	// Complete the bounded ownership snapshot while the parent chain is intact, then signal.
-	const escaped = await discoverEscapedDescendants(jobDir, pid, "during stop");
+	// Complete the bounded ownership snapshot while the parent chain is intact, then signal. A Devin job's wrapper runs
+	// no engine child, so it has no process tree to search and an empty one is no attribution loss.
+	const escaped =
+		(await text(`${jobDir}/engine`)) === "devin" ? [] : await discoverEscapedDescendants(jobDir, pid, "during stop");
 	const result = signalProcessGroup(pid, "SIGTERM");
 	void containEscapedDescendants(jobDir, escaped, "after stop").catch((error: unknown) =>
 		appendLimenLog(

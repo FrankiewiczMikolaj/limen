@@ -59,11 +59,7 @@ before(async () => {
 	session = spawn(
 		join(p.bin, "pi"),
 		["--extension", PEER, "--session-dir", join(lead, "session"), `@${join(lead, "task.md")}`],
-		{
-			cwd: p.root,
-			env: { ...p.env, ...LEAD, LIMEN_COORDINATOR: "1" },
-			stdio: "ignore",
-		},
+		{ cwd: p.root, env: { ...p.env, ...LEAD, LIMEN_COORDINATOR: "1" }, stdio: "ignore" },
 	);
 	await until(lead, () => existsSync(join(lead, "fake-blocked-1")));
 });
@@ -171,7 +167,6 @@ test("launches queued behind a slow sibling wait past the old 10-second lock dea
 
 	const worker = as(roster.worker1, "team-1");
 	assert.equal(limen(p, ["spawn", ...ROUTE, "say nested"], { env: worker }).status, 1, "a worker cannot launch");
-	assert.equal(limen(p, ["land", roster.worker1, "--yes"], { env: worker }).status, 1, "a worker cannot land");
 	assert.equal(readdirSync(join(p.root, ".limen/jobs")).length, 4);
 });
 

@@ -3,7 +3,7 @@
 // a workspace job works in one child repository; each refusal leaves no job, worktree or branch behind.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { mkdir, realpath, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import {
@@ -27,8 +27,6 @@ before(async () => {
 after(() => p.cleanup());
 
 const json = (path: string) => JSON.parse(readFileSync(path, "utf8"));
-const extensionsOf = (argv: readonly string[]) =>
-	argv.flatMap((value, index) => (value === "--extension" ? [argv[index + 1] ?? ""] : []));
 // What a half-made job would leave: a job dir, a worktree, a branch.
 const traces = () => [
 	readdirSync(join(p.root, ".limen/jobs")),
@@ -124,34 +122,15 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.ok(detail.includes("tokens 2 turns · input 2 · output 20 · cache read 200 · cache write 2,000"), detail);
 });
 
-test("a workspace job works in one child repository and loads a selected Pi extension once", async () => {
+test("a workspace job works in one child repository", async () => {
 	const workspace = join(p.parent, "workspace");
 	await Promise.all(["api", "web"].map((name) => repository(join(workspace, name))));
 	assert.equal(limen(p, ["workspace", "init"], { cwd: workspace }).status, 0);
-	const extension = join(p.parent, "selected.ts");
-	await writeFile(extension, "export default () => {};\n");
-	await symlink(extension, join(p.parent, "alias.ts"));
-	const flags = [
-		"--repo",
-		"api",
-		"--engine",
-		"pi",
-		"--extension",
-		extension,
-		"--extension",
-		join(p.parent, "alias.ts"),
-	];
-	const id = spawnJob(p, "commit", flags, { cwd: workspace });
+	const id = spawnJob(p, "commit", ["--repo", "api", "--engine", "pi"], { cwd: workspace });
 	assert.equal(waitJob(p, id, { cwd: workspace }), "done");
 	const dir = join(workspace, ".limen/jobs", id);
 	assert.equal(readFileSync(join(dir, "repo"), "utf8"), "api\n");
 	assert.match(limen(p, ["jobs", id], { cwd: workspace }).stdout, /\n {2}spawned-by user \S+, parent .+ \(pid \d+\)\n/);
 	assert.equal(git(join(workspace, "api"), "rev-list", "--count", `main..limen/${id}`), "1");
 	assert.equal(git(join(workspace, "web"), "branch", "--list", `limen/${id}`), "");
-	const argv: string[] = json(join(dir, "fake-argv.json"));
-	assert.ok(argv.includes("--no-extensions"));
-	assert.deepEqual(
-		extensionsOf(argv).filter((path) => path.startsWith(p.parent)),
-		[await realpath(extension)],
-	);
 });

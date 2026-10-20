@@ -61,11 +61,6 @@ await writeFile(
 	`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(URLS.map((url, index) => ({ url, auth: SECRETS[index] })))}'\nLIMEN_FINISH_WEBHOOK_AUTHOR_TARGETS='{"@alice":[1],"@bob":[2]}'\n`,
 );
 
-test("an unconfigured job sends nothing", () => {
-	assert.equal(wait(quiet), "done");
-	assert.deepEqual(requests(p), []);
-});
-
 test("a done job pings only the target its ticket author maps to", async () => {
 	const id = spawn(`Ticket: ${alice}\ncommit`, "S7 alice");
 	assert.equal(wait(id), "done");
@@ -151,6 +146,7 @@ test("a ping whose deliverer was killed mid-send goes out with the next limen co
 });
 
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {
+	assert.equal(wait(quiet), "done");
 	assert.equal(requests(p).length, 9);
 	assert.ok(
 		requests(p).every(

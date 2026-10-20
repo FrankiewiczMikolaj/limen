@@ -9,14 +9,7 @@ import { git, jobDir, jobFile, limen, type Plant, plant, release, spawnJob, TICK
 
 let p: Plant;
 let main: string;
-const job: Record<"a" | "b" | "running" | "empty" | "failed" | "ticket", string> = {
-	a: "",
-	b: "",
-	running: "",
-	empty: "",
-	failed: "",
-	ticket: "",
-};
+const job = { a: "", b: "", running: "", empty: "", failed: "", ticket: "" };
 const lines = (n: number) => "x\n".repeat(n);
 
 before(async () => {

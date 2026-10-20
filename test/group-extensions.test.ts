@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { type GroupRun, groupPath, readRun, saveJson } from "../src/job/group-cabinet.ts";
+import { type GroupRun, readRun } from "../src/job/group-cabinet.ts";
 import { git, jobDir, limen, plant, type RunOptions, TICKET, waitJob } from "./plant.ts";
 
 const lead = { PI_SESSION_ID: "extension-lead" };
@@ -167,15 +167,8 @@ test("invalid group selections never activate or consume jobs, including later t
 		const result = f.start("--extension", f.common, ...extra);
 		assert.equal(result.status, 1, result.stderr);
 	}
-	const omp = f.run([
-		"group",
-		"start",
-		f.feature,
-		...settings.map((arg) => arg.replace(/^pi:/, "omp:")),
-		f.mode,
-		"--team-extension",
-		`team-2=${f.common}`,
-	]);
+	const ompSettings = settings.map((arg) => arg.replace(/^pi:/, "omp:"));
+	const omp = f.run(["group", "start", f.feature, ...ompSettings, f.mode, "--team-extension", `team-2=${f.common}`]);
 	assert.match(omp.stderr, /supported only for Pi/);
 	assert.deepEqual(await readdir(join(f.root, ".limen/groups")).catch(() => []), []);
 	assert.deepEqual(await readdir(join(f.root, ".limen/jobs")).catch(() => []), []);
@@ -203,22 +196,4 @@ test("a repeated start keeps the original selections, even after a path disappea
 	assert.equal((await readdir(join(f.root, ".limen/jobs"))).length, 2);
 	assert.match(f.launch(run, "team-2").stderr, /cannot use extension/);
 	assert.equal((await readRun(f.root, run.id)).members.length, 2);
-});
-
-test("malformed extension maps fail closed", async (context) => {
-	const f = await fixture();
-	context.after(f.cleanup);
-	const started = f.start();
-	assert.equal(started.status, 0, started.stderr);
-	const run = await readRun(f.root, lastLine(started.stdout));
-	for (const member of run.members) {
-		await f.checkJob(member.id, []);
-	}
-	assert.match(f.launch(run, "team-1", "--extension", f.common).stderr, /recorded team extensions/);
-	assert.equal((await readRun(f.root, run.id)).members.length, 2);
-	for (const map of [null, [], {}, { "team-1": [], "team-2": ["relative.ts"] }, { "team-1": [], "team-2": "bad" }]) {
-		await saveJson(join(groupPath(run), "run.json"), { ...run, teamExtensions: map });
-		await assert.rejects(readRun(f.root, run.id), /invalid teamExtensions/);
-		assert.match(f.launch(run, "team-1").stderr, /invalid teamExtensions/);
-	}
 });

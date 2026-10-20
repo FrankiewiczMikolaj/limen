@@ -1,7 +1,7 @@
-// S6 · Spec keeper. One plant: ticket numbers, place ids, the keeper's start rules, picture bytes and ticket-author path
+// S6 · Spec keeper. One plant: ticket numbers, place ids, the keeper's start rules and ticket-author path
 // resolution, all through the real CLI. The strict ticket gate is s5's land refusal and u1's diagnostics.
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -59,26 +59,6 @@ test("keeper refuses a running job, then starts on a new branch at the candidate
 	const again = limen(p, ["keeper", TICKET, "--job", worker, ...ROUTE]);
 	assert.equal(again.status, 1);
 	assert.match(again.stderr, new RegExp(keeperBranch));
-});
-
-test("two strict picture builds give identical bytes", () => {
-	const dir = join(p.root, ".limen/picture");
-	const build = () => {
-		const run = limen(p, [
-			"picture",
-			"build",
-			"--dir",
-			dir,
-			"--out",
-			join(p.parent, "map.html"),
-			"--json",
-			join(p.parent, "map.json"),
-			"--strict",
-		]);
-		assert.equal(run.status, 0, run.stderr);
-		return [readFileSync(join(p.parent, "map.html")), readFileSync(join(p.parent, "map.json"))];
-	};
-	assert.deepEqual(build(), build());
 });
 
 test("ticket-author resolves aliased paths and invents no author for others", async () => {

@@ -19,6 +19,7 @@ limen spawn --engine <engine> --provider <provider> --model <model> --thinking <
 limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --repo R "instruction" [--label L]
 limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --review --detached --branch B --label L [--base REF] [--head REF] "instruction"
 limen continue <id|suffix|label> "follow-up instruction" [--review] [--label L] [--engine pi|omp] [--provider P] [--model M] [--thinking T] [--tab|--detached] [--timeout D] [--extension PATH ...]
+limen spawn --engine devin [--provider macos|linux] [--model MODE] "instruction" [--label L] [--branch B] [--timeout 20m] [--task-file F|-]
 ```
 
 `--base` and `--head` pin the range that a review reads. They take a full SHA, a short SHA, or a ref such as a branch or tag; Limen resolves it with `git rev-parse` and records the full SHA. They require `--review`.
@@ -30,6 +31,8 @@ Both hosted and detached Pi jobs retain `--no-extensions` and all required Limen
 For ordinary jobs, `continue` inherits the parent's list when no `--extension` is given. Supplied flags replace the whole list, even if an old path is unavailable; the parent record stays unchanged. Repeat the chosen `--provider`, `--model` and `--thinking` flags: continuation does not inherit those choices. An ordinary fresh `spawn`, including `spawn --branch`, has no user extras unless selected. Group members instead inherit the fixed recorded team list; they cannot replace it. There is no clear-list flag.
 
 Only paths are retained, not extension source or dependency versions. Later edits or upgrades at those paths affect later launches. See [extension trust and model routes](setup.md#personal-model-routes-and-pi-extensions) before selecting third-party code.
+
+**Devin cloud jobs.** `--engine devin` runs the job as a Devin cloud session: `--provider` names the platform (`macos` or `linux`) and `--model` the Devin mode. The job pushes its branch to `origin`, follows the session into its log, and fast-forwards the worktree from the pushed branch when the session finishes; Devin's last message is the result. It runs detached only: spawn refuses `--tab`, `--thinking` and `--extension`, and `continue` and group teams refuse the engine. `limen stop` and the timeout terminate the session. Credentials, limits and failure reasons: [Devin cloud jobs](setup.md#devin-cloud-jobs).
 
 ### Inspect jobs
 

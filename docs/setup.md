@@ -100,9 +100,9 @@ Project choices are in `spec/build.md`. The board records the engine, provider, 
 
 The coordinator must pass the board choices explicitly. Package fallbacks apply when command flags and environment variables do not select a setting.
 
-**Engine.** `--engine pi|omp` selects the job binary. The order of priority is:
+**Engine.** `--engine pi|omp|devin` selects the job's agent: the Pi or OMP binary on the seat, or a Devin cloud session (see [Devin cloud jobs](#devin-cloud-jobs)). The order of priority is:
 
-1. `--engine pi|omp`
+1. `--engine pi|omp|devin`
 2. `LIMEN_ENGINE` (for example, `LIMEN_ENGINE=pi` selects Pi)
 3. OMP, for new jobs, when neither is set
 
@@ -116,6 +116,8 @@ Two exceptions apply:
 1. `--model`
 2. `LIMEN_WORKER_MODEL` (or `LIMEN_REVIEWER_MODEL` for `--review`)
 3. the built-in `openai-codex/gpt-6-astra:high`
+
+A Devin job takes only `--model`: it names a Devin mode, and without it the organization's default mode runs.
 
 **`pi-claude` on OMP.** Name a Claude model on the local bridge as `--model pi-claude/<model>`, for example `--model pi-claude/claude-opus-5-5`. That id loads the bridge at `~/.omp/local/pi-claude-bridge` explicitly, because jobs otherwise start with `--no-extensions`. OMP has no `pi-claude` provider. A command that requires `--provider` takes `--provider pi-claude`; Limen keeps it in the job record and off the OMP command line. `--provider pi-claude --model claude-opus-5-5` runs the same route. `spawn`, `continue` and `group start` refuse a `pi-claude` provider with another provider's model, or a missing bridge, before any job exists.
 
@@ -158,6 +160,22 @@ limen spawn --engine <engine> \
 ```
 
 This job is detached, also in Herdr: a log-tail tab, a 90-minute timeout (change it with `--timeout`), a tool-call cap and process containment. Use `--tab` when a person will type into the worker. In both modes, `--provider`, `--model`, and `--thinking` go to the selected engine as separate flag and value pairs. `limen continue` accepts the same flags.
+
+### Devin cloud jobs
+
+`--engine devin` runs the job's agent as a Devin cloud session on Devin's own virtual machine, macOS or Linux. The job's folder, branch and worktree stay on the seat, so `jobs`, `wait`, `diff` and `land` work as for any job.
+
+```bash
+limen spawn --engine devin --provider macos --model normal \
+  --label "what this changes · FNNN" 'Implement FNNN: <outcome>. Ticket: spec/features/active/FNNN-slug/ticket.md'
+```
+
+- **Flags.** `--provider` is the Devin platform, `macos` or `linux`. `--model` is the Devin mode (`normal`, `fast`, `lite`, `ultra`, …), sent as `devin_mode`. Either one, when omitted, falls to the organization's default. Spawn refuses `--thinking`, `--tab` and `--extension`; `limen continue` and group teams refuse the engine. `LIMEN_DEVIN_ACU_LIMIT=<n>` caps the session at `n` ACUs (`max_acu_limit`).
+- **Start.** The job pushes its branch with `git push origin <branch>`; a failed push fails the job with git's reason. Then it creates a session for the `owner/repo` that the `origin` URL names, so Devin needs access to that repository. The prompt is the role preamble, the task, and a fixed contract: start from the pushed branch, commit there, push with `git push origin <branch>` only (no force-push, no pull request), reply with the handoff and stop.
+- **While it runs.** The job folder records the session in `devin-session` (its id) and `devin-url`. The log holds both, each status change, and every message Devin writes; Limen polls about every 30 seconds.
+- **End.** When the session waits for the user or reports finished, Limen fetches the branch and fast-forwards the worktree with `git merge --ff-only FETCH_HEAD`, writes Devin's last message as the result, and ends the job `done`. A branch that does not fast-forward, such as rewritten history, fails the job and leaves the worktree unchanged. A session that suspends (inactivity, quota, an error), exits early or errors fails the job and names the reason. `limen stop` and the job timeout terminate the session. A finished session stays in Devin waiting for the user, and sleeps on its own.
+- **Credentials.** `DEVIN_API_KEY` and `DEVIN_ORG_ID` when set; otherwise the Devin CLI login: the key in `~/.local/share/devin/credentials.toml` and the org id that `devin cloud drs whoami` prints (sign in with `devin auth login`). `DEVIN_API_URL` changes the API host from `https://api.devin.ai`. The key goes only into the Authorization header of each request, never into a log, a job file or the prompt.
+- **The pushed branch stays on origin.** Delete it after you land or drop the job: `git push origin --delete <branch>`.
 
 ## Adjacent-repository workspaces
 
