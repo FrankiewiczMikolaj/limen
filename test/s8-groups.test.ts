@@ -260,6 +260,7 @@ test("close refuses a member with uncommitted work until it is clean; each lead 
 	assert.equal(limen(p, ["group", "close", group], { env: LEAD }).status, 1);
 	assert.equal(JSON.parse(readFileSync(join(cabinet(), "run.json"), "utf8")).closed, false);
 	await rm(dirty);
+	await rm(join(jobFile(p, roster.worker2, "worktree"), ".git")); // a folder a prune race left: no Git work in it
 	const closed = limen(p, ["group", "close", group], { env: LEAD });
 	assert.equal(closed.status, 0, closed.stderr);
 	assert.equal(JSON.parse(readFileSync(join(cabinet(), "run.json"), "utf8")).closed, true);

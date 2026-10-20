@@ -357,31 +357,36 @@ export async function jobMembership(jobDir: string): Promise<GroupIdentity | und
 export async function retainedGroupJob(jobDir: string): Promise<boolean> {
 	return Boolean((await jobMembership(jobDir))?.run.closed === false);
 }
-export async function memberLive(root: string, member: GroupMember): Promise<boolean> {
+/** One member check may wait this long for a process query: the default second is missed under heavy load. */
+const MEMBER_QUERY_MS = 15_000;
+/**
+ * Why a member job is not over, or undefined when it is: its state says running, a process it recorded may still run,
+ * or it has no record yet. A process that cannot be checked counts as running. Its worktree plays no part.
+ */
+export async function memberLive(root: string, member: GroupMember): Promise<string | undefined> {
 	const dir = `${root}/.limen/jobs/${member.id}`;
 	const state = (await readFile(`${dir}/state`, "utf8").catch(() => "")).trim();
 	if (state === "running") {
-		return true;
+		return "its state is running";
 	}
+	const deadline = Date.now() + MEMBER_QUERY_MS;
 	const pid = Number(await readFile(`${dir}/pid`, "utf8").catch(() => ""));
-	if (pid > 0 && (await processInfo(pid)).kind !== "absent") {
-		return true;
+	if (pid > 0 && (await processInfo(pid, deadline)).kind !== "absent") {
+		return `its process ${pid} still runs or cannot be checked`;
 	}
 	const target = (await readFile(`${dir}/herdr/agent`, "utf8").catch(() => "")).trim();
 	if (target && hostedAgentStatus(target) !== "missing") {
-		return true;
+		return `its Herdr agent ${target} is still present, or Herdr did not answer`;
 	}
 	const owner = JSON.parse(await readFile(`${dir}/group-owner.json`, "utf8").catch(() => "null")) as {
 		pid: number;
 		born: string;
 	} | null;
-	if (owner) {
-		const info = await processInfo(owner.pid);
-		if (info.kind === "unavailable" || (info.kind === "present" && info.process.born === owner.born)) {
-			return true;
-		}
+	const info = owner ? await processInfo(owner.pid, deadline) : undefined;
+	if (info?.kind === "unavailable" || (info?.kind === "present" && info.process.born === owner?.born)) {
+		return `its owner process ${owner?.pid} ${info.kind === "present" ? "still runs" : "cannot be checked"}`;
 	}
-	return !state && !existsSync(`${dir}/finished-at`);
+	return !state && !existsSync(`${dir}/finished-at`) ? "it has no job record yet" : undefined;
 }
 export async function ownsLiveChildren(jobDir: string): Promise<boolean> {
 	const identity = await jobMembership(jobDir);
