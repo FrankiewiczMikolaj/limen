@@ -105,7 +105,11 @@ function teamRouteFlag(value: string): TeamRoute {
 	if (!route?.[1] || !route[2] || !route[3] || !route[4] || !LEVELS.includes(route[4])) {
 		throw new Error(`${INVALID_TEAM}; the reasoning level is one of ${LEVELS.join(", ")}`);
 	}
-	return { engine: resolveSpawnEngine(route[1]).id, provider: route[2], model: route[3], thinking: route[4] };
+	const engine = resolveSpawnEngine(route[1]).id;
+	if (engine === "devin") {
+		throw new Error("--engine devin runs detached jobs only and cannot be a group team's engine");
+	}
+	return { engine, provider: route[2], model: route[3], thinking: route[4] };
 }
 function teamExtensionPaths(values: readonly string[]): Record<string, string[]> {
 	const paths: Record<string, string[]> = {};

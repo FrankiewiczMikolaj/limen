@@ -4,10 +4,10 @@ import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-export type EngineId = "pi" | "omp";
+export type EngineId = "pi" | "omp" | "devin";
 export type EngineProfile = {
 	readonly id: EngineId;
-	readonly binaryEnv: "LIMEN_PI" | "LIMEN_OMP";
+	readonly binaryEnv: "LIMEN_PI" | "LIMEN_OMP" | "LIMEN_DEVIN";
 	readonly binaryDefault: EngineId;
 	readonly herdrKind: EngineId;
 	readonly projectTrust: boolean;
@@ -52,19 +52,31 @@ export const ENGINES: { readonly [K in EngineId]: EngineProfile } = {
 		noTitle: true,
 		authCheck: false,
 	},
+	// A Devin job runs in Devin's cloud through its API; the `devin` CLI only lends its login and reports its version.
+	devin: {
+		id: "devin",
+		binaryEnv: "LIMEN_DEVIN",
+		binaryDefault: "devin",
+		herdrKind: "devin",
+		projectTrust: false,
+		toolYolo: false,
+		sessionName: false,
+		noTitle: false,
+		authCheck: false,
+	},
 };
 export function engineProfile(id: string): EngineProfile {
-	if (id === "pi" || id === "omp") {
+	if (id === "pi" || id === "omp" || id === "devin") {
 		return ENGINES[id];
 	}
 	throw new Error(`unknown engine ${id}`);
 }
 export function resolveSpawnEngine(flag?: string): EngineProfile {
 	const raw = (flag ?? process.env.LIMEN_ENGINE)?.trim() || "omp";
-	if (raw === "pi" || raw === "omp") {
+	if (raw === "pi" || raw === "omp" || raw === "devin") {
 		return ENGINES[raw];
 	}
-	throw new Error("--engine must be pi or omp");
+	throw new Error("--engine must be pi, omp or devin");
 }
 export function engineBinary(profile: EngineProfile): string {
 	return process.env[profile.binaryEnv] ?? profile.binaryDefault;

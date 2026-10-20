@@ -339,12 +339,17 @@ async function readParentJob(
 		throw new Error(`parent record ${parentId} has no branch`);
 	}
 	const repo = await text(`${parentDir}/repo`);
+	const parentEngine = (await text(`${parentDir}/engine`)) || "pi";
+	if (parentEngine === "devin") {
+		throw new Error(
+			`limen continue cannot resume a devin job; spawn a new --engine devin job with --branch ${branch} instead`,
+		);
+	}
 	const sessions = (await readdir(`${parentDir}/session`).catch(() => [])).filter((name) => name.endsWith(".jsonl"));
 	if (sessions.length === 0) {
 		throw new Error(`parent record ${parentId} has no session transcript to continue`);
 	}
 	const session = sessions.sort().at(-1);
-	const parentEngine = (await text(`${parentDir}/engine`)) || "pi";
 	if (engine) {
 		const requested = resolveSpawnEngine(engine);
 		if (requested.id !== parentEngine) {

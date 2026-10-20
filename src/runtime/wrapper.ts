@@ -18,6 +18,7 @@ import {
 	processInfo,
 	signalProcessGroup,
 } from "./contain.ts";
+import { runDevinJob } from "./devin.ts";
 import { argvFor, engineBinary, jobProfile, prepareSkillConfig } from "./engine.ts";
 import { setUpJob, worktreeMissing } from "./job-setup.ts";
 import { observeToolStall, ownedToolDescendants, type ToolStallWatch, toolStallMs } from "./stalled-tool.ts";
@@ -84,8 +85,10 @@ export async function runInternalJob(): Promise<void> {
 	let graceTimer: NodeJS.Timeout | undefined;
 	let tools = 0;
 	let pending = Promise.resolve();
+	const stop = new AbortController();
 	process.on("SIGTERM", () => {
 		stopRequested = true;
+		stop.abort();
 		if (!confirmedToolStall) {
 			shutdownDeadline ??= Date.now() + STOP_GRACE_MS - 500;
 		}
@@ -102,6 +105,22 @@ export async function runInternalJob(): Promise<void> {
 	const missing = worktreeMissing(worktree);
 	if (missing) {
 		await finalizeJob(jobDir, "failed", missing, shutdownDeadline);
+		return;
+	}
+	const profile = await jobProfile(jobDir);
+	if (profile.id === "devin") {
+		await runDevinJob({
+			jobDir,
+			worktree,
+			taskFile,
+			preamble,
+			jobId,
+			label,
+			platform: process.env.LIMEN_PROVIDER ?? "",
+			mode: process.env.LIMEN_MODEL ?? "",
+			timeoutMs,
+			stop: stop.signal,
+		});
 		return;
 	}
 	let exhaustionTermination = Promise.resolve();
@@ -130,7 +149,6 @@ export async function runInternalJob(): Promise<void> {
 			await finalizeJob(jobDir, "failed", reason, shutdownDeadline);
 		})();
 	};
-	const profile = await jobProfile(jobDir);
 	const skillConfig = profile.id === "omp" ? await prepareSkillConfig(worktree, jobDir) : undefined;
 	const args = argvFor(profile, {
 		jsonMode: true,
