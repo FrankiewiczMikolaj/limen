@@ -1,8 +1,11 @@
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { ParseArgsOptionsConfig } from "node:util";
+import { readDataset } from "../picture/dataset.ts";
+import { parseFrontmatter } from "../picture/frontmatter.ts";
 import { buildPicture } from "../picture/picture-build.ts";
 import { servePicture } from "../picture/picture-serve.ts";
-import { headCommit, limenRoot, repoRoot } from "../project/git.ts";
+import { gitCommonDir, headCommit, repoRoot } from "../project/git.ts";
 import { firstPictureHint, pictureTick } from "../project/picture-tick.ts";
 import { pictureWatch } from "../project/picture-watch.ts";
 import { parseFlags } from "./flags.ts";
@@ -65,26 +68,19 @@ export async function pictureCommand(args: readonly string[], cwd: string): Prom
 		);
 		return;
 	}
-	const root = repoRoot(cwd);
-	const picture = resolve(cwd, dir ?? `${root}/.limen/picture`);
 	if (mode === "tick") {
-		await pictureTick(root, picture, values, dryRun);
+		const root = repoRoot(cwd);
+		await pictureTick(root, resolve(cwd, dir ?? `${root}/.limen/picture`), values, dryRun);
 		return;
 	}
+	const { picture, root, jobs } = await pictureSources(cwd, dir);
 	if (mode === "serve") {
-		await serve(cwd, root, picture, values.get("--port"));
+		await serve(root, picture, jobs, values.get("--port"));
 		return;
 	}
 	const out = resolve(cwd, values.get("--out") ?? `${picture}/map.html`);
 	const json = values.get("--json");
-	const model = await buildPicture(picture, out, json ? resolve(cwd, json) : undefined, headCommit(root), root).catch(
-		(error: NodeJS.ErrnoException) => {
-			if (error.code === "ENOENT" && error.path === picture) {
-				throw new Error(firstPictureHint(picture));
-			}
-			throw error;
-		},
-	);
+	const model = await buildPicture(picture, out, json ? resolve(cwd, json) : undefined, headCommit(root), root);
 	for (const d of model.diagnostics) {
 		console.error(
 			`${d.level} ${d.code}${d.source ? ` ${d.source}${d.line === null ? "" : `:${d.line}`}` : ""}: ${d.message}`,
@@ -96,21 +92,44 @@ export async function pictureCommand(args: readonly string[], cwd: string): Prom
 	}
 }
 
-async function serve(cwd: string, root: string, picture: string, port = String(SERVE_PORT)): Promise<void> {
+/**
+ * The map folder, the checkout whose tickets and board join it, and the plant's live jobs. All come from the repository
+ * that holds the map, except that a checkout of that repository, a job worktree too, keeps its own tickets and board:
+ * a branch checks its tickets against the plant's map.
+ */
+async function pictureSources(
+	cwd: string,
+	dir: string | undefined,
+): Promise<{ picture: string; root: string; jobs: string }> {
+	const picture = await mapFolder(dir === undefined ? repoRoot(cwd) : resolve(cwd, dir));
+	const owner = repoRoot(picture);
+	const root = gitCommonDir(cwd) === gitCommonDir(owner) ? repoRoot(cwd) : owner;
+	return { picture, root, jobs: `${owner}/.limen/jobs` };
+}
+
+/** `dir` when it holds the plant file, else the `.limen/picture` below it; a folder with neither has no map. */
+async function mapFolder(dir: string): Promise<string> {
+	const dataset = await readDataset(dir).catch(() => undefined);
+	if (dataset?.files.some((file) => parseFrontmatter(file.text).data.kind === "plant")) {
+		return dir;
+	}
+	const nested = join(dir, ".limen", "picture");
+	if (existsSync(nested)) {
+		return nested;
+	}
+	throw new Error(`${dir} has no plant file (nodes/*.md with "kind: plant") and ${firstPictureHint(nested)}`);
+}
+
+async function serve(root: string, picture: string, jobs: string, port = String(SERVE_PORT)): Promise<void> {
 	if (!/^\d{1,5}$/.test(port) || Number(port) > 65_535) {
 		throw new Error(`invalid picture serve port ${JSON.stringify(port)}\n${HELP}`);
 	}
 	const served = await servePicture({
 		dir: picture,
 		root,
-		jobsRoot: `${limenRoot(cwd)}/.limen/jobs`,
+		jobsRoot: jobs,
 		port: Number(port),
 		tip: () => headCommit(root),
-	}).catch((error: NodeJS.ErrnoException) => {
-		if (error.code === "ENOENT" && error.path === picture) {
-			throw new Error(firstPictureHint(picture));
-		}
-		throw error;
 	});
 	console.log(`picture: serving ${served.url} with live job activity; Ctrl-C stops`);
 }

@@ -42,11 +42,13 @@ limen picture build --dir "$LIMEN_CONTEXT_ROOT/.limen/picture" --out /tmp/check.
 
 The strict check exits 1 for ticket errors. It warns, but does not guess a link, when an active ticket has no known `touches`.
 
+`--dir` names the map folder, or a folder that holds one in `.limen/picture`, such as a plant root. A folder with neither stops build and serve with an error that names both paths; neither draws an empty map. The tickets and board come from the repository that holds the map. A checkout of that repository, a job worktree too, keeps its own, so the check above reads the branch's tickets.
+
 Remove a Needs Adam request and its date after Adam answers. Remove a Wrong problem and its date after the fix. The pin then leaves the page.
 
 ## Live job activity
 
-`limen picture serve` serves the same page on `http://127.0.0.1:4747/` (`--port` picks another port; `--dir` another dataset). It reads the job folders in `.limen/jobs/` once a second and pushes changes to the open page over Server-Sent Events. It never changes a job, and it listens only on 127.0.0.1. Ctrl-C stops it. A reload rebuilds the page from the current tickets and board.
+`limen picture serve` serves the same page on `http://127.0.0.1:4747/` (`--port` picks another port; `--dir` another dataset). It reads the job folders in `.limen/jobs/` of the repository that holds the map once a second, whatever folder it runs from, and pushes changes to the open page over Server-Sent Events. It never changes a job, and it listens only on 127.0.0.1. Ctrl-C stops it. A reload rebuilds the page from the current tickets and board.
 
 The page then shows a live strip with each job, the feature it names, and what it does now: thinking, editing files, reading code, running tests and checks, running a command, running helpers, or waiting. Each line names the engine and model and the time since the last event. The places a running job's feature touches carry a mark, and the feature's detail lists its jobs.
 

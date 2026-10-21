@@ -33,6 +33,13 @@ test("ticket new refuses an unknown place id before any file exists", () => {
 	assert.deepEqual(lane("planned"), before);
 });
 
+test("picture build --dir takes a plant root from any folder and stops on a folder with no map", () => {
+	const built = limen(p, ["picture", "build", "--strict", "--dir", p.root], { cwd: p.parent });
+	assert.match(`${built.status} ${built.stdout}`, /^0 picture: [1-9]\d* places/, built.stderr);
+	const { status, stderr } = limen(p, ["picture", "build", "--dir", p.bin]);
+	assert.match(`${status} ${stderr}`, /^1 \S+\/bin has no plant file .+ no map yet in \S+\/bin\/\.limen\/picture\./);
+});
+
 test("keeper refuses a running job, then starts on a new branch at the candidate tip", async () => {
 	const refused = limen(p, ["keeper", TICKET, "--job", worker, ...ROUTE]);
 	assert.equal(refused.status, 1);

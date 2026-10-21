@@ -48,6 +48,11 @@ export function limenRoot(cwd: string): string {
 export function isGitRepository(cwd: string): boolean {
 	return git(cwd, ["rev-parse", "--show-toplevel"]).status === 0;
 }
+/** The Git folder a primary checkout shares with its worktrees; undefined outside a Git repository. */
+export function gitCommonDir(cwd: string): string | undefined {
+	const result = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+	return result.status === 0 ? result.stdout.trim() : undefined;
+}
 export function workspaceRepository(workspace: string, name: string): string {
 	if (!name || basename(name) !== name || name === "." || name === "..") {
 		throw new Error("--repo must name one immediate child repository");
