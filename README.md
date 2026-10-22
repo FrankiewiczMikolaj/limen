@@ -83,7 +83,7 @@ See the [Picture guide](docs/picture.md) for navigation and updates.
 
 ## Task-note experiment (started 2026-10-22)
 
-The experiment started on 2026-10-22 at 11:45 CEST (UTC+2), when this change landed on `main`. Jobs that started before that time have no note.
+The experiment started on 2026-10-22 at 12:17 CEST (UTC+2), when this change landed on `main`. Jobs that started before that time have no note.
 
 **What changed.** Every Limen job keeps a task note in `.limen/jobs/<id>/note.md`. Team coordinators of a group get one too; the top-level coordinator session does not. The agent writes the note. Limen copies and shows it, and never parses it.
 
