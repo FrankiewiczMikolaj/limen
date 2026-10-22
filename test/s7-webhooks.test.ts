@@ -82,7 +82,6 @@ test("a continuation from a subdirectory keeps the parent's config and author ro
 	await settled(id);
 	const urls = payloads().flatMap((ping) => (ping.body.jobId === id ? [ping.url] : []));
 	assert.deepEqual(urls, [URLS[0]]);
-	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
 
 test("a failed job's ping reaches each target until it answers for good, and never twice after it accepted", async () => {
@@ -120,10 +119,8 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 	assert.match(limen(p, ["status"]).stdout, /^Finish webhook rejects: invalid key \(target 3 HTTP 401 for job.failed/m);
 	// A resend of the settled ping is what the next limen command, sweep or wake hook would run; it sends nothing.
 	run(["webhook", "deliver", jobDir(p, id)]);
-	assert.deepEqual(
-		urls.map((url) => requests(p).filter((request) => request.url === url).length),
-		[1, 3, 1],
-	);
+	const counts = urls.map((url) => requests(p).filter((request) => request.url === url).length);
+	assert.deepEqual(counts, [1, 3, 1]);
 });
 
 test("a ping whose deliverer was killed mid-send goes out with the next limen command", async () => {

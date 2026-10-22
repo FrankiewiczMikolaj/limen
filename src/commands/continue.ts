@@ -431,6 +431,13 @@ async function publishContinuation(record: ContinuationRecord): Promise<void> {
 	// Resume the parent's opt-in (or absence), not the current shell's destination.
 	const finishConfig = await text(`${parent.dir}/finish-webhook-env`);
 	const finishAuthor = await text(`${parent.dir}/finish-webhook-author`);
+	const carried: Record<string, string> = {};
+	for (const name of ["note.md", "note.first.md"]) {
+		const body = await text(`${parent.dir}/${name}`);
+		if (body) {
+			carried[name] = `${body}\n`;
+		}
+	}
 	await publishJob(jobDir, {
 		task: `${record.task}\n`,
 		label: record.label,
@@ -452,6 +459,7 @@ async function publishContinuation(record: ContinuationRecord): Promise<void> {
 		...(record.group ? { group: record.group } : {}),
 		...(finishConfig ? { finishConfig } : {}),
 		...(finishAuthor ? { finishAuthor } : {}),
+		carried,
 	});
 }
 async function restoreParentWorktree(

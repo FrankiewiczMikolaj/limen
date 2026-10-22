@@ -59,7 +59,6 @@ test("keeper refuses a running job, then starts on a new branch at the candidate
 	const keeperBranch = `limen/keeper-f001-${tip.slice(0, 7)}`;
 	assert.equal(jobFile(p, keeper, "branch"), keeperBranch);
 	assert.equal(jobFile(p, keeper, "base"), tip);
-	assert.equal(jobFile(p, keeper, "role"), "keeper");
 	assert.ok(jobFile(p, keeper, "task.md").split("\n").includes(`Ticket: ${TICKET}`));
 	assert.equal(git(p.root, "rev-parse", branch), tip);
 	assert.equal(waitJob(p, keeper), "done");

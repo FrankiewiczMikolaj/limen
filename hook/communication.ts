@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { noteStart, recordNote } from "../src/job/task-note.ts";
 import { formatDrift, inheritFile, listDrift, packageRoot, readOptional } from "../src/project/inherit.ts";
 import {
 	planningSource,
@@ -70,6 +72,9 @@ const GUIDANCE: Readonly<Record<ReminderKind, { readonly file: string; readonly 
 export default function limenCommunication(pi: PiApi): void {
 	let lastTouch: string | undefined;
 	let lastFailure: string | undefined;
+	// The job folder once the first prompt showed the task note, and the note text this hook saw last.
+	let noteDir: string | undefined;
+	let noteSeen: string | undefined;
 	pi.on("before_agent_start", (event, context) => {
 		const root = process.env.LIMEN_CONTEXT_ROOT ?? context.cwd;
 		const job = process.env.LIMEN_JOB === "1";
@@ -78,9 +83,15 @@ export default function limenCommunication(pi: PiApi): void {
 		lastTouch = undefined;
 		lastFailure = undefined;
 		const extra = guidancePrompt(root, job);
+		const cue = turnCue(root, job, isWakePrompt(event.prompt), touched, failed);
+		const firstNote = job && !noteDir ? jobFolder(root) : undefined;
+		if (firstNote) {
+			noteDir = firstNote;
+			noteSeen = readOptional(join(firstNote, "note.md"));
+		}
 		const message = {
 			customType: CONTEXT_TYPE,
-			content: turnCue(root, job, isWakePrompt(event.prompt), touched, failed),
+			content: firstNote ? `${cue}\n\n${noteStart(firstNote)}` : cue,
 			display: false,
 		};
 		if (!extra) {
@@ -109,6 +120,9 @@ export default function limenCommunication(pi: PiApi): void {
 	pi.on("session_start", forget);
 	pi.on("session_compact", forget);
 	pi.on("tool_result", (event, context) => {
+		if (noteDir) {
+			noteSeen = recordNote(noteDir, noteSeen);
+		}
 		if (event.isError) {
 			return;
 		}
@@ -129,6 +143,11 @@ export default function limenCommunication(pi: PiApi): void {
 
 function isWakePrompt(prompt: string | undefined): boolean {
 	return typeof prompt === "string" && prompt.startsWith("Limen job ");
+}
+
+function jobFolder(root: string): string | undefined {
+	const dir = join(root, ".limen", "jobs", process.env.LIMEN_JOB_ID ?? "");
+	return process.env.LIMEN_JOB_ID && existsSync(dir) ? dir : undefined;
 }
 
 function guidancePrompt(cwd: string, job: boolean): string {

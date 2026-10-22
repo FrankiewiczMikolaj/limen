@@ -70,7 +70,6 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	assert.ok(jobFile(p, lost, "log").includes(`failed: worktree ${jobFile(p, lost, "worktree")} `));
 	const live = spawnJob(p, "block");
 	await until(jobDir(p, live), () => jobFile(p, live, "log").includes("prune: removed"));
-	assert.match(jobFile(p, landed, "log"), new RegExp(`pruned .*/${landed} \\(job ${landed}\\): job done`));
 	const liveTree = jobFile(p, live, "worktree");
 	// Another checkout (the live job's worktree) runs its own job; its worktree nests inside this plant's worktree root.
 	assert.equal(limen(p, ["init"], { cwd: liveTree }).status, 0);

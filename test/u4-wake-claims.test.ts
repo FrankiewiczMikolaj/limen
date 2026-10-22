@@ -59,10 +59,7 @@ test("a second listener never takes a live claim, even one aged past 30 seconds 
 
 test("a dead owner's claim is recovered: an unaccepted one is released, an accepted one spends one attempt and is delivered again", async (t) => {
 	const { dir, claim, events, listen, age, sends } = await job(t);
-	assert.equal(
-		listen("a", () => Promise.withResolvers<void>().promise),
-		true,
-	);
+	assert.ok(listen("a", () => Promise.withResolvers<void>().promise));
 	age(false);
 	assert.equal(listen("b"), true);
 	refreshClaim(claim);

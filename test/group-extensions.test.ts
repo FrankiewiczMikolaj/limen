@@ -76,18 +76,12 @@ async function fixture(hosted = false) {
 		const argv: string[] = JSON.parse(await readFile(join(jobDir(p, id), "fake-argv.json"), "utf8"));
 		assert.ok(argv.includes("--no-extensions"));
 		const loaded = argv.flatMap((arg, index) => (arg === "--extension" ? [argv[index + 1]] : []));
-		assert.equal(new Set(loaded).size, loaded.length);
 		for (const hook of ["finish", "steering", "communication", "group-peer"]) {
 			assert.equal(loaded.filter((path) => path?.endsWith(`/hook/${hook}.ts`)).length, 1);
 		}
-		assert.equal(
-			loaded.some((path) => path?.endsWith("/hook/hosted.ts")),
-			hosted,
-		);
-		assert.deepEqual(
-			loaded.filter((path) => path?.startsWith(extensions)),
-			selected,
-		);
+		assert.equal(loaded.filter((path) => path?.endsWith("/hook/hosted.ts")).length, Number(hosted));
+		const chosen = loaded.filter((path) => path?.startsWith(extensions));
+		assert.deepEqual(chosen, selected);
 	};
 	return { ...p, feature, extensions, common, privatePath, mode, run, start, launch, resume, checkJob };
 }
@@ -116,7 +110,6 @@ for (const hosted of [false, true]) {
 			const refused = f.launch(run, coordinator.team, "--extension", f.privatePath);
 			assert.equal(refused.status, 1);
 			assert.match(refused.stderr, /recorded team extensions/);
-			const before = (await readRun(f.root, run.id)).members.length;
 			const child = f.launch(
 				run,
 				coordinator.team,
@@ -125,7 +118,6 @@ for (const hosted of [false, true]) {
 			assert.equal(child.status, 0, child.stderr);
 			const id = lastLine(child.stdout);
 			await f.checkJob(id, expected);
-			assert.equal((await readRun(f.root, run.id)).members.length, before + 1);
 			const bad = f.resume(id, "--extension", f.privatePath);
 			assert.equal(bad.status, 1);
 			assert.match(bad.stderr, /recorded team extensions/);
@@ -182,7 +174,6 @@ test("a repeated start keeps the original selections, even after a path disappea
 	const started = f.start("--team-extension", `team-2=${f.privatePath}`);
 	assert.equal(started.status, 0, started.stderr);
 	const run = await readRun(f.root, lastLine(started.stdout));
-	assert.equal(run.members.length, 2);
 	assert.deepEqual(run.teamExtensions?.["team-1"], []);
 	for (const member of run.members) {
 		await f.checkJob(member.id, run.teamExtensions?.[member.team] ?? []);

@@ -12,10 +12,7 @@ test("malformed lines are reported at their own line and never overwrite the fir
 	);
 	assert.equal(parsed.ok, true);
 	assert.deepEqual(parsed.data, { id: "first", sources: ["good"], last: "kept" });
-	assert.deepEqual(
-		parsed.errors.map((error) => error.line),
-		[3, 4, 5, 8],
-	);
+	assert.equal(parsed.errors.map((error) => error.line).join(), "3,4,5,8");
 	assert.deepEqual([parsed.body, parsed.bodyLine], ["Body\n", 11]);
 });
 

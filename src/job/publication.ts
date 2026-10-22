@@ -85,6 +85,8 @@ type NewJob = {
 	readonly finishAuthor?: string;
 	readonly finishConfig?: string;
 	readonly session?: { readonly source: string; readonly name: string };
+	/** Files a continuation carries from its parent's job folder, such as the task note. */
+	readonly carried?: Readonly<Record<string, string>>;
 };
 
 /** Publish a complete starting record before creating or restoring its protected worktree. */
@@ -112,6 +114,7 @@ export async function publishJob(jobDir: string, job: NewJob): Promise<void> {
 			log: "",
 			// The spawning process. Until spawn writes `state`, a live spawner means the job is starting, not orphaned.
 			starting: `${process.pid}\n`,
+			...job.carried,
 		};
 		if (job.model) {
 			files.model = `${job.model}\n`;

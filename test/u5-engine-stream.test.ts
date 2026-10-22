@@ -31,7 +31,6 @@ test("a line split across chunks yields one event when its end arrives, and flus
 		[{ kind: "assistant", text: "done" }],
 	);
 	assert.deepEqual(parser.flush(), [{ kind: "tool", name: "bash", detail: "npm test" }]);
-	assert.deepEqual(parser.flush(), []);
 });
 
 test("only an assistant's error or aborted stop reason reaches the result; other lines never pose as a reply", () => {

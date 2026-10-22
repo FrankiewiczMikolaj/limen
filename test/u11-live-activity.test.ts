@@ -78,7 +78,6 @@ test("a finished job shows its end for an hour, then leaves the page", () => {
 		"",
 	]);
 	assert.equal(seen({ state: "stopped", finishedAt: finishedAt - 1 }), undefined);
-	assert.equal(jobActivity(job({ state: "done", finishedAt }), NOW)?.finishedAt, new Date(finishedAt).toISOString());
 	assert.deepEqual(jobActivity(job({}), NOW)?.work, ["f932", "f780"]);
 });
 

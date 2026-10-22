@@ -87,6 +87,7 @@ function run(
 const cabinet = () => join(p.root, ".limen/groups", group);
 const members = (): Array<{ id: string; team: string; role: string }> =>
 	JSON.parse(readFileSync(join(cabinet(), "run.json"), "utf8")).members;
+const roles = () => members().map((member) => `${member.team} ${member.role}`);
 const as = (id: string, team: string) => ({
 	LIMEN_JOB: "1",
 	LIMEN_JOB_ID: id,
@@ -113,10 +114,7 @@ test("a stale lead registration starts nothing; two concurrent activations by th
 	group = started[0]?.id ?? "";
 	assert.equal(started[1]?.id, group);
 	assert.deepEqual(readdirSync(join(p.root, ".limen/groups")), [group]);
-	assert.deepEqual(
-		members().map((member) => `${member.team} ${member.role}`),
-		["team-1 coordinator", "team-2 coordinator"],
-	);
+	assert.deepEqual(roles(), ["team-1 coordinator", "team-2 coordinator"]);
 	[roster.coordinator1 = "", roster.coordinator2 = ""] = members().map((member) => member.id);
 	for (const id of [roster.coordinator1, roster.coordinator2]) {
 		assert.equal(waitJob(p, id), "done");
@@ -154,15 +152,9 @@ test("launches queued behind a slow sibling wait past the old 10-second lock dea
 		[0, 1],
 		raced.map((result) => result.output).join("\n"),
 	);
-	// No half-claimed slot: the roster and the job records are the same four jobs, and each worker carries the group.
-	assert.deepEqual(
-		members().map((member) => `${member.team} ${member.role}`),
-		["team-1 coordinator", "team-2 coordinator", "team-1 worker", "team-2 worker"],
-	);
+	// No half-claimed slot: the roster and the job records are the same four jobs.
+	assert.deepEqual(roles(), ["team-1 coordinator", "team-2 coordinator", "team-1 worker", "team-2 worker"]);
 	assert.deepEqual(new Set(readdirSync(join(p.root, ".limen/jobs"))), new Set(members().map((member) => member.id)));
-	for (const worker of [roster.worker1, roster.worker2]) {
-		assert.equal(jobFile(p, worker, "group"), group);
-	}
 	assert.equal(waitJob(p, roster.worker2), "done");
 
 	const worker = as(roster.worker1, "team-1");

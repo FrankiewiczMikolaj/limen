@@ -12,6 +12,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { noteSteer } from "../src/job/task-note.ts";
 
 type PiApi = {
 	on(event: "session_start" | "session_shutdown", handler: (event: unknown, context: unknown) => void): void;
@@ -126,7 +127,7 @@ function deliver(pi: PiApi, job: string, name: string): boolean {
 		return false;
 	}
 	try {
-		pi.sendUserMessage(text, { deliverAs: "steer" });
+		pi.sendUserMessage(`${text}\n\n${noteSteer(job)}`, { deliverAs: "steer" });
 		writeFileSync(join(claim, "accepted"), "1\n");
 		renameSync(claim, delivered);
 		rmSync(inbox, { force: true });

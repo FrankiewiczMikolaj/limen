@@ -220,3 +220,5 @@ Optional overlays replace a package default, one file at a time:
 The communication hook puts the capability frame, the shop manual, the speech register, the vision, and the styleguide in the system prompt for each model call. The capability frame (`templates/capability.md`) tells every role that engineering time is abundant and the owner's attention is scarce; it comes from the package even when a project replaces the register. The board digest comes last, so a change to NOW or NEXT does not break the cached prefix.
 
 A short note on each turn recalls the capability frame in one sentence and names the audience and the reply rules. The wake cue is in that note, not in the system prompt. After a write or an edit, the tool result repeats the rule that applies.
+
+Every job also keeps a task note, checked once before the finish, and a project can add `.agents/limen/reminders.md` for every job. The [task-note experiment](../README.md#task-note-experiment-started-2026-10-22) describes both.

@@ -36,18 +36,6 @@ opened: 2026-10-06
 ## Outcome
 
 A throwaway plant for one test file.
-
-## Scope
-
-- Everything.
-
-## Out of scope
-
-- Nothing.
-
-## Acceptance
-
-- The scenario passes.
 `;
 const node = (kind: string, id: string, parent: string) => `---
 schema: architecture-map/1

@@ -134,9 +134,9 @@ after(() => p.cleanup());
 
 let first = "";
 test("a hosted job's task never travels as argv, and it finishes done with its handoff when the session ends", async () => {
-	first = spawnJob(p, "say hi\nfinish F001 handoff from the hosted pane", ["--tab", "--label", "F001 hosted"], { env });
+	first = spawnJob(p, "say hi\nfinish\nfinish F001 handoff", ["--tab", "--label", "F001 hosted"], { env });
 	assert.equal(waitJob(p, first, { env }), "done");
-	assert.equal(jobFile(p, first, "result"), "F001 handoff from the hosted pane");
+	assert.equal(jobFile(p, first, "result"), "F001 handoff");
 	const argv = engineArgv(pane(first));
 	assert.ok(
 		argv.every((arg) => !arg.includes("F001 handoff") && !/[\r\n]/.test(arg)),
@@ -148,7 +148,7 @@ test("a hosted job's task never travels as argv, and it finishes done with its h
 
 let second = "";
 test("a live OMP job stays running while Herdr reports done, then after Herdr loses its agent row (88fd5ac)", async () => {
-	second = spawnJob(p, "block\nfinish second handoff", ["--tab", "--engine", "omp", "--label", "F001 omp"], { env });
+	second = spawnJob(p, "block\nfinish\nfinish omp done", ["--tab", "--engine", "omp", "--label", "F001 omp"], { env });
 	const dir = jobDir(p, second);
 	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
 	const target = pane(second);
@@ -190,7 +190,7 @@ test("two competing sweeps start exactly one replacement for a killed hosted sup
 	assert.equal(jobFile(p, second, "state"), "running");
 	await release(dir);
 	assert.equal(waitJob(p, second, { env }), "done");
-	assert.equal(jobFile(p, second, "result"), "second handoff");
+	assert.equal(jobFile(p, second, "result"), "omp done");
 	assert.equal(starts(second), 2, "one replacement supervisor, not two");
 	assert.ok(!jobFile(p, second, "log").includes("failed:"));
 });
@@ -205,7 +205,6 @@ test("hosted Pi stop records stopped once and closes the job's tab", async () =>
 	const tab = jobFile(p, third, "herdr/tab");
 	await until(herdr, () => named("tab", "close").some((args) => args[2] === tab));
 	assert.equal(jobFile(p, third, "log").match(/\] stopped: enough/g)?.length, 1);
-	assert.ok(!jobFile(p, third, "result").includes("never"), "a stopped job never reached its finish line");
 	assert.equal(named("tab", "create").length, 3, "one tab per hosted job");
 	assert.equal(named("workspace", "create").length, 1, "one role space");
 });

@@ -85,7 +85,7 @@ after(async () => {
 test("a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session", async () => {
 	const second = coordinator("second", "coord", "block\n");
 	const ids = {
-		done: job("commit\nfinish a done handoff", "a done"),
+		done: job("commit\nfinish\nfinish a done handoff", "a done"),
 		failed: job("fail 7", "a failed"),
 		provider: job("commit\nerror", "a provider error"),
 	};
@@ -95,8 +95,9 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	await release(second);
 	await until(second, () => engineEvents(second).some((event) => event.event === "exit"));
 	assert.deepEqual(states, { done: "done", failed: "failed", provider: "failed" });
-	// A detached job resumed from a hosted session calls finish too; its handoff, not the last words, is the result.
+	// A detached job resumed from a hosted session calls finish too: once for the note check, then with the result.
 	assert.equal(jobFile(p, ids.done, "result"), "a done handoff");
+	assert.equal(jobFile(p, ids.done, "log").split("note check sent").length, 2);
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
 	assert.equal(git(p.root, "rev-list", "--count", `main..${jobFile(p, ids.provider, "branch")}`), "1");
 	wokeOnce(ids, [coord, second]);
@@ -143,19 +144,11 @@ test("wakes of jobs that end while muted arrive after /limen on, in one turn, ea
 	assert.ok(on >= 0, "the session saw /limen on");
 	const heard = muted.map((id) => wakes(coord, id));
 	// Before 7e43d23 the batched turn confirmed only its last wake, and the first was injected again.
-	assert.deepEqual(
-		heard.map((list) => list.length),
-		[1, 1],
-	);
-	assert.ok(
-		heard.every(([wake]) => (wake?.index ?? -1) > on),
-		"muted wakes arrive only after /limen on",
-	);
+	assert.equal(heard.map((list) => list.length).join(), "1,1");
+	const afterOn = heard.every(([wake]) => (wake?.index ?? -1) > on);
+	assert.ok(afterOn, "muted wakes arrive only after /limen on");
 	// The first idle inject opens a turn; the second joins it as a follow-up, so both enter one turn.
-	assert.deepEqual(
-		heard.map(([wake]) => wake?.event),
-		["user", "followUp"],
-	);
+	assert.equal(heard.map(([wake]) => wake?.event).join(), "user,followUp");
 });
 
 test("limen watch and unwatch move a job's wake to another session", async () => {

@@ -93,14 +93,9 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.equal(readFileSync(join(dir, "task.md"), "utf8"), task);
 	assert.equal(readFileSync(join(dir, "fake-task.txt"), "utf8"), task);
 	const argv: string[] = json(join(dir, "fake-argv.json"));
-	assert.equal(
-		argv.some((value) => value.includes("say all done")),
-		false,
-	);
-	assert.deepEqual(
-		json(join(dir, "fake-env.json")).filter((name: string) => /^(HERDR_|PI_SESSION_)/.test(name)),
-		[],
-	);
+	assert.ok(!argv.some((value) => value.includes("say all done")), "the task stays out of argv");
+	const leaked = json(join(dir, "fake-env.json")).filter((name: string) => /^(HERDR_|PI_SESSION_)/.test(name));
+	assert.deepEqual(leaked, []);
 	const commits = git(p.root, "rev-list", `${base}..limen/${id}`).split("\n");
 	assert.equal(commits.length, 1);
 	assert.equal(git(p.root, "rev-parse", "HEAD"), base);

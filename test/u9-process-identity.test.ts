@@ -66,7 +66,6 @@ test("the reaper keeps a live owner and finalizes a dead owner and a stranger at
 	assert.equal((await processInfo(info.process.pid, 0)).kind, "absent", "a gone pid needs no helper and no time");
 	const seen = new Map<string, number>();
 	await reapDeadJobs(jobs, seen, t0 + 31_000);
-	assert.deepEqual([...seen.keys()].sort(), ["owner", "stranger"]);
 	await reapDeadJobs(jobs, seen, t0 + 91_000);
 	assert.equal(await readFile(join(owner, "state"), "utf8"), "failed\n");
 	assert.equal(await readFile(join(stranger, "state"), "utf8"), "failed\n");

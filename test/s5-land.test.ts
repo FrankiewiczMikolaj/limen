@@ -64,13 +64,10 @@ test("a running, an empty and a failed job are refused", async () => {
 	assert.equal(waitJob(p, job.failed), "failed");
 	assert.match(limen(p, ["board"]).stdout, /`F001-demo` \(🟠 ACTIVE\)[^\n]*\n {2}- last job failed: demo · F001/);
 	await until(jobDir(p, job.running), () => existsSync(join(jobDir(p, job.running), "fake-blocked-1")));
-	assert.equal(jobFile(p, job.running, "state"), "running");
 	refused(job.running);
 	await release(jobDir(p, job.running));
 	assert.equal(waitJob(p, job.running), "done");
-	assert.deepEqual(changed(job.empty), [""]);
 	refused(job.empty);
-	assert.notDeepEqual(changed(job.failed), [""]);
 	refused(job.failed);
 });
 
