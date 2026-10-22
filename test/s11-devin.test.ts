@@ -89,6 +89,7 @@ test("a rewritten branch or a sleeping session fails the job; stop and timeout e
 	const timedOut = await devinJob("e", ["--timeout", "2s"]);
 	assert.equal(waitJob(p, timedOut), "failed");
 	assert.deepEqual([jobFile(p, stopped, "state"), jobFile(p, timedOut, "state")], ["stopped", "failed"]);
+	assert.equal(jobFile(p, stopped, "cleanup"), "", "a Devin wrapper has no engine child to search for escapes");
 	const ended = requests(p).flatMap((request) => (request.method === "DELETE" ? [request.url.split("/").at(-1)] : []));
 	assert.deepEqual(ended, ["d", "e"]);
 	const jobs = join(p.root, ".limen/jobs");

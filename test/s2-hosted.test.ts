@@ -2,7 +2,7 @@
 // child process so the fake engine and its hooks really load, answers `agent get` from a state file the test edits,
 // and names the pane's foreground process after the engine it launched, as real Herdr does.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -97,14 +97,7 @@ const saveState = async (next: unknown) => {
 };
 const prompts = (id: string) =>
 	named("agent", "prompt").filter((args) => args[2] === COORDINATOR && args[3]?.includes(id)).length;
-const alive = (pid: number) => {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
-	}
-};
+const alive = (pid: number) => spawnSync("kill", ["-0", String(pid)]).status === 0;
 /** Runs the CLI without blocking the event loop, so two sweeps can race. */
 const limenAsync = (args: readonly string[]) =>
 	new Promise<number>((resolve) =>

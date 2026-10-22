@@ -71,6 +71,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 		HERDR_ENV: "1",
 		HERDR_PANE_ID: "p1",
 		LIMEN_JOB_ID: "2026-10-08-f001-coordinator-1a2b3c4d",
+		LIMEN_HOSTED: "1",
 	};
 	const id = spawnJob(p, task, ["--detached", "--label", "F001 demo"], { env: caller });
 	const dir = jobDir(p, id);
@@ -94,7 +95,8 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.equal(readFileSync(join(dir, "fake-task.txt"), "utf8"), task);
 	const argv: string[] = json(join(dir, "fake-argv.json"));
 	assert.ok(!argv.some((value) => value.includes("say all done")), "the task stays out of argv");
-	const leaked = json(join(dir, "fake-env.json")).filter((name: string) => /^(HERDR_|PI_SESSION_)/.test(name));
+	const leak = /^(HERDR_|PI_SESSION_|LIMEN_HOSTED$)/; // A hosted caller's flag would turn off the detached note check.
+	const leaked = json(join(dir, "fake-env.json")).filter((name: string) => leak.test(name));
 	assert.deepEqual(leaked, []);
 	const commits = git(p.root, "rev-list", `${base}..limen/${id}`).split("\n");
 	assert.equal(commits.length, 1);

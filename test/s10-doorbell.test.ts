@@ -156,6 +156,8 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	const claims = join(state, hashed as string, "claims");
 	assert.deepEqual((await readdir(claims)).sort(), ["104.json", "issue-5.json"]);
 	assert.deepEqual((await readdir(join(p.root, ".limen/github/claims"))).sort(), ["104.json", "issue-5.json"]);
+	const asked = new Set(requests(p).flatMap((request) => /\/collaborators\/(\w+)\//.exec(request.url)?.[1] ?? []));
+	assert.deepEqual([...asked].sort(), ["alice", "eve", "mallory", "trent"], "each author reached the permission check");
 	assert.deepEqual(
 		await prompts(),
 		["coord:p1", "coord:p1"],
