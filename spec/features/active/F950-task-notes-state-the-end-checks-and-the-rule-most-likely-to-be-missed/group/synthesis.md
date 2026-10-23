@@ -31,4 +31,4 @@ The coordinator edited the group's final text. The proposal drops colored marker
 - The runtime, hooks, templates, tests, package files, and Biome config matched published main. No code repair belongs to this proposal.
 - `limen picture build --strict` passed with two existing warnings: a missing overlay-test source and the duplicate F778 ticket. Neither warning concerns this feature.
 
-`evidence/` retains the check logs, render metrics, and page checksum. The headless browser exited. The scratch render directory `/tmp/limen-tasks/note-shape-f950-render/` is disposable and is removed after filing. The Downloads page stays for Adam. The feature stays active only for his text decision; the group is closed.
+`evidence/` retains the check logs, render metrics, and page checksum. Trailing whitespace is removed from the check logs. The headless browser exited. The scratch render directory `/tmp/limen-tasks/note-shape-f950-render/` is disposable and is removed after filing. The Downloads page stays for Adam. The feature stays active only for his text decision; the group is closed.

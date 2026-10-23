@@ -18,9 +18,9 @@
 test at test/structure.test.ts:24:1
 ✖ runtime remains dependency-free and TypeScript basenames stay unambiguous (561.597375ms)
   AssertionError [ERR_ASSERTION]: TypeScript basenames must be unique
-  
+
   131 !== 228
-  
+
       at TestContext.<anonymous> (file:///Users/overment/.overment/limen/test/structure.test.ts:30:9)
       at async Test.run (node:internal/test_runner/test:1069:7)
       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:332:3) {
