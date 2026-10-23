@@ -1,6 +1,6 @@
 # F938 checks · Pi is the default engine (2026-10-23)
 
-Live proof on macOS with pi 1.2.0, Herdr 0.9.5 and the Claude Code bridge package `@vanillagreen/pi-claude-bridge` 4.1.0. The proof plant was a disposable copy made by `bin/limen-group-fixture.mjs` in `/private/tmp/limen-pi-proof-nRbe/plant`, with no finish webhook. Every command ran this branch's `bin/limen`, without `LIMEN_ENGINE` and outside any job environment.
+Live proof on macOS with pi 1.2.0, Herdr 0.9.5 and the Claude Code bridge package `@vanillagreen/pi-claude-bridge` 4.1.0. The proof plant was a disposable copy made by `bin/limen-group-fixture.mjs` in `/private/tmp/limen-pi-proof-nRbe/plant`, with no finish webhook. Every command ran this branch's `bin/limen`, without `LIMEN_ENGINE` and outside any job environment. The plant is deleted, so the job records below are kept only in this file.
 
 ## Jobs
 
@@ -13,6 +13,7 @@ Live proof on macOS with pi 1.2.0, Herdr 0.9.5 and the Claude Code bridge packag
 
 - The plain spawn's mismatch line is display only: the package default model text carries the `:high` suffix, and the session records `modelId gpt-6-astra` with `thinkingLevel high`.
 - A real Pi lead (`pi --no-extensions --extension templates/limen-extension.ts`, `LIMEN_COORDINATOR=1`) ran `limen group start`. The group (`84741ff0-7c5f-4e27-a37c-9cc64f9a2415`) recorded route `pi pi-claude/claude-opus-5-5 high` and finished round 1. Result delivery recorded "not delivered" because the print-mode lead had exited.
+- A coordinator started as other plants start it, `LIMEN_COORDINATOR=1 pi --approve --provider openai-codex --model gpt-6.1-sol --thinking xhigh`, in a fresh plant after `limen init`, loaded the hooks through `.pi/extensions/limen.ts`. Asked which engine new jobs use, it answered from the shop manual: "with neither set, new jobs use Pi."
 
 ## Argv
 
