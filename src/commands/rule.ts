@@ -108,7 +108,7 @@ async function setRule(args: readonly string[]): Promise<void> {
 	startTimer(rule);
 	console.log(`rule ${name} ${change ? "changed" : "set"} until ${localTime(rule.until)}`);
 	const kind = change ? "change" : "set";
-	for (const line of await broadcast(rule, kind, ruleText(rule, kind), actorPane())) {
+	for (const line of await broadcast(rule, kind, ruleText(rule, kind))) {
 		console.log(line);
 	}
 }
@@ -120,7 +120,7 @@ async function endCommand(args: readonly string[]): Promise<void> {
 		throw new Error(`no active rule ${JSON.stringify(name)}; limen rule lists them`);
 	}
 	const reason = words.join(" ").replace(/\s+/g, " ").trim();
-	const lines = await endRule(rule, `by limen rule end${reason ? `: ${reason}` : ""}`, actorPane());
+	const lines = await endRule(rule, `by limen rule end${reason ? `: ${reason}` : ""}`);
 	console.log(lines ? [`rule ${name} ended`, ...lines].join("\n") : `rule ${name} had already ended`);
 }
 
@@ -141,11 +141,11 @@ async function ruleTimer(folder: string, version: string): Promise<void> {
 	}
 }
 
-async function endRule(rule: SeatRule, why: string, skip = ""): Promise<readonly string[] | undefined> {
+async function endRule(rule: SeatRule, why: string): Promise<readonly string[] | undefined> {
 	if (!claimRuleEnd(rule, why)) {
 		return;
 	}
-	return broadcast(rule, "end", ruleText(rule, "end", why), skip);
+	return broadcast(rule, "end", ruleText(rule, "end", why));
 }
 
 function startTimer(rule: SeatRule): void {
@@ -159,11 +159,11 @@ function startTimer(rule: SeatRule): void {
 }
 
 /**
- * One ping per live coordinator pane, to the newest live registration on it, across the seat's projects. Each pane's
- * receipt is claimed before the prompt, so no process sends the same text to a pane twice. The pane that ran this
- * command is not pinged: its coordinator wrote the rule.
+ * One ping per live coordinator pane, to the newest live registration on it, across the seat's projects. The pane that
+ * ran this command is pinged too. Each pane's receipt is claimed before the prompt, so no process sends the same text
+ * to a pane twice.
  */
-async function broadcast(rule: SeatRule, kind: Kind, text: string, skip: string): Promise<readonly string[]> {
+async function broadcast(rule: SeatRule, kind: Kind, text: string): Promise<readonly string[]> {
 	const tabs = await liveTabs();
 	const herdr = herdrBinary();
 	if (!herdr) {
@@ -171,20 +171,17 @@ async function broadcast(rule: SeatRule, kind: Kind, text: string, skip: string)
 	}
 	const dir = join(ruleFolder(rule.name), "pings", `${rule.version}.${kind}`);
 	await mkdir(dir, { recursive: true });
-	return Promise.all(tabs.map((tab) => pingTab(herdr, join(dir, tab.pane.replace(/[^\w.:-]/g, "_")), tab, text, skip)));
+	return Promise.all(tabs.map((tab) => pingTab(herdr, join(dir, tab.pane.replace(/[^\w.:-]/g, "_")), tab, text)));
 }
 
-async function pingTab(herdr: string, receipt: string, tab: Tab, text: string, skip: string): Promise<string> {
-	const own = tab.pane === skip;
-	const first = `${own ? "not sent: this pane ran the command" : "attempting"} ${tab.pane}, ${tab.root} session ${tab.session}`;
+async function pingTab(herdr: string, receipt: string, tab: Tab, text: string): Promise<string> {
 	try {
-		await writeFile(receipt, `${first} ${new Date().toISOString()}\n`, { flag: "wx", flush: true });
+		const claim = `attempting ${tab.pane}, ${tab.root} session ${tab.session} ${new Date().toISOString()}\n`;
+		await writeFile(receipt, claim, { flag: "wx", flush: true });
 	} catch {
 		return `${tab.pane}: pinged already`;
 	}
-	if (!own) {
-		await promptPane(herdr, tab.pane, text, Date.now() + PING_MS, receipt);
-	}
+	await promptPane(herdr, tab.pane, text, Date.now() + PING_MS, receipt);
 	return `${tab.pane}: ${(await textFile(receipt)).split("\n").at(-1)}`;
 }
 
@@ -210,8 +207,6 @@ function ruleText(rule: SeatRule, kind: Kind, why = ""): string {
 	const head = kind === "set" ? "for every coordinator, until" : "for every coordinator changed; it now holds until";
 	return `Limen rule ${rule.name} ${head} ${localTime(rule.until)}: ${said}${priority} Follow it until it ends. It is on the board (limen rule, limen board, your turn context); do not copy it into spec/build.md. Limen tells you when it changes or ends.`;
 }
-
-const actorPane = () => (process.env.HERDR_ENV === "1" ? (process.env.HERDR_PANE_ID?.trim() ?? "") : "");
 
 /** A duration such as 90m, 12h or 3d; a local date and time; or an ISO time with a zone. Only a future time. */
 function parseUntil(value: string, now = Date.now()): string {

@@ -208,7 +208,7 @@ test("in Herdr a spawn with no mode flag runs detached under its --timeout, not 
 	assert.equal(jobFile(p, id, "herdr/mode"), "watch", "a log-tail tab, not a hosted pane");
 });
 
-test("a rule set, change and end time ping each live coordinator pane once (F951); a dead timer's rule still ends", async () => {
+test("a rule set, change, end and end time ping each live coordinator pane once (F951); a dead timer's rule still ends", async () => {
 	// Two sessions on w1:p1; w1:p3 shut down; w1:p4's pid belongs to another process now; coord:p0 runs the commands.
 	for (const [index, pane] of ["w1:p1", "w1:p1", "w1:p2", "w1:p3", "w1:p4", COORDINATOR].entries()) {
 		const dir = join(p.root, ".limen/coordinators", `s${index}`);
@@ -220,22 +220,23 @@ test("a rule set, change and end time ping each live coordinator pane once (F951
 	}
 	const said = (rule: string) => named("agent", "prompt").filter((args) => args[3]?.startsWith(`Limen rule ${rule} `));
 	const panes = (rule: string, word: string) =>
-		said(rule)
-			.flatMap((args) => (args[3]?.includes(word) ? [args[2]] : []))
-			.sort();
+		said(rule).flatMap((args) => (args[3]?.includes(word) ? [args[2]] : []));
+	const heard = (rule: string, ...words: string[]) => words.map((word) => panes(rule, word).sort());
 	const rule = (...args: string[]) => limen(p, ["rule", ...args], { env }).stdout;
 	assert.match(rule("set", "week", "--until", "1h", "Hold reviews"), /^rule week set/);
 	assert.match(rule("set", "week", "--until", "3s", "--start-priority", "1", "Priority 1 only"), /^rule week changed/);
 	const board = limen(p, ["board"], { env }).stdout;
 	assert.match(board, /^## RULES .*\n- week until .*, start priority 1: Priority 1 only\n/);
 	await until(herdr, () => panes("week", " ended ").length >= 3);
-	const [set = "", , change = ""] = said("week").map((args) => args[3] ?? "");
+	const [set = "", , , change = ""] = said("week").map((args) => args[3] ?? ""); // three set pings, then the change
 	assert.match(set, /^Limen rule week for every coordinator, until \w+ \d+ \w+, \d\d:\d\d .*Hold reviews\. .*build/);
 	assert.match(change, /changed; it now holds until .*Priority 1 only\. Start priority: 1\./);
-	const live = ["w1:p1", "w1:p2"];
-	const kinds = ["coordinator, until", "changed", " ended "].map((word) => panes("week", word));
-	assert.deepEqual(kinds, [live, live, [COORDINATOR, ...live]], "the timer pings the pane that set the rule too");
+	// The pane that runs a command is a live coordinator pane too, so it hears each set, change and end.
+	const live = [COORDINATOR, "w1:p1", "w1:p2"];
+	assert.deepEqual(heard("week", "coordinator, until", "changed", " ended "), [live, live, live]);
 	assert.deepEqual([rule(), limen(p, ["board"], { env }).stdout.includes("RULES")], ["no active rules\n", false]);
+	assert.match(rule("set", "now", "--until", "1h", "Now") + rule("end", "now", "done"), /\nrule now ended\n/);
+	assert.deepEqual(heard("now", "coordinator, until", "(by limen rule end: done)"), [live, live]);
 	// A rule whose timer died ends on the next command, once, though two commands race to end it.
 	rule("set", "late", "--until", "1h", "Late");
 	spawnSync("pkill", ["-f", join(p.parent, ".limen/rules/late")]);
@@ -243,5 +244,5 @@ test("a rule set, change and end time ping each live coordinator pane once (F951
 	await writeFile(record, readFileSync(record, "utf8").replace(/"until": "[^"]+"/, '"until": "2000-01-01T00:00:00Z"'));
 	assert.deepEqual(await Promise.all([limenAsync(["jobs"]), limenAsync(["rule"])]), [0, 0]);
 	await until(herdr, () => panes("late", " ended ").length >= 3);
-	assert.deepEqual(panes("late", " ended "), [COORDINATOR, ...live]);
+	assert.deepEqual(heard("late", " ended "), [live]);
 });
