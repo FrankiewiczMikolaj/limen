@@ -47,8 +47,7 @@ async function amend(id: string, files: Readonly<Record<string, string>>): Promi
 function refused(id: string, env: Readonly<Record<string, string>> = {}, flags: readonly string[] = ["--yes"]): string {
 	const run = limen(p, ["land", id, ...flags], { env });
 	assert.equal(run.status, 1, `${id} landed: ${run.stdout}`);
-	assert.equal(git(p.root, "rev-parse", "main"), main);
-	assert.equal(git(p.root, "rev-parse", "HEAD"), main);
+	assert.deepEqual([git(p.root, "rev-parse", "main"), git(p.root, "rev-parse", "HEAD")], [main, main]);
 	return run.stderr;
 }
 

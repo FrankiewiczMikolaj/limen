@@ -126,8 +126,7 @@ after(() => p.cleanup());
 let first = "";
 test("a hosted job's task never travels as argv, and it finishes done with its handoff when the session ends", async () => {
 	first = spawnJob(p, "say hi\nfinish\nfinish F001 handoff", ["--tab", "--label", "F001 hosted"], { env });
-	assert.equal(waitJob(p, first, { env }), "done");
-	assert.equal(jobFile(p, first, "result"), "F001 handoff");
+	assert.deepEqual([waitJob(p, first, { env }), jobFile(p, first, "result")], ["done", "F001 handoff"]);
 	const leaked = engineArgv(pane(first)).filter((arg) => arg.includes("F001 handoff") || /[\r\n]/.test(arg));
 	assert.deepEqual(leaked, [], "no task text in argv");
 });

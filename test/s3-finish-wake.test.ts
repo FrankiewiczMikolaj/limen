@@ -165,11 +165,10 @@ test("limen watch and unwatch move a job's wake to another session", async () =>
 	// The coord session visits jobs in id order in one sweep; a misrouted wake for `moved` lands before the barrier's.
 	const barrier = job("say ok", "y barrier");
 	await delivered([barrier]);
-	assert.equal(wakes(other, moved).length, 1);
-	assert.equal(wakes(coord, moved).length, 0);
+	assert.deepEqual([wakes(other, moved).length, wakes(coord, moved).length], [1, 0]);
 });
 
-test("a held gate queues jobs by priority; a queued job tells its session once that it started, then its finish wakes it once", async () => {
+test("a held gate queues jobs by priority and a rule's start priority holds the rest; a queued job tells its session once that it started, then its finish wakes it once", async () => {
 	const reading = join(p.parent, "start-reading.json");
 	writeFileSync(reading, '{"cpuIdle":10,"memoryFree":80}');
 	// A dead wrapper and a stopped job at the head hold nothing; a 2s timeout counts from engine start, not the queue.
@@ -182,11 +181,17 @@ test("a held gate queues jobs by priority; a queued job tells its session once t
 	process.kill(Number(jobFile(p, dead, "pid")), "SIGKILL");
 	assert.equal(limen(p, ["stop", stopped, "not needed"]).stdout, `stopped ${stopped}: not needed\n`);
 	await until(jobDir(p, timed), () => Date.now() - Date.parse(jobFile(p, timed, "started-at")) > 2_500);
+	// The priority budget: while a start priority 1 rule holds, the open gate starts priority 1 only, and the rest wait.
+	assert.match(limen(p, ["rule", "set", "week", "--until", "1h", "--start-priority", "1", "Low"]).stdout, /^rule/);
+	writeFileSync(reading, '{"cpuIdle":90,"memoryFree":80}');
+	await until(jobDir(p, later), () => /"held by rule week until .+"ahead":1/.test(jobFile(p, later, "queued")));
+	const held = "held by rule week until [^\\n]+ \\(start priority 1\\)";
 	const shown = limen(p, ["jobs", later], { env: { LIMEN_REAP_CONFIRM_MS: "1" } }).stdout;
-	assert.match(shown, / · queued · waiting \d+s: CPU 10% idle \(gate 25%\), memory 80% free \(gate 20%\), 2 ahead · /);
+	assert.match(shown, new RegExp(` · queued · waiting \\d+s: ${held}, 1 ahead · `));
+	assert.match(limen(p, ["queue"]).stdout, new RegExp(`1\\. ${timed} .+\\n   ${held}\\n.+\\n2\\. ${later} `));
 	assert.ok(!engineEvents(coord).some((event) => event.text?.startsWith("limen: late started")), "no toast yet");
 	sessions[0]?.kill("SIGSTOP"); // The quick job ends while its listener sleeps, before its start notice.
-	writeFileSync(reading, '{"cpuIdle":90,"memoryFree":80}');
+	assert.match(limen(p, ["rule", "end", "week"]).stdout, /^rule week ended/);
 	assert.equal(waitJob(p, timed), "done");
 	sessions[0]?.kill("SIGCONT");
 	const noticed = (id: string) => existsSync(join(jobDir(p, id), "notify/delivered/_start.coord"));

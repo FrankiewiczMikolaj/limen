@@ -9,10 +9,12 @@ import { formatDuration, parseDuration } from "../job/job.ts";
 import { appendLimenLog, atomicWrite, textFile } from "../job/record.ts";
 import { readOptional } from "../project/inherit.ts";
 import { seatDir } from "../project/seat.ts";
+import { activeRules, localTime, type SeatRule } from "../project/seat-rules.ts";
 import { processAlive } from "./contain.ts";
 
 // The machine is shared by every plant, so one queue and one gate serve the whole seat. A detached job's own wrapper
 // waits in it after its handshake and before setup; no daemon runs it. Adam's decision 85 (a) set 25% and 20%.
+// A seat rule with a start priority (the priority budget, Adam's decision 99) holds every less urgent job, gate or not.
 export type StartGate = { readonly cpuIdle: number; readonly memoryFree: number; readonly settleMs: number };
 /** Percentages; a value the machine could not report is undefined and does not hold a job back. */
 export type Reading = { readonly cpuIdle: number | undefined; readonly memoryFree: number | undefined };
@@ -142,23 +144,36 @@ function gateOpen(reading: Reading, gate: StartGate): boolean {
 	return (reading.cpuIdle ?? 100) >= gate.cpuIdle && (reading.memoryFree ?? 100) >= gate.memoryFree;
 }
 
-/** Marks a job queued before its handshake, so no reader sees it running as started; logs gate values it ignored. */
+/** The active rules that hold a job of this priority: each one whose start priority is more urgent. */
+function holdingRules(priority: number): readonly SeatRule[] {
+	return activeRules().filter((rule) => rule.startPriority !== undefined && priority > rule.startPriority);
+}
+const heldText = (rules: readonly SeatRule[]): string =>
+	rules
+		.map((rule) => `held by rule ${rule.name} until ${localTime(rule.until)} (start priority ${rule.startPriority})`)
+		.join("; ");
+
+/**
+ * Marks a job queued before its handshake, so no reader sees it running as started; logs gate values it ignored. A job
+ * queues while the gate is on or a rule holds its priority.
+ */
 export async function enterStartQueue(jobDir: string): Promise<boolean> {
 	const { gate, ignored } = startGate();
 	if (ignored.length > 0) {
 		await appendLimenLog(jobDir, `start gate: ignored ${ignored.join("; ")}`);
 	}
-	if (gate) {
+	const queued = gate !== undefined || holdingRules(await jobPriority(jobDir)).length > 0;
+	if (queued) {
 		await atomicWrite(`${jobDir}/queued`, `${JSON.stringify({ since: new Date().toISOString() })}\n`);
 	}
-	return gate !== undefined;
+	return queued;
 }
 
 /**
- * Holds the job in the seat queue until it is first in priority, then queue-time order, the settle interval since the
- * last start has passed, and its reading passes the gate. Only the first job samples the load. The gate is read again
- * on each poll, so an edit to the seat's file reaches waiting jobs. Returns false when the job was stopped while it
- * waited. A job that waited leaves `start-notice` for its coordinator.
+ * Holds the job in the seat queue until no rule holds its priority, it is first in priority, then queue-time order, the
+ * settle interval since the last start has passed, and its reading passes the gate. Only the first job samples the
+ * load. The gate and the rules are read again on each poll, so an edit or a rule's end reaches waiting jobs. Returns
+ * false when the job was stopped while it waited. A job that waited leaves `start-notice` for its coordinator.
  */
 export async function waitForStart(jobDir: string, stop: AbortSignal): Promise<boolean> {
 	const id = basename(jobDir);
@@ -175,15 +190,12 @@ export async function waitForStart(jobDir: string, stop: AbortSignal): Promise<b
 	try {
 		while (!stop.aborted) {
 			await enqueue(entry);
-			const { gate } = startGate();
-			const decision = gate
-				? await decide(entry, gate, stop).catch((error: unknown) => {
-						if (stop.aborted) {
-							return undefined;
-						}
-						throw error;
-					})
-				: ({ start: true, detail: "the gate is off" } as const);
+			const decision = await decide(entry, startGate().gate, stop).catch((error: unknown) => {
+				if (stop.aborted) {
+					return undefined;
+				}
+				throw error;
+			});
 			if (!decision) {
 				return false;
 			}
@@ -199,7 +211,7 @@ export async function waitForStart(jobDir: string, stop: AbortSignal): Promise<b
 			) {
 				const queued: Queued = { since, detail: decision.detail, ahead: decision.ahead };
 				await atomicWrite(`${jobDir}/queued`, `${JSON.stringify(queued)}\n`);
-				if (!shown) {
+				if (!shown || (decision.kind !== shown.kind && decision.kind.startsWith("rules"))) {
 					await appendLimenLog(jobDir, `queued: ${decision.detail}, ${decision.ahead} ahead`);
 				}
 				shown = { kind: decision.kind, ahead: decision.ahead, at: Date.now() };
@@ -219,8 +231,17 @@ async function enqueue(entry: Entry): Promise<void> {
 		await atomicWrite(entryPath(entry.id), `${JSON.stringify(entry)}\n`);
 	}
 }
-async function decide(entry: Entry, gate: StartGate, stop: AbortSignal): Promise<Decision> {
+async function decide(entry: Entry, gate: StartGate | undefined, stop: AbortSignal): Promise<Decision> {
 	const ahead = (await liveEntries()).filter((other) => other.id !== entry.id && order(other, entry) < 0).length;
+	// A held job sorts after every job it could start, so it never blocks the head. A rule change is a new hold.
+	const holding = holdingRules(entry.priority);
+	if (holding.length > 0) {
+		const kind = `rules ${holding.map((rule) => rule.version).join(" ")}`;
+		return { start: false, kind, detail: heldText(holding), ahead };
+	}
+	if (!gate) {
+		return { start: true, detail: "the gate is off" };
+	}
 	if (ahead > 0) {
 		return { start: false, kind: "ahead", detail: readingText(lastReading(), gate), ahead };
 	}
@@ -382,29 +403,30 @@ export async function queuedLine(jobDir: string, label: string): Promise<string 
 	}
 }
 
-/** `limen queue`: the gate, the current reading, and every waiting job in start order. */
+/** `limen queue`: the gate, the current reading, and every waiting job in start order with the rules that hold it. */
 export async function queueReport(): Promise<string> {
 	const { gate, ignored } = startGate();
 	const lines: string[] = [];
 	if (ignored.length > 0) {
 		lines.push(`start gate: ignored ${ignored.join("; ")}`);
 	}
-	if (!gate) {
-		lines.push("start gate off (LIMEN_START_GATE=off): detached jobs start at once");
-		return lines.join("\n");
+	if (gate) {
+		const reading = await readLoad();
+		const settling = await settleLeft(gate);
+		const state = !gateOpen(reading, gate) ? "closed" : settling > 0 ? `settling ${formatDuration(settling)}` : "open";
+		lines.push(`start gate ${state}: ${readingText(reading, gate)}; settle ${formatDuration(gate.settleMs)}`);
+	} else {
+		lines.push("start gate off (LIMEN_START_GATE=off): detached jobs start at once unless a rule holds them");
 	}
-	const reading = await readLoad();
-	const settling = await settleLeft(gate);
-	const state = !gateOpen(reading, gate) ? "closed" : settling > 0 ? `settling ${formatDuration(settling)}` : "open";
-	lines.push(`start gate ${state}: ${readingText(reading, gate)}; settle ${formatDuration(gate.settleMs)}`);
 	const entries = await liveEntries();
 	if (entries.length === 0) {
 		lines.push("queue empty");
 	}
 	entries.forEach((entry, index) => {
 		const wait = formatDuration(Date.now() - entry.queuedAt);
+		const holding = holdingRules(entry.priority);
 		lines.push(`${index + 1}. ${entry.id} · priority ${entry.priority} · waiting ${wait} · ${entry.label}`);
-		lines.push(`   ${entry.jobDir}`);
+		lines.push(...(holding.length > 0 ? [`   ${heldText(holding)}`] : []), `   ${entry.jobDir}`);
 	});
 	return lines.join("\n");
 }
