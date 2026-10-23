@@ -2,6 +2,7 @@
 touches:
   - limen.sessions.guidance
 opened: 2026-10-23
+landed: 2026-10-23
 ---
 
 # F950 · Task notes state the end checks and the rule most likely to be missed

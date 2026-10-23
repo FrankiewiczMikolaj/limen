@@ -29,7 +29,6 @@
 
 <!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
-- `F950-task-notes-state-the-end-checks-and-the-rule-most-likely-to-be-missed` (🟠 ACTIVE): Task notes state the end checks and the rule most likely to be missed
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
@@ -57,6 +56,7 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F950-task-notes-state-the-end-checks-and-the-rule-most-likely-to-be-missed` (🟢 PROVEN): Task notes state the end checks and the rule most likely to be missed; landed 2026-10-23
 - `F949-a-limen-job-can-run-as-a-devin-cloud-session-and-return-its-commits` (🟢 PROVEN): A limen job can run as a Devin cloud session and return its commits; landed 2026-10-20
 - `F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system` (🟢 PROVEN): Every agent knows it works inside a highly capable agent system; landed 2026-10-17
 - `F947-a-coordinator-s-end-of-turn-always-sends-one-ping` (🟢 PROVEN): A coordinator's end of turn always sends one ping; landed 2026-10-17
@@ -66,7 +66,6 @@
 - `F935-a-real-group-shows-as-one-tree-on-the-live-picture` (🟢 PROVEN): A real group shows as one tree on the live picture; landed 2026-10-09
 - `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
 - `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
-- `F932-live-picture-activity` (🟢 PROVEN): The picture shows what each running job is doing now; landed 2026-10-08
-- 2026-10: 53 landed. spec/features/done/2026-10/
+- 2026-10: 54 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/
