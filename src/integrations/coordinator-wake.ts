@@ -14,10 +14,8 @@ const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found
  * Start a turn on the Herdr pane that spawned this job. Only jobs whose coordinator had no Pi session record
  * `origin-pane`; Pi coordinators keep their in-process wake. A group member never wakes anyone: the group tells its
  * lead once, after its last round (`limen group advance`).
- * Claimed once per job by `notify/herdr-prompt`, which keeps one line per attempt. Only an attempt Herdr refused before
- * it sent any input is tried again, at most twice; text that may have reached the pane is never sent again, so a
- * coordinator hears its wake once. `notify/delivered/_herdr` is written only when Herdr observed the pane working after
- * submission.
+ * Claimed once per job by `notify/herdr-prompt`, which keeps one line per attempt (see `promptPane`), so a coordinator
+ * hears its wake once. `notify/delivered/_herdr` is written only when Herdr observed the pane working after submission.
  */
 export async function promptCoordinator(jobDir: string, shutdownDeadline = Number.POSITIVE_INFINITY): Promise<void> {
 	const pane = await textFile(`${jobDir}/origin-pane`);
@@ -35,11 +33,37 @@ export async function promptCoordinator(jobDir: string, shutdownDeadline = Numbe
 	} catch {
 		return; // Another finalizer already owns this wake.
 	}
+	const ok = await promptPane(herdr, pane, message, shutdownDeadline, `${jobDir}/notify/herdr-prompt`, (line) =>
+		appendLimenLog(jobDir, `coordinator wake via Herdr: ${line}`),
+	);
+	if (ok) {
+		await mkdir(`${jobDir}/notify/delivered`, { recursive: true });
+		await writeFile(`${jobDir}/notify/delivered/_herdr`, `${new Date().toISOString()}\n`, {
+			flag: "wx",
+			flush: true,
+		}).catch(() => {});
+	}
+}
+
+/**
+ * Prompt one Herdr pane after the caller claimed `receipt`, and keep one receipt line per attempt; `note` hears each
+ * attempt as it ends. Only an attempt Herdr refused before it sent any input is tried again, at most twice; text that
+ * may have reached the pane is never sent again. True when Herdr observed the pane working after submission.
+ */
+export async function promptPane(
+	herdr: string,
+	pane: string,
+	message: string,
+	deadline: number,
+	receipt: string,
+	note: (line: string) => Promise<void> = async () => {},
+): Promise<boolean> {
 	const lines: string[] = [];
+	let ok = false;
 	for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-		const budget = Math.min(PROMPT_MS, shutdownDeadline - Date.now());
+		const budget = Math.min(PROMPT_MS, deadline - Date.now());
 		if (budget < 1_000) {
-			lines.push("no shutdown budget for another attempt; inspect the job and wake the coordinator deliberately");
+			lines.push("no time left for another attempt; deliver this text to the pane deliberately");
 			break;
 		}
 		const wait = String(Math.max(budget - 2_000, 1_000));
@@ -56,27 +80,24 @@ export async function promptCoordinator(jobDir: string, shutdownDeadline = Numbe
 					? `not sent to ${pane}: ${outcome.detail}`
 					: `may have reached ${pane}, turn not seen (${outcome.detail}); not resent`;
 		lines.push(`attempt ${attempt}: ${result} ${new Date().toISOString()}`);
-		await appendLimenLog(jobDir, `coordinator wake via Herdr: attempt ${attempt}: ${result}`);
+		await note(`attempt ${attempt}: ${result}`);
 		if (outcome.ok) {
-			await mkdir(`${jobDir}/notify/delivered`, { recursive: true });
-			await writeFile(`${jobDir}/notify/delivered/_herdr`, `${new Date().toISOString()}\n`, {
-				flag: "wx",
-				flush: true,
-			}).catch(() => {});
+			ok = true;
 			break;
 		}
 		if (!UNSENT.test(outcome.detail)) {
 			break;
 		}
 		if (attempt < ATTEMPTS) {
-			await atomicWrite(`${jobDir}/notify/herdr-prompt`, `attempting ${pane}\n${lines.join("\n")}\n`);
+			await atomicWrite(receipt, `attempting ${pane}\n${lines.join("\n")}\n`);
 		} else {
 			lines.push(
-				`automatic delivery stopped after ${ATTEMPTS} attempts Herdr did not send; inspect the job and wake the coordinator deliberately`,
+				`automatic delivery stopped after ${ATTEMPTS} attempts Herdr did not send; deliver this text to the pane deliberately`,
 			);
 		}
 	}
-	await atomicWrite(`${jobDir}/notify/herdr-prompt`, `${lines.join("\n")}\n`);
+	await atomicWrite(receipt, `${lines.join("\n")}\n`);
+	return ok;
 }
 
 async function wakeMessage(jobDir: string): Promise<string | undefined> {

@@ -15,10 +15,11 @@ export function worktreeLock<T>(jobsRoot: string, operation: () => Promise<T>): 
 }
 
 /**
- * One line naming who ran this spawn or continue, from what the environment shows: a Limen job, else a Pi session or
- * Herdr pane (`coordinator` when LIMEN_COORDINATOR=1), then the user and the parent process. Unknown parts are left out.
+ * One line naming who ran this spawn, continue or rule, from what the environment shows: a Limen job, else a Pi session
+ * or Herdr pane (`coordinator` when LIMEN_COORDINATOR=1), then the user and the parent process. Unknown parts are left
+ * out.
  */
-function spawnerLine(): string {
+export function spawnerLine(): string {
 	const job = process.env.LIMEN_JOB_ID?.trim();
 	if (job && SESSION_ID.test(job)) {
 		return `job ${job}`;
