@@ -18,27 +18,40 @@ const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found
  * hears its wake once. `notify/delivered/_herdr` is written only when Herdr observed the pane working after submission.
  */
 export async function promptCoordinator(jobDir: string, shutdownDeadline = Number.POSITIVE_INFINITY): Promise<void> {
+	await promptOriginPane(jobDir, await wakeMessage(jobDir), COMPLETION, shutdownDeadline);
+}
+/** A job that waited in the start queue tells its pane once that it started: `notify/herdr-start`, never the wake's receipt. */
+export async function promptStartNotice(jobDir: string, message: string): Promise<void> {
+	await promptOriginPane(jobDir, message, START, Number.POSITIVE_INFINITY);
+}
+type PaneRoute = { readonly receipt: string; readonly delivered: string; readonly name: string };
+const COMPLETION: PaneRoute = { receipt: "herdr-prompt", delivered: "_herdr", name: "coordinator wake via Herdr" };
+const START: PaneRoute = { receipt: "herdr-start", delivered: "_start._herdr", name: "start notice via Herdr" };
+/** Claims the route's receipt once per job, prompts the job's `origin-pane`, and records a delivery Herdr observed. */
+async function promptOriginPane(
+	jobDir: string,
+	message: string | undefined,
+	route: PaneRoute,
+	deadline: number,
+): Promise<void> {
 	const pane = await textFile(`${jobDir}/origin-pane`);
-	const message = await wakeMessage(jobDir);
 	const herdr = herdrBinary();
-	if (!message || !pane || !herdr || shutdownDeadline - Date.now() < 1_000) {
+	if (!message || !pane || !herdr || deadline - Date.now() < 1_000) {
 		return;
 	}
 	await mkdir(`${jobDir}/notify`, { recursive: true });
+	const receipt = `${jobDir}/notify/${route.receipt}`;
 	try {
-		await writeFile(`${jobDir}/notify/herdr-prompt`, `attempting ${pane} ${new Date().toISOString()}\n`, {
-			flag: "wx",
-			flush: true,
-		});
+		await writeFile(receipt, `attempting ${pane} ${new Date().toISOString()}\n`, { flag: "wx", flush: true });
 	} catch {
 		return; // Another finalizer already owns this wake.
 	}
-	const ok = await promptPane(herdr, pane, message, shutdownDeadline, `${jobDir}/notify/herdr-prompt`, (line) =>
-		appendLimenLog(jobDir, `coordinator wake via Herdr: ${line}`),
+	const ok = await promptPane(herdr, pane, message, deadline, receipt, (line) =>
+		appendLimenLog(jobDir, `${route.name}: ${line}`),
 	);
 	if (ok) {
 		await mkdir(`${jobDir}/notify/delivered`, { recursive: true });
-		await writeFile(`${jobDir}/notify/delivered/_herdr`, `${new Date().toISOString()}\n`, {
+		await writeFile(`${jobDir}/notify/delivered/${route.delivered}`, `${new Date().toISOString()}\n`, {
 			flag: "wx",
 			flush: true,
 		}).catch(() => {});
@@ -109,7 +122,7 @@ async function wakeMessage(jobDir: string): Promise<string | undefined> {
 	if (!membership) {
 		const keeper = state === "done" ? ` ${keeperHint(jobDir, id)}` : "";
 		const instruction = `Start with \`limen jobs ${id}\`. Inspect its diff, commits, final message, and checks before landing. If a check blocks landing, name that check and resume a focused fix.${keeper} Keep the user informed; ask only when a genuine product decision needs them.`;
-		return completionWake(jobDir, label || id, state, id, branch, repo, false, instruction);
+		return completionWake(jobDir, label || id, state, id, branch, repo, { instruction });
 	}
 	await appendLimenLog(
 		jobDir,

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ticketPointers } from "../project/planning.ts";
 import { producedNothing } from "./job.ts";
+import { claimSlots, deliveryExists } from "./wake-delivery.ts";
 
 function text(path: string): string {
 	try {
@@ -41,6 +42,11 @@ function handoffExcerpt(job: string): string {
 	}
 	return sections.length ? `\n\n${sections.join("\n\n")}` : "";
 }
+/**
+ * How a completion wake travels. `fallback`: a busy coordinator's wake reaches another session. `instruction`: a route's
+ * own landing words (the Herdr prompt to an OMP coordinator). `session`: the Pi session that receives the wake.
+ */
+type CompletionRoute = { readonly fallback?: boolean; readonly instruction?: string; readonly session?: string };
 export function completionWake(
 	job: string,
 	label: string,
@@ -48,14 +54,17 @@ export function completionWake(
 	id: string,
 	branch: string,
 	repo: string,
-	fallback: boolean,
-	routeInstruction?: string,
+	route: CompletionRoute = {},
 ): string {
+	const { fallback = false, instruction: routeInstruction } = route;
 	const location = repo ? ` in repository ${repo}` : "";
 	const task = firstSentence(text(join(job, "task.md")));
-	const lead = task
+	const said = task
 		? `Limen job ${JSON.stringify(label)}: ${task}\nis ${state} (${id}) on branch ${branch}${location}.`
 		: `Limen job ${JSON.stringify(label)} is ${state} (${id}) on branch ${branch}${location}.`;
+	const waited = missedStartNotice(job, route.session);
+	// A start notice the session never got is its own paragraph after the lead, word for word.
+	const lead = waited ? `${said}\n\n${waited}` : said;
 	const empty = jobProducedNothing(job);
 	const scout = state === "done" && !empty && text(join(job, "role")) === "scout";
 	const facts = empty ? "It produced nothing (0 tool calls, no commits)." : "";
@@ -86,6 +95,18 @@ export function completionWake(
 			"The subscribed coordinator is busy. Do not spawn, stop, steer, or land on behalf of another coordinator unless the human asks.";
 	}
 	return joinWake(lead, handoffExcerpt(job), [facts, handoff].filter(Boolean).join("\n\n"), instruction);
+}
+/**
+ * The first line of the job's start notice, when the job waited in the start queue and `session` never got that
+ * notice: the job ended before the Pi hook delivered it. A start notice is news only while the job runs, so the
+ * completion wake carries this line instead. A notice in flight (claimed) may have reached the session; it counts.
+ */
+function missedStartNotice(job: string, session: string | undefined): string {
+	const slot = `_start.${session}`;
+	if (!session || deliveryExists(job, slot) || claimSlots(job).includes(slot)) {
+		return "";
+	}
+	return text(join(job, "start-notice")).split("\n", 1)[0] ?? "";
 }
 /** The done-wake sentence that sends spec work to the keeper; the ticket comes from the job task's first `Ticket:` pointer (keeper follows a moved one). */
 export function keeperHint(job: string, id: string): string {

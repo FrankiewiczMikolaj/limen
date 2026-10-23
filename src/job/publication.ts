@@ -69,6 +69,8 @@ type NewJob = {
 	readonly base: string;
 	readonly role: string;
 	readonly engine: EngineId;
+	/** The start-queue order: 1 is the most urgent. */
+	readonly priority?: number;
 	/** The model the spawner asked for, compared with the served model in `limen jobs <id>`. */
 	readonly model?: string;
 	readonly extensions?: readonly string[];
@@ -115,11 +117,10 @@ export async function publishJob(jobDir: string, job: NewJob): Promise<void> {
 			log: "",
 			// The spawning process. Until spawn writes `state`, a live spawner means the job is starting, not orphaned.
 			starting: `${process.pid}\n`,
+			...(job.priority ? { priority: `${job.priority}\n` } : {}),
+			...(job.model ? { model: `${job.model}\n` } : {}),
 			...job.carried,
 		};
-		if (job.model) {
-			files.model = `${job.model}\n`;
-		}
 		if (job.repo) {
 			files.repo = `${job.repo}\n`;
 		}

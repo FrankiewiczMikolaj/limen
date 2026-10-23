@@ -57,6 +57,8 @@ export type JobFiles = {
 	readonly engine: string;
 	readonly model: string;
 	readonly activity: string;
+	/** The job waits in the seat's start queue; its engine has not started. */
+	readonly queued?: boolean;
 	readonly lastTool: string;
 	readonly detail: string;
 	readonly stopReason: string;
@@ -134,6 +136,9 @@ function liveState(files: JobFiles, now: number): LiveState | undefined {
 	if (files.owner === "gone") {
 		return "dead";
 	}
+	if (files.queued) {
+		return "waiting";
+	}
 	const checks = files.activity === "tool" && toolWords(files.lastTool, files.detail) === "running tests and checks";
 	if (now - files.lastEventAt > (checks ? CHECK_QUIET_MS : QUIET_MS)) {
 		return "quiet";
@@ -145,6 +150,9 @@ function liveState(files: JobFiles, now: number): LiveState | undefined {
 function currentWords(files: JobFiles, state: LiveState): string {
 	if (state === "starting") {
 		return "starting";
+	}
+	if (files.queued && state === "waiting") {
+		return "queued to start";
 	}
 	if (files.activity === "wait") {
 		return "waiting";
@@ -348,6 +356,7 @@ async function readJobFiles(
 		engine,
 		model: await sessionModel(id, session, models),
 		activity,
+		queued: !terminal && (await field("queued")) !== "",
 		lastTool,
 		detail: terminal ? "" : await commandDetail(dir, lastTool, toolDetail),
 		stopReason,

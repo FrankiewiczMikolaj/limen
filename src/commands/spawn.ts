@@ -44,6 +44,7 @@ import {
 	resolveSpawnEngine,
 } from "../runtime/engine.ts";
 import { liveJob } from "../runtime/reap.ts";
+import { DEFAULT_PRIORITY, parsePriority, queuedLine } from "../runtime/start-queue.ts";
 import { normalizeWorkerExtensions } from "../runtime/worker-extensions.ts";
 import { launchHostedSupervisor, launchWrapper } from "../runtime/wrapper.ts";
 import { hunkBinary } from "./diff.ts";
@@ -62,6 +63,7 @@ type SpawnOptions = {
 	thinking?: string;
 	timeoutMs?: number;
 	prepare?: string;
+	priority?: number;
 	review: boolean;
 	tab: boolean;
 	detached: boolean;
@@ -420,6 +422,7 @@ async function publishSpawnedJob(launch: SpawnLaunch, record: SpawnRecord): Prom
 		base: record.base,
 		role: record.role,
 		engine: launch.profile.id,
+		priority: launch.options.priority ?? DEFAULT_PRIORITY,
 		...(launch.model ? { model: launch.model } : {}),
 		extensions: launch.extensions,
 		planningSource: place.source,
@@ -506,6 +509,7 @@ async function startDetachedJob(launch: SpawnLaunch, job: SpawnedJob, versions: 
 		throw error;
 	}
 	await waitForHandshake(jobDir, wrapperPid);
+	const queued = await queuedLine(jobDir, options.label);
 	const state = await text(`${jobDir}/state`);
 	if (state !== "running") {
 		const detail = await lastLimenDetail(jobDir);
@@ -515,7 +519,7 @@ async function startDetachedJob(launch: SpawnLaunch, job: SpawnedJob, versions: 
 		return;
 	}
 	await versions.catch(() => {});
-	console.log(`started ${options.label}`);
+	console.log(queued ?? `started ${options.label}`);
 	console.log(id);
 }
 export async function startHosted(input: {
@@ -649,6 +653,7 @@ const SPAWN_FLAGS = {
 	timeout: { type: "string" },
 	"task-file": { type: "string" },
 	prepare: { type: "string" },
+	priority: { type: "string" },
 	role: { type: "string" },
 	engine: { type: "string" },
 	base: { type: "string" },
@@ -675,6 +680,7 @@ function parseSpawnArgs(args: readonly string[]): SpawnOptions {
 			"timeout",
 			"task-file",
 			"prepare",
+			"priority",
 			"role",
 			"engine",
 			"base",
@@ -687,6 +693,7 @@ function parseSpawnArgs(args: readonly string[]): SpawnOptions {
 	}
 	const engine = values.engine?.trim();
 	const timeoutMs = values.timeout === undefined ? undefined : parseDuration(values.timeout);
+	const priority = parsePriority(values.priority);
 	if (values.review && role) {
 		throw new Error("--role and --review cannot be combined");
 	}
@@ -705,6 +712,7 @@ function parseSpawnArgs(args: readonly string[]): SpawnOptions {
 		...(label ? { label } : {}),
 		...(taskFile ? { taskFile } : {}),
 		...(timeoutMs ? { timeoutMs } : {}),
+		...(priority ? { priority } : {}),
 	};
 	for (const key of ["prepare", "branch", "base", "head", "repo", "model", "provider", "thinking"] as const) {
 		const value = values[key];

@@ -18,6 +18,7 @@ import {
 import { limenRoot, liveDiffstat, workspaceRepository } from "../project/git.ts";
 import { hostedUncertaintyText, readHostedUncertainty } from "../runtime/hosted-uncertainty.ts";
 import { confirmDeadJobs, ownerAlive, startingJob } from "../runtime/reap.ts";
+import { queuedText, readQueued } from "../runtime/start-queue.ts";
 
 export const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
 const HUMAN_TERMINAL_ROWS = 6;
@@ -272,6 +273,7 @@ type JobFacts = {
 	readonly observedAt: number;
 	readonly agentStatus: string | undefined;
 	readonly pulse: Pulse | undefined;
+	readonly queue: string | undefined;
 	readonly recordedTools: number | undefined;
 	readonly empty: boolean;
 	readonly diffstat: string;
@@ -408,7 +410,9 @@ async function renderReadableJob(loaded: LoadedJob): Promise<{ compact: string; 
 	const observedAt = running ? Date.now() : recordedDate(fields.finished, new Date(), "finished-at").getTime();
 	const alive = running && (await ownerAlive(loaded.jobDir));
 	const agentStatus = running && fields.hosted && evidence.agent ? hostedAgentStatus(evidence.agent) : undefined;
-	const pulse = running ? runningPulse(job.pid, alive, fields.activity) : undefined;
+	const queued = running ? readQueued(loaded.jobDir) : undefined;
+	const queue = queued ? queuedText(queued) : undefined;
+	const pulse = running ? runningPulse(job.pid, alive, fields.activity, queued !== undefined) : undefined;
 	const recordedTools = fields.toolCalls ? recordedCount(fields.toolCalls) : undefined;
 	const empty = !running && producedNothing(recordedTools, evidence.commitsStat ? evidence.commits : undefined);
 	const diffstat = detailed
@@ -421,14 +425,15 @@ async function renderReadableJob(loaded: LoadedJob): Promise<{ compact: string; 
 		...(empty ? { producedNothing: true } : {}),
 		...(fields.lastTool ? { lastTool: displayed(fields.lastTool, detailed) } : {}),
 		...(running && pulse ? { pulse, processAlive: alive } : {}),
+		...(pulse === "queued" && queue ? { queue } : {}),
 		diffstat,
 		logTail: log.tail,
 	});
-	const facts: JobFacts = { job, startedAt, observedAt, agentStatus, pulse, recordedTools, empty, diffstat };
+	const facts: JobFacts = { job, startedAt, observedAt, agentStatus, pulse, queue, recordedTools, empty, diffstat };
 	return { compact: [rendered, ...jobBlocks(loaded, facts)].join("\n"), record: jobRecord(loaded, facts) };
 }
-function runningPulse(pid: number | undefined, alive: boolean, activity: string): Pulse {
-	const input: { alive: boolean; pid?: number; activity?: string } = { alive };
+function runningPulse(pid: number | undefined, alive: boolean, activity: string, queued: boolean): Pulse {
+	const input: { alive: boolean; queued: boolean; pid?: number; activity?: string } = { alive, queued };
 	if (pid !== undefined) {
 		input.pid = pid;
 	}
@@ -489,13 +494,14 @@ function jobBlocks(loaded: LoadedJob, facts: JobFacts): string[] {
 }
 function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 	const { id, detailed, fields, evidence, logStat, log } = loaded;
-	const { job, observedAt, pulse, recordedTools, empty, agentStatus } = facts;
+	const { job, observedAt, pulse, queue, recordedTools, empty, agentStatus } = facts;
 	const reason = stopSummary(fields.stopReason || log.detail);
 	const running = job.phase === "running";
 	return {
 		id,
 		job,
 		...(pulse ? { pulse } : {}),
+		...(pulse === "queued" && queue ? { queue } : {}),
 		...(recordedTools !== undefined ? { toolCalls: recordedTools } : {}),
 		...(empty ? { producedNothing: true } : {}),
 		...(fields.lastTool ? { lastTool: displayed(fields.lastTool, detailed) } : {}),

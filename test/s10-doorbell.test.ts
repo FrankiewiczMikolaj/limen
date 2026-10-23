@@ -110,10 +110,8 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	context.after(p.cleanup);
 	git(p.root, "remote", "add", "origin", `https://github.com/${REPO}.git`);
 	await mkdir(join(p.root, ".limen/github/claims"), { recursive: true });
-	await writeFile(
-		join(p.root, ".limen/github/binding.json"),
-		JSON.stringify({ repo: REPO, coordinator: "coord:p1", user: "worker", connectedAt: "2026-09-24T00:00:00Z" }),
-	);
+	const binding = { repo: REPO, coordinator: "coord:p1", user: "worker", connectedAt: "2026-09-24T00:00:00Z" };
+	await writeFile(join(p.root, ".limen/github/binding.json"), JSON.stringify(binding));
 	const state = join(p.parent, "poller");
 	await mkdir(state, { mode: 0o700 });
 	const key = join(p.parent, "app.pem");
@@ -158,11 +156,7 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	assert.deepEqual((await readdir(join(p.root, ".limen/github/claims"))).sort(), ["104.json", "issue-5.json"]);
 	const asked = new Set(requests(p).flatMap((request) => /\/collaborators\/(\w+)\//.exec(request.url)?.[1] ?? []));
 	assert.deepEqual([...asked].sort(), ["alice", "eve", "mallory", "trent"], "each author reached the permission check");
-	assert.deepEqual(
-		await prompts(),
-		["coord:p1", "coord:p1"],
-		"one coordinator prompt for the PR comment, one for the issue",
-	);
+	assert.deepEqual(await prompts(), ["coord:p1", "coord:p1"], "one prompt for the PR comment, one for the issue");
 	assert.deepEqual(posts(), [], "a prompt accepted is not yet a reply");
 
 	// The coordinator starts a hosted task for the PR request; the fake agent answers one status check and leaves.
@@ -204,11 +198,8 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	poll();
 	const replies = posts();
 	const sent = replies.map((request) => `${request.method} ${request.url}`);
-	assert.deepEqual(
-		sent,
-		Array(2).fill(`POST https://api.github.com/repos/${REPO}/issues/4/comments`),
-		"one start and one terminal reply; none for the forged claim; no review",
-	);
+	const reply = `POST https://api.github.com/repos/${REPO}/issues/4/comments`;
+	assert.deepEqual(sent, [reply, reply], "one start and one terminal reply; none for the forged claim; no review");
 	assert.deepEqual((await readdir(claims)).sort(), ["104.json", "issue-5.json"]);
 	poll();
 	assert.equal(posts().length, 2, "a poller restart posts nothing twice");

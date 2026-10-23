@@ -1,12 +1,14 @@
 import { spawn } from "node:child_process";
 import { appendFile, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { promptStartNotice } from "../integrations/coordinator-wake.ts";
 import { jobMembership } from "../job/group-cabinet.ts";
 import {
 	appendLimenLog,
 	atomicWrite,
 	finalizeJob,
 	isFailedStopReason,
+	requestedTerminal,
 	textFile,
 	writeHandshake,
 } from "../job/record.ts";
@@ -22,6 +24,7 @@ import { runDevinJob } from "./devin.ts";
 import { argvFor, engineBinary, jobProfile, prepareSkillConfig } from "./engine.ts";
 import { setUpJob, worktreeMissing } from "./job-setup.ts";
 import { observeToolStall, ownedToolDescendants, type ToolStallWatch, toolStallMs } from "./stalled-tool.ts";
+import { enterStartQueue, waitForStart } from "./start-queue.ts";
 import { createStreamParser, type StreamEvent } from "./stream.ts";
 import { readWorkerExtensions } from "./worker-extensions.ts";
 
@@ -73,10 +76,6 @@ export async function runInternalJob(): Promise<void> {
 		await finalizeJob(jobDir, "failed", "group deadline or stop before engine launch");
 		return;
 	}
-	const configuredTimeout = process.env.LIMEN_TIMEOUT_MS ? Number(process.env.LIMEN_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS;
-	const timeoutMs = membership
-		? Math.max(1, Math.min(configuredTimeout, (membership.member?.deadline ?? membership.run.deadline) - Date.now()))
-		: configuredTimeout;
 	const preamble = await readFile(preambleFile, "utf8");
 	let confirmedToolStall = false;
 	let stopRequested = false;
@@ -93,9 +92,26 @@ export async function runInternalJob(): Promise<void> {
 			shutdownDeadline ??= Date.now() + STOP_GRACE_MS - 500;
 		}
 	});
-	if (process.env.LIMEN_SETUP_KEEP) {
-		// Spawn waits for this handshake, not for setup, so it returns before prune and --prepare run.
+	const profile = await jobProfile(jobDir);
+	// A group member runs on its group's deadline and a Devin job runs in the cloud; both start at once.
+	const gate = !(membership || profile.id === "devin") && (await enterStartQueue(jobDir));
+	// Spawn waits for this handshake, not for the queue or setup, so it returns before prune and --prepare run.
+	// One handshake per run: a second one races the first one's `born` write and can crash the wrapper.
+	const early = Boolean(process.env.LIMEN_SETUP_KEEP || gate);
+	if (early) {
 		await writeHandshake(jobDir);
+	}
+	if (gate && !(await waitForStart(jobDir, stop.signal))) {
+		const requested = await textFile(`${jobDir}/stop-requested`);
+		const reason = requested || "stopped while queued";
+		await finalizeJob(jobDir, requestedTerminal(reason), reason, shutdownDeadline);
+		return;
+	}
+	const notice = await textFile(`${jobDir}/start-notice`);
+	if (notice) {
+		void promptStartNotice(jobDir, notice).catch(() => {});
+	}
+	if (process.env.LIMEN_SETUP_KEEP) {
 		await setUpJob(jobDir, worktree);
 		if (stopRequested || (await textFile(`${jobDir}/stop-requested`))) {
 			await finalizeJob(jobDir, "stopped", "stopped during setup", shutdownDeadline);
@@ -107,7 +123,11 @@ export async function runInternalJob(): Promise<void> {
 		await finalizeJob(jobDir, "failed", missing, shutdownDeadline);
 		return;
 	}
-	const profile = await jobProfile(jobDir);
+	// The timeout and a group deadline count from engine start, so time in the start queue never counts against them.
+	const configuredTimeout = process.env.LIMEN_TIMEOUT_MS ? Number(process.env.LIMEN_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS;
+	const timeoutMs = membership
+		? Math.max(1, Math.min(configuredTimeout, (membership.member?.deadline ?? membership.run.deadline) - Date.now()))
+		: configuredTimeout;
 	if (profile.id === "devin") {
 		await runDevinJob({
 			jobDir,
@@ -230,7 +250,9 @@ export async function runInternalJob(): Promise<void> {
 		child.once("error", (error) => resolve({ code: null, signal: null, error }));
 		child.once("close", (code, signal) => resolve({ code, signal }));
 	});
-	await writeHandshake(jobDir);
+	if (!early) {
+		await writeHandshake(jobDir);
+	}
 	await atomicWrite(`${jobDir}/state`, "running\n");
 	await appendLimenLog(jobDir, "worker started");
 	const enginePid = child.pid;

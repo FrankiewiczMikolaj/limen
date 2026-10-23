@@ -13,6 +13,7 @@ import { openCommand } from "./commands/open.ts";
 import { pictureCommand } from "./commands/picture.ts";
 import { planningCommand } from "./commands/planning-source.ts";
 import { pruneCommand } from "./commands/prune.ts";
+import { queueCommand } from "./commands/queue.ts";
 import { endDueRules, ruleCommand } from "./commands/rule.ts";
 import { spawnCommand } from "./commands/spawn.ts";
 import { statusCommand } from "./commands/status.ts";
@@ -47,6 +48,7 @@ const COMMANDS = {
 	jobs: jobsCommand,
 	status: statusCommand,
 	prune: pruneCommand,
+	queue: queueCommand,
 	rule: ruleCommand,
 	watch: watchCommand,
 	unwatch: unwatchCommand,
@@ -76,6 +78,7 @@ const COMMANDS = {
 	| "jobs"
 	| "status"
 	| "prune"
+	| "queue"
 	| "rule"
 	| "watch"
 	| "unwatch"
@@ -101,7 +104,8 @@ usage:
   limen group publish [GROUP-ID] [--team team-N] "finding"  # members inherit verified membership; lead supplies ID
   limen group wait [GROUP-ID] [--timeout D]
   limen group stop|close [GROUP-ID]
-  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "Implement FNNN: <outcome>. Start by writing <slice>. Ticket: spec/features/active/FNNN-slug/ticket.md" [--label L] [--branch B] [--role NAME] [--timeout 20m; default 90m] [--task-file F|-] [--prepare CMD] [--extension PATH ...; Pi only]
+  limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "Implement FNNN: <outcome>. Start by writing <slice>. Ticket: spec/features/active/FNNN-slug/ticket.md" [--label L] [--branch B] [--role NAME] [--timeout 20m; default 90m] [--task-file F|-] [--prepare CMD] [--priority 1|2|3; default 2] [--extension PATH ...; Pi only]
+                                  # detached: waits in the seat's start queue while CPU or memory is short, then starts and tells you
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "Short title" --task-file F|-  # the file is the task; the positional words become the label
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> "…" [--label L]  # selected engine's flags; detached, also in Herdr (log-tail tab)
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --tab "…"  # hosted: a person types into the tab (requires Herdr; no --timeout)
@@ -109,7 +113,7 @@ usage:
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --repo R "Implement FNNN: <outcome>. Ticket: spec/features/active/FNNN-slug/ticket.md" [--label L]
   limen spawn --engine <engine> --provider <provider> --model <model> --thinking <level> --review --detached --branch B --label L [--base SHA] [--head SHA] "Review the FNNN candidate against spec/features/active/FNNN-slug/ticket.md"
   limen spawn --engine devin [--provider macos|linux] [--model MODE] "…" [--label L] [--task-file F|-]  # a Devin cloud session on the job branch; detached only, no --thinking
-  limen continue <id|suffix|label> "follow-up instruction" [--review] [--label L] [--engine pi|omp] [--provider P] [--model X] [--thinking T] [--tab|--detached] [--extension PATH ...; replaces ordinary Pi list, group list stays fixed]
+  limen continue <id|suffix|label> "follow-up instruction" [--review] [--label L] [--engine pi|omp] [--provider P] [--model X] [--thinking T] [--tab|--detached] [--priority 1|2|3; default the parent's] [--extension PATH ...; replaces ordinary Pi list, group list stays fixed]
                                   # resume a finished job in its own engine session — full context, same worktree; Herdr default is hosted
   limen steer <id|suffix|label> | --running "correction"
   limen diff <id|suffix|label>
@@ -119,6 +123,7 @@ usage:
   limen stop <id|suffix|label> [reason]
   limen jobs [--running|--active|--all|--label PREFIX|<id|suffix|label>]
   limen status [--all]                          # plant inbox: running, candidates to inspect, needs a decision (last 7 days), coordinator tabs
+  limen queue                                   # the seat's start queue in start order, and the CPU and memory reading against the gate
   limen prune [--retire [--dry-run]]           # --retire deletes finished, failed, or stopped job records whose branch is landed (ancestor or cherry-pick) or deleted
   limen rule                                    # the seat-wide rules that hold now
   limen rule set NAME --until 90m|12h|3d|"YYYY-MM-DD HH:MM"|ISO [--start-priority 1|2|3] "text"  # one rule for every coordinator; a set or change pings each live coordinator tab once

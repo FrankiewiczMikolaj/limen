@@ -147,6 +147,18 @@ Limen copies the saved session into a new linked job. The new job keeps the work
 
 **Every job can call `finish`.** A detached continuation of a hosted job keeps the hosted transcript, so the worker may call `finish` again; OMP shows it as `xd://finish`. The handoff becomes the job result, and the job ends `done` when the engine exits. A later reply does not replace that handoff.
 
+### Start queue
+
+Every plant on the seat shares one machine, so detached jobs wait in one queue for the whole seat, under `$LIMEN_HOME/.limen/start-queue/` (`~/.limen/start-queue/` by default). The job's own wrapper waits after its handshake and before prune, `--prepare` and the engine. No daemon runs the queue.
+
+- **Order.** Priority first (`--priority 1|2|3`, 1 the most urgent, 2 the default), then the time the job entered the queue.
+- **Gate.** Only the first job in the queue reads the load: CPU idle across all cores over about two seconds, and free memory. On macOS free memory is the `memory_pressure` free percentage; on Linux it is MemAvailable over MemTotal. The job starts when CPU is at least 25% idle and memory at least 20% free. A value the machine cannot report does not hold a job back.
+- **Settle.** After one start, the next start waits a settle interval of 60 seconds, so the new job's load shows in the next reading.
+- **Values.** `$LIMEN_HOME/.limen/start-gate.json` changes them for the whole seat: `{ "cpuIdle": 25, "memoryFree": 20, "settle": "60s" }`. A waiting job reads the file again on each poll, so an edit reaches jobs already in the queue. `LIMEN_START_GATE` overrides the file for the jobs started under it: `off` turns the gate off, and a JSON object in the same form replaces the file. The job log names each value that Limen ignores. `LIMEN_START_READING` names a file that holds the reading instead of the machine (`{ "cpuIdle": 10, "memoryFree": 80 }`); tests and manual checks use it.
+- **What a coordinator sees.** A job that the gate admits at once and that has nobody ahead starts as before; its log says `start gate: open`. A job that must wait makes spawn print `queued`, shows the pulse `queued` in `limen jobs`, and logs `queued: …`. When it starts, its log says `start queue: started after …`, and its coordinator gets one start notice on the route its finish uses: the Pi wake hook for a subscribed session, or `herdr agent prompt` to the recorded `origin-pane`. The notice says no action is needed. Its receipt is its own (`notify/delivered/_start.<session>`, `notify/herdr-start`) and never counts as the completion wake. The Pi "started" toast waits until the job leaves the queue. A start notice is news only while the job runs: when the job ends before the Pi hook delivers it, no late notice follows, and the session's completion wake carries the notice's line instead. The Herdr route starts its notice as the job leaves the queue, before prune, `--prepare` and the engine; the job does not wait for the pane's answer.
+- **Stop and loss.** `limen stop` ends a queued job `stopped` with the stop reason. A queue entry whose wrapper is gone, or whose job ended, is removed and does not block the queue. A recycled pid can keep a lost entry until the reaper ends its job.
+- **Limits.** The job timeout and a group deadline count from engine start; time in the queue never counts against them. Hosted (`--tab`) jobs, group launches and Devin jobs start at once.
+
 ### Limits
 
 | Limit | Detached job | Hosted job |

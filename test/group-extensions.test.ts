@@ -108,8 +108,7 @@ for (const hosted of [false, true]) {
 			const expected = run.teamExtensions?.[coordinator.team] ?? [];
 			await f.checkJob(coordinator.id, expected);
 			const refused = f.launch(run, coordinator.team, "--extension", f.privatePath);
-			assert.equal(refused.status, 1);
-			assert.match(refused.stderr, /recorded team extensions/);
+			assert.match(`${refused.status} ${refused.stderr}`, /^1 .*recorded team extensions/s);
 			const child = f.launch(
 				run,
 				coordinator.team,
@@ -119,8 +118,7 @@ for (const hosted of [false, true]) {
 			const id = lastLine(child.stdout);
 			await f.checkJob(id, expected);
 			const bad = f.resume(id, "--extension", f.privatePath);
-			assert.equal(bad.status, 1);
-			assert.match(bad.stderr, /recorded team extensions/);
+			assert.match(`${bad.status} ${bad.stderr}`, /^1 .*recorded team extensions/s);
 			const record = join(jobDir(f, id), "extensions.json");
 			await writeFile(record, "[]\n");
 			assert.match(f.resume(id).stderr, /parent does not match/);

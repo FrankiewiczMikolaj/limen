@@ -18,19 +18,14 @@ await mkdir(join(p.root, "spec/features/done/2026-09/F004-x"), { recursive: true
 git(p.root, "branch", "limen/f007-y");
 const worker = spawnJob(p, "block\ncommit", ["--label", "F009 keeper proof"]);
 
-test("ticket new takes the next number past folders, limen branches and job labels", () => {
-	const made = limen(p, ["ticket", "new", "x", "--touches", "demo.place"]);
-	assert.equal(made.status, 0, made.stderr);
-	assert.equal(made.stdout.trim(), "spec/features/planned/F010-x/ticket.md");
-	assert.ok(existsSync(join(p.root, made.stdout.trim())));
-});
-
-test("ticket new refuses an unknown place id before any file exists", () => {
+test("ticket new refuses an unknown place id before any file exists, then takes the number past folders, limen branches and job labels", () => {
 	const before = lane("planned");
 	const refused = limen(p, ["ticket", "new", "y", "--touches", "nope"]);
-	assert.equal(refused.status, 1);
-	assert.match(refused.stderr, /nope/);
+	assert.match(`${refused.status} ${refused.stderr}`, /^1 .*nope/s);
 	assert.deepEqual(lane("planned"), before);
+	const made = limen(p, ["ticket", "new", "x", "--touches", "demo.place"]);
+	assert.equal(made.stdout, "spec/features/planned/F010-x/ticket.md\n", made.stderr);
+	assert.ok(existsSync(join(p.root, made.stdout.trim())));
 });
 
 test("picture build --dir takes a plant root from any folder and stops on a folder with no map", () => {
