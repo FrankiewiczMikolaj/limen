@@ -56,6 +56,7 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F951-limen-starts-queued-jobs-by-priority-and-tells-every-coordinator-each-rule` (🟢 PROVEN): Limen starts queued jobs by priority and tells every coordinator each rule; landed 2026-10-23
 - `F950-task-notes-state-the-end-checks-and-the-rule-most-likely-to-be-missed` (🟢 PROVEN): Task notes state the end checks and the rule most likely to be missed; landed 2026-10-23
 - `F949-a-limen-job-can-run-as-a-devin-cloud-session-and-return-its-commits` (🟢 PROVEN): A limen job can run as a Devin cloud session and return its commits; landed 2026-10-20
 - `F948-every-agent-knows-it-works-inside-a-highly-capable-agent-system` (🟢 PROVEN): Every agent knows it works inside a highly capable agent system; landed 2026-10-17
@@ -65,7 +66,6 @@
 - `F943-the-coordinator-sweep-does-not-start-a-process-for-each-running-job-every-half-second` (🟢 PROVEN): The coordinator sweep does not start a process for each running job every half second; landed 2026-10-13
 - `F935-a-real-group-shows-as-one-tree-on-the-live-picture` (🟢 PROVEN): A real group shows as one tree on the live picture; landed 2026-10-09
 - `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
-- `F933-quiet-mark-waits-longer-during-tests` (🟢 PROVEN): The quiet mark waits longer while a job runs a long test; landed 2026-10-08
-- 2026-10: 54 landed. spec/features/done/2026-10/
+- 2026-10: 55 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/

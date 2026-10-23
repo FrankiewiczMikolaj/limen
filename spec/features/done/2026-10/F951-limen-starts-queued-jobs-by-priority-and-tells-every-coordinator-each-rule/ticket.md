@@ -7,6 +7,7 @@ touches:
   - limen.integrations.seat
   - limen.commands
 opened: 2026-10-23
+landed: 2026-10-23
 ---
 
 # F951 · Limen starts queued jobs by priority and tells every coordinator each rule
