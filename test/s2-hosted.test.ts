@@ -126,8 +126,7 @@ after(() => p.cleanup());
 let first = "";
 test("a hosted job's task never travels as argv, and it finishes done with its handoff when the session ends", async () => {
 	first = spawnJob(p, "say hi\nfinish\nfinish F001 handoff", ["--tab", "--label", "F001 hosted"], { env });
-	assert.equal(waitJob(p, first, { env }), "done");
-	assert.equal(jobFile(p, first, "result"), "F001 handoff");
+	assert.deepEqual([waitJob(p, first, { env }), jobFile(p, first, "result")], ["done", "F001 handoff"]);
 	const leaked = engineArgv(pane(first)).filter((arg) => arg.includes("F001 handoff") || /[\r\n]/.test(arg));
 	assert.deepEqual(leaked, [], "no task text in argv");
 });
@@ -171,8 +170,7 @@ test("two competing sweeps start exactly one replacement for a killed hosted sup
 	await until(dir, () => starts(second) >= 2);
 	assert.equal(jobFile(p, second, "state"), "running");
 	await release(dir);
-	assert.equal(waitJob(p, second, { env }), "done");
-	assert.equal(jobFile(p, second, "result"), "omp done");
+	assert.deepEqual([waitJob(p, second, { env }), jobFile(p, second, "result")], ["done", "omp done"]);
 	assert.equal(starts(second), 2, "one replacement supervisor, not two");
 	assert.ok(!jobFile(p, second, "log").includes("failed:"));
 });

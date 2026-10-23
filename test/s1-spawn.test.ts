@@ -76,8 +76,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	const id = spawnJob(p, task, ["--detached", "--label", "F001 demo"], { env: caller });
 	const dir = jobDir(p, id);
 	const tree = jobFile(p, id, "worktree");
-	assert.equal(git(tree, "branch", "--show-current"), `limen/${id}`);
-	assert.equal(git(tree, "rev-parse", "HEAD"), base);
+	assert.deepEqual([git(tree, "branch", "--show-current"), git(tree, "rev-parse", "HEAD")], [`limen/${id}`, base]);
 	await rm(join(dir, "spawner")); // `jobs` below reads the picture's link to the spawner job, `spawned-by`, alone.
 
 	// Plain `git status` on stale stat data rewrites the index under the worker's own `git add` (43c01cf).
@@ -100,8 +99,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.deepEqual(leaked, []);
 	const commits = git(p.root, "rev-list", `${base}..limen/${id}`).split("\n");
 	assert.equal(commits.length, 1);
-	assert.equal(git(p.root, "rev-parse", "HEAD"), base);
-	assert.equal(git(p.root, "status", "--porcelain"), "");
+	assert.deepEqual([git(p.root, "rev-parse", "HEAD"), git(p.root, "status", "--porcelain")], [base, ""]);
 	const shown = limen(p, ["jobs", id]);
 	assert.ok(shown.stdout.includes(commits[0]?.slice(0, 7) ?? "?"), shown.stdout);
 	assert.ok(shown.stdout.includes("all done"), shown.stdout);

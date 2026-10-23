@@ -4,8 +4,9 @@
 // wake by moving its claim to notify/delivered/<session>, and no listener injects that wake again afterwards, so once
 // the delivered record exists every wake the job will cause for that session is already recorded.
 import assert from "node:assert/strict";
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { open, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -165,16 +166,17 @@ test("limen watch and unwatch move a job's wake to another session", async () =>
 	// The coord session visits jobs in id order in one sweep; a misrouted wake for `moved` lands before the barrier's.
 	const barrier = job("say ok", "y barrier");
 	await delivered([barrier]);
-	assert.equal(wakes(other, moved).length, 1);
-	assert.equal(wakes(coord, moved).length, 0);
+	assert.deepEqual([wakes(other, moved).length, wakes(coord, moved).length], [1, 0]);
 });
 
-test("a held gate queues jobs by priority; a queued job tells its session once that it started, then its finish wakes it once", async () => {
+test("a held gate queues jobs by priority and a rule's start priority holds the rest; a queued job tells its session once that it started, then its finish wakes it once", async () => {
 	const reading = join(p.parent, "start-reading.json");
 	writeFileSync(reading, '{"cpuIdle":10,"memoryFree":80}');
+	const pipe = join(p.parent, "timed-reading");
+	execFileSync("mkfifo", [pipe]); // timed reads its load from this pipe: each sample it takes waits for the test
 	// A dead wrapper and a stopped job at the head hold nothing; a 2s timeout counts from engine start, not the queue.
 	const [dead = "", stopped = ""] = ["q dead", "q stopped"].map((label) => job("say no", label, ["--priority", "1"]));
-	const timed = job("say timed", "q timed", ["--timeout", "2s"]);
+	const timed = job("say timed", "q timed", ["--timeout", "2s"], { PI_SESSION_ID: "coord", LIMEN_START_READING: pipe });
 	const run = limen(p, ["spawn", ...ROUTE, "--label", "late", "block"], { env: { PI_SESSION_ID: "coord" } });
 	assert.match(run.stdout, /\nqueued late: CPU 10% idle \(gate 25%\), memory 80% free \(gate 20%\), 3 ahead\n\S+\n$/);
 	const later = run.stdout.trim().split("\n").at(-1) ?? "";
@@ -182,11 +184,21 @@ test("a held gate queues jobs by priority; a queued job tells its session once t
 	process.kill(Number(jobFile(p, dead, "pid")), "SIGKILL");
 	assert.equal(limen(p, ["stop", stopped, "not needed"]).stdout, `stopped ${stopped}: not needed\n`);
 	await until(jobDir(p, timed), () => Date.now() - Date.parse(jobFile(p, timed, "started-at")) > 2_500);
+	// The budget: urgent starts under a start priority 2 rule; a change to 1 while timed samples must still hold timed.
+	limen(p, ["rule", "set", "week", "--until", "1h", "--start-priority", "2", "Low"]);
+	writeFileSync(reading, '{"cpuIdle":90,"memoryFree":80}');
+	const head = await open(pipe, "w"); // timed, the head once urgent started, samples the load
+	assert.match(limen(p, ["rule", "set", "week", "--until", "1h", "--start-priority", "1", "Low"]).stdout, /changed/);
+	await head.writeFile("{}").finally(() => head.close());
+	await until(jobDir(p, later), () => /"held by rule week until .+"ahead":1/.test(jobFile(p, later, "queued")));
+	const held = "held by rule week until [^\\n]+ \\(start priority 1\\)";
 	const shown = limen(p, ["jobs", later], { env: { LIMEN_REAP_CONFIRM_MS: "1" } }).stdout;
-	assert.match(shown, / · queued · waiting \d+s: CPU 10% idle \(gate 25%\), memory 80% free \(gate 20%\), 2 ahead · /);
+	assert.match(shown, new RegExp(` · queued · waiting \\d+s: ${held}, 1 ahead · `));
+	assert.match(limen(p, ["queue"]).stdout, new RegExp(`1\\. ${timed} .+\\n   ${held}\\n.+\\n2\\. ${later} `));
 	assert.ok(!engineEvents(coord).some((event) => event.text?.startsWith("limen: late started")), "no toast yet");
 	sessions[0]?.kill("SIGSTOP"); // The quick job ends while its listener sleeps, before its start notice.
-	writeFileSync(reading, '{"cpuIdle":90,"memoryFree":80}');
+	assert.match(limen(p, ["rule", "end", "week"]).stdout, /^rule week ended/);
+	await writeFile(pipe, "{}"); // timed, the head again, samples once more
 	assert.equal(waitJob(p, timed), "done");
 	sessions[0]?.kill("SIGCONT");
 	const noticed = (id: string) => existsSync(join(jobDir(p, id), "notify/delivered/_start.coord"));

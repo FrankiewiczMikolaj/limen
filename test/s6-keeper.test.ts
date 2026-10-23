@@ -52,11 +52,9 @@ test("keeper refuses a running job, then starts on a new branch at the candidate
 	assert.equal(started.status, 0, started.stderr);
 	const keeper = started.stdout.trim().split("\n").at(-1) ?? "";
 	const keeperBranch = `limen/keeper-f001-${tip.slice(0, 7)}`;
-	assert.equal(jobFile(p, keeper, "branch"), keeperBranch);
-	assert.equal(jobFile(p, keeper, "base"), tip);
+	assert.deepEqual([jobFile(p, keeper, "branch"), jobFile(p, keeper, "base")], [keeperBranch, tip]);
 	assert.ok(jobFile(p, keeper, "task.md").split("\n").includes(`Ticket: ${TICKET}`));
-	assert.equal(git(p.root, "rev-parse", branch), tip);
-	assert.equal(waitJob(p, keeper), "done");
+	assert.deepEqual([git(p.root, "rev-parse", branch), waitJob(p, keeper)], [tip, "done"]);
 	const again = limen(p, ["keeper", TICKET, "--job", worker, ...ROUTE]);
 	assert.equal(again.status, 1);
 	assert.match(again.stderr, new RegExp(keeperBranch));

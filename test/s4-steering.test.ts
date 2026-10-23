@@ -121,13 +121,11 @@ test("a worker prompt carries register and styleguide once, vision and board poi
 	const system = jobFile(p, parent, "fake-system.txt");
 	const context = jobFile(p, parent, "fake-context.txt");
 	const seen = [STYLE, REGISTER, FRAME].map((marker) => count(system, marker));
-	assert.deepEqual(seen, [1, 1, 1], "styleguide, register, capability frame");
-	assert.equal(count(context, CUE), 1, "capability cue");
+	assert.deepEqual([...seen, count(context, CUE)], [1, 1, 1, 1], "styleguide, register, capability frame and cue");
 	assert.ok(context.includes("`spec/vision.md`"), "vision pointer");
 	assert.ok(context.includes("`spec/build.md`"), "board pointer");
-	assert.equal(count(system + context, VISION), 0, "a worker reads the vision itself");
-	assert.equal(count(system + context, BOARD), 0, "a worker never gets the board body");
-	assert.equal(count(system + context, RULE), 0, "seat rules are for coordinators");
+	const absent = [VISION, BOARD, RULE].map((marker) => count(system + context, marker));
+	assert.deepEqual(absent, [0, 0, 0], "a worker reads the vision itself, never gets the board body or a seat rule");
 });
 
 test("continue resumes the parent's session, linked, with its extensions or a replacement", () => {

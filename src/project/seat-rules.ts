@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { seatDir } from "./seat.ts";
 
 /**
  * One rule for every coordinator on the seat, kept under the Limen home in `.limen/rules/<name>/rule.json`. Each set
@@ -19,7 +19,7 @@ export type SeatRule = {
 };
 
 export const RULE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const rulesRoot = () => join(process.env.LIMEN_HOME || homedir(), ".limen", "rules");
+const rulesRoot = () => join(seatDir(), "rules");
 export const ruleFolder = (name: string) => join(rulesRoot(), name);
 
 /** The rule a folder holds, ended or not; undefined when it holds none. */
