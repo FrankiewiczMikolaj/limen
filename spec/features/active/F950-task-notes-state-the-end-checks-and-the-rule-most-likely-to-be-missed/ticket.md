@@ -2,39 +2,38 @@
 touches:
   - limen.sessions.guidance
 opened: 2026-10-23
-needs-adam: Approve or revise the task-note prompt before implementation.
-needs-adam-on: 2026-10-23
 ---
 
 # F950 · Task notes state the end checks and the rule most likely to be missed
 
 ## Outcome
 
-Adam can review one proposed task-note prompt and three real examples before any runtime change. The note states what must be true at the end, how to prove it, and the task rule most likely to be missed. It is not a task copy or a result log.
+Each job receives the approved task-note prompt. Its note states observable end checks, the one rule a quick finish could miss, and what remains unproven. It is not a task copy or a result log, and it has no colored markers.
 
 ## Scope
 
-- Start from the prompt strings in `src/job/task-note.ts` and the eight supplied notes.
-- Compare three independent proposals through draft, critique, revise, and final rounds.
-- Propose the complete FORMAT, noteStart, noteSteer, and noteCheck text, including conditional text.
-- Retain the final proposal, three before-and-after examples, disagreements, and route failures in the group record.
-- Show the proposal and examples in a minimal local HTML page for Adam.
+- Implement the approved FORMAT, noteStart, noteSteer, and noteCheck text from `group/prompt.txt`, starting in `src/job/task-note.ts`.
+- Substitute job paths and note contents, and apply the approved conditions without sending their bracketed labels.
+- Keep existing note storage and recording behavior; this is prompt text, not a note parser or workflow gate.
+- Replace tests and documentation that quote the old note format.
+- Retain local check evidence and send the implementation through an independent review before landing.
 
 ## Out of scope
 
-- Changes to Limen code, hooks, tests, dependencies, or installed prompts.
-- Claims of better delivery from the two inconclusive studies.
-- New models, extra teams, or implementation before Adam decides.
+- Changes to the approved wording or the historical group record.
+- Repairs to the old wake-test failure or the structure scan of retained evidence.
+- New dependencies, runtime state, model routes, or GitHub Actions.
+- Claims that the new prompt improves delivery.
 
 ## Acceptance
 
-- One group records exactly the three requested routes and four requested rounds, or records the exact route failure.
-- The final proposal states observable end checks, one easy-to-miss rule, and the checks with no evidence.
-- Three rewrites use the supplied tasks without inventing evidence or results.
-- `~/Downloads/limen-note-shape.html` shows only the final prompt text and each task in three lines, its old note, and its new note.
-- A headless render confirms black text on white with no added introduction, labels, or color.
-- Only this feature spec and group record land on main and are pushed; Limen code stays unchanged.
+- First and continued prompts use the approved wording, with reminders included only when their file is nonempty.
+- Steers preserve the old requirement, append the changed requirement, and invalidate stale proof as the approved text states.
+- The finish check covers present and missing notes, differing first notes, conditional reminders, and both finish-tool paths.
+- Existing note persistence still records the first version and logs changes without parsing the note.
+- Focused regressions, TypeScript, and Biome pass; tests stay within the existing line cap.
+- Full local-check output is retained, with any wake or structure-scan failure reported rather than masked.
 
 ## Notes
 
-The exact routes, source paths, and deliverable paths are in `group/brief.md`. Adam reviews the prompt before implementation.
+Adam approved `group/prompt.txt` as written. That file, not the unedited group final under `group/proposals/`, owns the wording. Implementation and review routes, landing, and push authority are recorded on the board.

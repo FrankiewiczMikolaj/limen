@@ -2,6 +2,7 @@
 
 ## TRACK
 
+- **Task-note implementation (F950, Adam 2026-10-23 16:03):** implement the approved `group/prompt.txt` as written with one Pi `pi-claude/claude-opus-5-5` worker at `xhigh`, then an independent Pi `openai-codex/gpt-6.1-sol` review at `xhigh`, then land on main and push using local evidence only; no GitHub Actions, no repair or masking of the old wake and structure-scan failures.
 - **Pi/OMP engines (Adam 2026-09-22):** one flag, one profile table, one wrapper, one unchanged parser; separate auth stores and same-engine continuation. This VPS plant coordinator owns the board and authorized main landings/pushes; Adam retains review ownership, with no independent reviewer. Live hosted OMP proof, doorbell, unusable-route, and restoring Claude were outside the engine slice.
 - **Standing engine (Adam 2026-10-23):** new jobs default to Pi at runtime; `--engine` overrides `LIMEN_ENGINE`. Use `--engine omp` or `LIMEN_ENGINE=omp` when OMP is required; continuation keeps the recorded engine, and old records without one remain Pi. This replaces the 2026-09-23 OMP default.
 - **Standing models (Adam):** ordinary work, coordination, research, and quality use `openai-codex/gpt-6.1-sol` on Pi (`--engine pi --provider openai-codex --model gpt-6.1-sol`); simple / cheap tasks and UI-related work use `pi-claude/claude-opus-5-5` on Pi (`--engine pi --provider pi-claude --model claude-opus-5-5`: Claude Max through Pi's Claude Code bridge; never `anthropic/`). On OMP the Opus route is `--engine omp --provider pi-claude --model pi-claude/claude-opus-5-5`. Pass engine/provider/model/reasoning explicitly; this supersedes the earlier GPT-6-Sol and Grok model choices.
@@ -28,6 +29,7 @@
 
 <!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F950-task-notes-state-the-end-checks-and-the-rule-most-likely-to-be-missed` (🟠 ACTIVE): Task notes state the end checks and the rule most likely to be missed
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
