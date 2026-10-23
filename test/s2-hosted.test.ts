@@ -95,8 +95,6 @@ const saveState = async (next: unknown) => {
 	await writeFile(join(herdr, "state.tmp"), JSON.stringify(next));
 	await rename(join(herdr, "state.tmp"), join(herdr, "state.json"));
 };
-const prompts = (id: string) =>
-	named("agent", "prompt").filter((args) => args[2] === COORDINATOR && args[3]?.includes(id)).length;
 const alive = (pid: number) => spawnSync("kill", ["-0", String(pid)]).status === 0;
 /** Runs the CLI without blocking the event loop, so two sweeps can race. */
 const limenAsync = (args: readonly string[]) =>
@@ -133,10 +131,8 @@ test("a hosted job's task never travels as argv, and it finishes done with its h
 	const argv = engineArgv(pane(first));
 	assert.ok(
 		argv.every((arg) => !arg.includes("F001 handoff") && !/[\r\n]/.test(arg)),
-		"task text must not travel as shell argv",
+		"no task text in argv",
 	);
-	await until(jobDir(p, first), () => jobFile(p, first, "notify/herdr-prompt").startsWith("attempt 1:"));
-	assert.equal(prompts(first), 1, "a wake Herdr sent is never sent again");
 });
 
 let second = "";
@@ -160,11 +156,7 @@ test("a live OMP job stays running while Herdr reports done, then after Herdr lo
 			.slice(seen)
 			.filter((args) => args.includes(target)).length;
 	await until(herdr, () => probes() >= 4 || jobFile(p, second, "state") !== "running");
-	assert.equal(
-		jobFile(p, second, "state"),
-		"running",
-		`omp still runs on ${target}; a lost agent row must not end the job`,
-	);
+	assert.equal(jobFile(p, second, "state"), "running", `a lost agent row must not end the job on ${target}`);
 });
 
 test("two competing sweeps start exactly one replacement for a killed hosted supervisor (5754dad)", async () => {
@@ -202,10 +194,19 @@ test("hosted Pi stop records stopped once and closes the job's tab", async () =>
 	assert.equal(named("workspace", "create").length, 1, "one role space");
 });
 
-test("in Herdr a spawn with no mode flag runs detached under its --timeout, not in a hosted pane", () => {
-	const id = spawnJob(p, "say hi\nfinish flagless handoff", ["--timeout", "5m", "--label", "F001 flagless"], { env });
+test("in Herdr a spawn with no mode flag runs detached under its --timeout; queued, it tells its pane once that it started", async () => {
+	const reading = join(p.parent, "start-reading.json");
+	await writeFile(reading, '{"cpuIdle":90,"memoryFree":10}');
+	const run = limen(p, ["spawn", "--timeout", "5m", "--label", "flagless", "say hi\nfinish flagless handoff"], { env });
+	assert.match(run.stdout, /\nqueued flagless: CPU 90% idle \(gate 25%\), memory 10% free \(gate 20%\), 0 ahead\n/);
+	const id = run.stdout.trim().split("\n").at(-1) ?? "";
+	await writeFile(reading, "{}");
 	assert.equal(waitJob(p, id, { env }), "done");
 	assert.equal(jobFile(p, id, "herdr/mode"), "watch", "a log-tail tab, not a hosted pane");
+	const receipts = ["herdr-start", "herdr-prompt"].map((name) => () => jobFile(p, id, `notify/${name}`));
+	await until(jobDir(p, id), () => receipts.every((receipt) => receipt().startsWith("attempt 1: delivered to")));
+	const sent = named("agent", "prompt").filter((args) => args[3]?.includes(id));
+	assert.equal(sent.map((args) => args[3]?.includes(") started after ")).join(), "true,false", "each sent once");
 });
 
 test("a rule set, change, end and end time ping each live coordinator pane once (F951); a dead timer's rule still ends", async () => {

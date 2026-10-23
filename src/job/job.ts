@@ -26,7 +26,7 @@ export const isTerminal = (state: string): state is TerminalState =>
 	(TERMINAL_STATES as readonly string[]).includes(state);
 /** A session ID that is safe as one path segment, for example under `notify/delivered/`. */
 export const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-export type Pulse = "starting" | "think" | "tool" | "wait" | "dead";
+export type Pulse = "starting" | "queued" | "think" | "tool" | "wait" | "dead";
 export type JobView = {
 	readonly elapsedMs: number;
 	readonly silentMs: number;
@@ -34,6 +34,8 @@ export type JobView = {
 	readonly producedNothing?: boolean;
 	readonly lastTool?: string;
 	readonly pulse?: Pulse;
+	/** For a job in the start queue: its wait and the reason. */
+	readonly queue?: string;
 	readonly processAlive?: boolean;
 	readonly diffstat: string;
 	readonly logTail: string;
@@ -74,6 +76,7 @@ export function parseJob(input: JobInput): Job {
 export function derivePulse(input: {
 	readonly pid?: number;
 	readonly alive: boolean;
+	readonly queued?: boolean;
 	readonly activity?: string;
 }): Pulse {
 	if (input.pid === undefined) {
@@ -81,6 +84,9 @@ export function derivePulse(input: {
 	}
 	if (!input.alive) {
 		return "dead";
+	}
+	if (input.queued) {
+		return "queued";
 	}
 	if (input.activity === "tool" || input.activity === "wait") {
 		return input.activity;
@@ -208,6 +214,9 @@ export function renderJob(job: Job, view: JobView): string {
 	];
 	if (view.pulse) {
 		facts.push(view.pulse);
+	}
+	if (view.queue) {
+		facts.push(view.queue);
 	}
 	if (view.toolCalls !== undefined) {
 		facts.push(`tools ${view.toolCalls}`);

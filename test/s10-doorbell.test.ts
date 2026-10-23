@@ -158,11 +158,7 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	assert.deepEqual((await readdir(join(p.root, ".limen/github/claims"))).sort(), ["104.json", "issue-5.json"]);
 	const asked = new Set(requests(p).flatMap((request) => /\/collaborators\/(\w+)\//.exec(request.url)?.[1] ?? []));
 	assert.deepEqual([...asked].sort(), ["alice", "eve", "mallory", "trent"], "each author reached the permission check");
-	assert.deepEqual(
-		await prompts(),
-		["coord:p1", "coord:p1"],
-		"one coordinator prompt for the PR comment, one for the issue",
-	);
+	assert.deepEqual(await prompts(), ["coord:p1", "coord:p1"], "one prompt for the PR comment, one for the issue");
 	assert.deepEqual(posts(), [], "a prompt accepted is not yet a reply");
 
 	// The coordinator starts a hosted task for the PR request; the fake agent answers one status check and leaves.

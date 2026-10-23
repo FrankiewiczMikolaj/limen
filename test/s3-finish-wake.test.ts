@@ -170,3 +170,33 @@ test("limen watch and unwatch move a job's wake to another session", async () =>
 	assert.equal(wakes(other, moved).length, 1);
 	assert.equal(wakes(coord, moved).length, 0);
 });
+
+test("a held gate queues jobs by priority; a queued job tells its session once that it started, then its finish wakes it once", async () => {
+	const reading = join(p.parent, "start-reading.json");
+	writeFileSync(reading, '{"cpuIdle":10,"memoryFree":80}');
+	// A dead wrapper and a stopped job at the head hold nothing; a 2s timeout counts from engine start, not the queue.
+	const [dead = "", stopped = ""] = ["q dead", "q stopped"].map((label) => job("say no", label, ["--priority", "1"]));
+	const timed = job("say timed", "q timed", ["--timeout", "2s"]);
+	const run = limen(p, ["spawn", ...ROUTE, "--label", "late", "block"], { env: { PI_SESSION_ID: "coord" } });
+	assert.match(run.stdout, /\nqueued late: CPU 10% idle \(gate 25%\), memory 80% free \(gate 20%\), 3 ahead\n\S+\n$/);
+	const later = run.stdout.trim().split("\n").at(-1) ?? "";
+	const urgent = job("block", "q urgent", ["--priority", "1"]);
+	process.kill(Number(jobFile(p, dead, "pid")), "SIGKILL");
+	assert.equal(limen(p, ["stop", stopped, "not needed"]).stdout, `stopped ${stopped}: not needed\n`);
+	await until(jobDir(p, timed), () => Date.now() - Date.parse(jobFile(p, timed, "started-at")) > 2_500);
+	const shown = limen(p, ["jobs", later], { env: { LIMEN_REAP_CONFIRM_MS: "1" } }).stdout;
+	assert.match(shown, / · queued · waiting \d+s: CPU 10% idle \(gate 25%\), memory 80% free \(gate 20%\), 2 ahead · /);
+	assert.ok(!engineEvents(coord).some((event) => event.text?.startsWith("limen: late started")), "no toast yet");
+	writeFileSync(reading, '{"cpuIdle":90,"memoryFree":80}');
+	const noticed = (id: string) => existsSync(join(jobDir(p, id), "notify/delivered/_start.coord"));
+	await until(jobDir(p, later), () => noticed(later) && noticed(urgent));
+	await Promise.all([later, urgent].map((id) => release(jobDir(p, id))));
+	assert.equal([later, urgent, timed, stopped].map((id) => waitJob(p, id)).join(), "done,done,done,stopped");
+	const started = (id: string) => /\[limen (\S+)\] start queue: started/.exec(jobFile(p, id, "log"))?.[1] ?? "";
+	assert.ok(started(urgent) < started(timed) && started(timed) < started(later), "priority, then queue time");
+	assert.equal(jobFile(p, stopped, "log").match(/\] stopped:/g)?.length, 1, "a queued stop finalizes once");
+	await delivered([later, urgent]);
+	// The start notice is its own receipt: it comes first, and the finish still wakes the session once.
+	const heard = [later, urgent].map((id) => wakes(coord, id).map((wake) => wake.text?.includes(") started after ")));
+	assert.deepEqual(heard.flat(), [true, false, true, false]);
+});

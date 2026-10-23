@@ -117,6 +117,8 @@ export default function limenWake(pi: PiApi): void {
 		| undefined;
 	const firstDead = new Map<string, number>();
 	const settled = new Set<string>();
+	// Jobs that had left the start queue before this session began; their start is old news here.
+	const startedEarlier = new Set<string>();
 	let ownsJobs: boolean | undefined;
 	let cacheExpiresAt = 0;
 	let sweeping = false;
@@ -575,6 +577,30 @@ export default function limenWake(pi: PiApi): void {
 		}
 		return routed;
 	};
+	// A job that waited in the start queue tells its own session once that it started; the slot is its own receipt family.
+	const sendStart = (jobs: string, id: string): boolean => {
+		const job = join(jobs, id);
+		const slot = `_start.${sessionId}`;
+		const message = text(join(job, "start-notice"));
+		if (!session || !message || startedEarlier.has(id) || deliveryExists(job, slot)) {
+			return false;
+		}
+		const label = text(join(job, "label")) || id;
+		const blocked = () => {
+			try {
+				session?.ui.notify(`limen: ${label} start notice was unconfirmed twice; delivery stopped (${id})`, "info");
+			} catch {
+				dropFooter("ui.notify failed");
+			}
+		};
+		const eligible = () => {
+			if (recoverClaims(job, (claim) => pendingDeliveries.has(claim))) {
+				blocked();
+			}
+			return stateOf(jobs, id) === "running" && subscribed(job, sessionId) && !existsSync(join(job, "queued"));
+		};
+		return claimDelivery(job, slot, eligible, () => injectWake(message), deliveryCallbacks(message, blocked));
+	};
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: split pending: job observer in the wake hook
 	const observe = (jobs: string, id: string) => {
 		if (existsSync(join(jobs, id, "group"))) {
@@ -591,7 +617,9 @@ export default function limenWake(pi: PiApi): void {
 		const own = subscribed(job, sessionId);
 		const label = text(join(job, "label")) || id;
 		const branch = text(join(job, "branch"));
-		if (own && state === "running" && !muted && claimMarker(job, "started", sessionId)) {
+		// A job in the start queue has not started: the toast waits for its handshake and for it to leave the queue.
+		const waiting = !text(join(job, "pid")) || existsSync(join(job, "queued"));
+		if (own && state === "running" && !muted && !waiting && claimMarker(job, "started", sessionId)) {
 			try {
 				session.ui.notify(`limen: ${label} started (${id})`, "info");
 			} catch {
@@ -602,6 +630,9 @@ export default function limenWake(pi: PiApi): void {
 			return;
 		}
 		if (state === "running") {
+			if (own && !waiting && existsSync(join(job, "start-notice"))) {
+				sendStart(jobs, id);
+			}
 			const stamp = text(join(job, "advisory")) ? "advisory" : "ownership-uncertainty";
 			if (!existsSync(join(job, stamp))) {
 				return;
@@ -758,6 +789,7 @@ export default function limenWake(pi: PiApi): void {
 		activeDeliveries.clear();
 		firstDead.clear();
 		settled.clear();
+		startedEarlier.clear();
 		ownsJobs = undefined;
 		cacheExpiresAt = 0;
 		herdr = herdrTarget();
@@ -774,8 +806,9 @@ export default function limenWake(pi: PiApi): void {
 			if (tab && text(join(job, "origin-tab")) === tab && !text(join(job, "origin-pane"))) {
 				subscribeSession(job, id);
 			}
-			if (subscribed(job, id)) {
+			if (subscribed(job, id) && text(join(job, "pid")) && !existsSync(join(job, "queued"))) {
 				claimMarker(job, "started", id);
+				startedEarlier.add(jobId);
 			}
 		}
 		watcher = watch(jobs, { recursive: true }, (_event, filename) => {
@@ -1058,6 +1091,7 @@ async function pulseOf(jobs: string, id: string): Promise<Pulse> {
 	const activity = text(join(jobs, id, "activity"));
 	return derivePulse({
 		alive: await ownerAlive(join(jobs, id)),
+		queued: existsSync(join(jobs, id, "queued")),
 		...(recorded !== undefined ? { pid: recorded } : {}),
 		...(activity ? { activity } : {}),
 	});

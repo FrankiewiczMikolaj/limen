@@ -108,14 +108,8 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 		.map((line) => JSON.parse(line));
 	const answers = (target: number) =>
 		receipts.filter((r) => r.target === target && r.transport !== "pending").map((r) => `${r.http} ${r.body ?? ""}`);
-	assert.deepEqual(
-		[answers(1), answers(2), answers(3)],
-		[
-			["200 "],
-			['503 {"error":"busy"}', '503 {"error":"busy"}', "200 "],
-			['401 {"error":"no automation for [auth] at [url]"}'],
-		],
-	);
+	assert.deepEqual([answers(1), answers(2)], [["200 "], ['503 {"error":"busy"}', '503 {"error":"busy"}', "200 "]]);
+	assert.deepEqual(answers(3), ['401 {"error":"no automation for [auth] at [url]"}']);
 	assert.match(limen(p, ["status"]).stdout, /^Finish webhook rejects: invalid key \(target 3 HTTP 401 for job.failed/m);
 	// A resend of the settled ping is what the next limen command, sweep or wake hook would run; it sends nothing.
 	run(["webhook", "deliver", jobDir(p, id)]);

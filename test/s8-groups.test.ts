@@ -147,11 +147,7 @@ test("launches queued behind a slow sibling wait past the old 10-second lock dea
 	roster.worker1 = first.id;
 	roster.worker2 = raced.find((result) => result.status === 0)?.id ?? "";
 	assert.equal(first.status, 0, first.output);
-	assert.deepEqual(
-		raced.map((result) => result.status).sort(),
-		[0, 1],
-		raced.map((result) => result.output).join("\n"),
-	);
+	assert.deepEqual(raced.map((r) => r.status).sort(), [0, 1], raced.map((r) => r.output).join("\n"));
 	// No half-claimed slot: the roster and the job records are the same four jobs.
 	assert.deepEqual(roles(), ["team-1 coordinator", "team-2 coordinator", "team-1 worker", "team-2 worker"]);
 	assert.deepEqual(new Set(readdirSync(join(p.root, ".limen/jobs"))), new Set(members().map((member) => member.id)));

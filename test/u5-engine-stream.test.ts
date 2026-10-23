@@ -25,13 +25,7 @@ const end = (message: object) => JSON.stringify({ type: "message_end", message }
 
 test("a line split across chunks yields one event when its end arrives, and flush emits a trailing partial line", () => {
 	const parser = createStreamParser();
-	const line = end({
-		role: "assistant",
-		content: [
-			{ type: "text", text: "do" },
-			{ type: "text", text: "ne" },
-		],
-	});
+	const line = end({ role: "assistant", content: ["do", "ne"].map((text) => ({ type: "text", text })) });
 	assert.deepEqual(parser.push(`{"type":"agent_start"}\r\n${line.slice(0, 20)}`), [
 		{ kind: "activity", name: "think" },
 	]);

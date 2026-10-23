@@ -5,6 +5,8 @@ export type JobRecord = {
 	readonly invalid?: string;
 	readonly job?: Job;
 	readonly pulse?: Pulse;
+	/** For a job in the start queue: its wait and the reason. */
+	readonly queue?: string;
 	readonly toolCalls?: number;
 	readonly producedNothing?: boolean;
 	readonly lastTool?: string;
@@ -194,6 +196,9 @@ function runningFacts(record: JobRecord, paint: Paint): string[] {
 		facts.push(paint("red", "dead"));
 	} else if (pulse === "starting") {
 		facts.push(paint("dim", "starting"));
+	} else if (pulse === "queued") {
+		// A queued job has no engine yet, so its silence is no warning.
+		return [...facts, paint("dim", `queued · ${record.queue ?? "waiting"}`)];
 	} else {
 		facts.push(pulse === "tool" && record.lastTool ? clip(record.lastTool, 24) : pulse);
 	}

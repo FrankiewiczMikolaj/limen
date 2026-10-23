@@ -297,12 +297,16 @@ export function sessionOwnsJobs(jobs: string, session: string): boolean {
 function isAdvisorySlot(slot: string): boolean {
 	return slot.startsWith("_advisory.");
 }
-export function receiptFamily(slot: string): "_advisory" | "_uncertainty" | "_completion" {
+export function receiptFamily(slot: string): "_advisory" | "_uncertainty" | "_start" | "_completion" {
 	if (isAdvisorySlot(slot)) {
 		return "_advisory";
 	}
 	if (slot.startsWith("_uncertainty.")) {
 		return "_uncertainty";
+	}
+	// A start notice from the start queue is news, never the completion delivery.
+	if (slot.startsWith("_start.")) {
+		return "_start";
 	}
 	return "_completion";
 }

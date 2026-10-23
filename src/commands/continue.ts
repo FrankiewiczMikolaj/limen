@@ -41,6 +41,7 @@ import {
 	preflightEngine,
 	resolveSpawnEngine,
 } from "../runtime/engine.ts";
+import { jobPriority, parsePriority, queuedLine } from "../runtime/start-queue.ts";
 import { normalizeWorkerExtensions, readWorkerExtensions } from "../runtime/worker-extensions.ts";
 import { launchWrapper } from "../runtime/wrapper.ts";
 import { parseFlags } from "./flags.ts";
@@ -71,6 +72,7 @@ type ContinueOptions = {
 	readonly thinking: string | undefined;
 	readonly engine: string | undefined;
 	readonly timeoutMs: number | undefined;
+	readonly priority: number | undefined;
 	readonly selected: readonly string[];
 	readonly query: string;
 	readonly instruction: string;
@@ -89,12 +91,13 @@ function parseContinueArgs(args: readonly string[]): ContinueOptions {
 			thinking: { type: "string" },
 			engine: { type: "string" },
 			timeout: { type: "string" },
+			priority: { type: "string" },
 			extension: { type: "string", multiple: true },
 		} as const,
 		{
 			unknown: (word) => `unknown continue option ${word}`,
 			missing: (flag) => `${flag} requires a value`,
-			dashValues: ["label", "model", "provider", "thinking", "engine", "timeout"],
+			dashValues: ["label", "model", "provider", "thinking", "engine", "timeout", "priority"],
 			endOfFlags: false,
 		},
 	);
@@ -123,6 +126,7 @@ function parseContinueArgs(args: readonly string[]): ContinueOptions {
 		thinking,
 		engine,
 		timeoutMs: values.timeout === undefined ? undefined : parseDuration(values.timeout),
+		priority: parsePriority(values.priority),
 		selected: values.extension ?? [],
 		query,
 		instruction,
@@ -149,6 +153,7 @@ type ContinuationRecord = {
 	readonly engine: EngineId;
 	readonly model: string | undefined;
 	readonly extensions: readonly string[];
+	readonly priority: number;
 	readonly source: PlanningSource;
 	readonly hosted: boolean;
 	readonly membership: GroupIdentity | undefined;
@@ -236,6 +241,8 @@ async function continueJob(args: readonly string[], cwd: string, locked = false,
 		engine: profile.id,
 		model: chosenModel,
 		extensions,
+		// A continuation keeps its parent's place in the start-queue order unless it names its own.
+		priority: options.priority ?? (await jobPriority(parentDir)),
 		source,
 		hosted,
 		membership,
@@ -446,6 +453,7 @@ async function publishContinuation(record: ContinuationRecord): Promise<void> {
 		base: existsSync(parent.worktree) ? headCommit(parent.worktree) : branchCommit(repository, parent.branch),
 		role: record.role,
 		engine: record.engine,
+		priority: record.priority,
 		extensions: record.extensions,
 		...(record.model ? { model: record.model } : {}),
 		planningSource: record.source,
@@ -545,6 +553,7 @@ async function startDetachedContinuation(continuation: Continuation): Promise<vo
 		throw error;
 	}
 	await waitForHandshake(jobDir, wrapperPid);
+	const queued = await queuedLine(jobDir, label);
 	const state = await text(`${jobDir}/state`);
 	if (state !== "running") {
 		console.log(state, label);
@@ -552,6 +561,9 @@ async function startDetachedContinuation(continuation: Continuation): Promise<vo
 		return;
 	}
 	await versions.catch(() => {});
+	if (queued) {
+		console.log(queued);
+	}
 	console.log(
 		review
 			? `continued ${label} as reviewer in ${parentId}'s session — shares prior context; this review is not independent`

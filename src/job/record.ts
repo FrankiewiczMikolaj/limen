@@ -51,6 +51,7 @@ export async function finalizeJob(
 	).catch(() => {});
 	await atomicWrite(`${jobDir}/state`, `${state}\n`);
 	await rm(`${jobDir}/ownership-uncertainty`, { force: true });
+	await rm(`${jobDir}/queued`, { force: true });
 	const group = await textFile(`${jobDir}/group`);
 	if (group) {
 		const membership = await jobMembership(jobDir);
