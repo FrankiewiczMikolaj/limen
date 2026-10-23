@@ -1,0 +1,92 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmod, cp, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+import { pathToFileURL } from 'node:url';
+
+const evidence = '/tmp/f951-s3-rereview.R4inAg';
+const { plant, limen, jobDir, jobFile, waitJob, LIMEN } = await import(pathToFileURL(join(process.cwd(), 'test/plant.ts')));
+const p = await plant();
+const fakeHerdr = join(p.bin, 'herdr');
+await writeFile(fakeHerdr, `#!${process.execPath}\nimport { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(join(evidence, 'admission-herdr.jsonl'))}, JSON.stringify(process.argv.slice(2)) + '\\n');\nconsole.log('{}');\n`);
+await chmod(fakeHerdr, 0o755);
+const seat = { ...p, env: { ...p.env, LIMEN_HERDR: fakeHerdr } };
+const paused = join(p.parent, 'admission-paused');
+const release = join(p.parent, 'admission-release');
+const hook = join(p.parent, 'delay-admission-read.mjs');
+// Delay only the queue's head-validation read after the new holdingNow check, not its load read.
+// The queue lock owner proves this is liveEntries inside the final admission operation.
+await writeFile(hook, `import fsp from 'node:fs/promises';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
+const original = fsp.readFile;
+let delayed = false;
+fsp.readFile = async function(path, ...args) {
+  if (!delayed && String(path).includes('/.limen/start-queue/entries/') && String(path).endsWith('.json')) {
+    const owner = ${JSON.stringify(join(p.parent, '.limen/start-queue/.lock/owner'))};
+    if (existsSync(owner) && Number(readFileSync(owner, 'utf8')) === process.pid) {
+      delayed = true;
+      writeFileSync(${JSON.stringify(paused)}, JSON.stringify({ at: new Date().toISOString(), pid: process.pid, path: String(path) }));
+      while (!existsSync(${JSON.stringify(release)})) await delay(10);
+    }
+  }
+  return original.call(this, path, ...args);
+};
+syncBuiltinESMExports();
+`);
+await cp(hook, join(evidence, 'delay-admission-read.mjs'));
+const until = async (check, label) => {
+  const end = Date.now() + 15000;
+  while (!check()) {
+    assert.ok(Date.now() < end, `deadline: ${label}`);
+    await delay(20);
+  }
+};
+const cli = (args) => {
+  const run = limen(seat, args);
+  console.log(JSON.stringify({ at: new Date().toISOString(), args, ...run }));
+  assert.equal(run.status, 0, run.stderr);
+  return run.stdout;
+};
+let runner;
+try {
+  console.log(JSON.stringify({ LIMEN_HOME: p.parent, fakeHerdr, head: '0a51476fcd20dfd4522d75896d7964b3a7ceb9b2' }));
+  writeFileSync(join(p.parent, 'start-reading.json'), '{"cpuIdle":90,"memoryFree":80}');
+  let stdout = '';
+  let stderr = '';
+  runner = spawn(process.execPath, [LIMEN, 'spawn', '--engine', 'pi', '--provider', 'p', '--model', 'm', '--thinking', 'high', '--detached', '--priority', '2', '--label', 'p2-at-admission', 'block'], {
+    cwd: p.root,
+    env: { ...seat.env, NODE_OPTIONS: `${p.env.NODE_OPTIONS} --import=${hook}` },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  runner.stdout.on('data', (data) => { stdout += data; });
+  runner.stderr.on('data', (data) => { stderr += data; });
+  const ended = new Promise((resolve) => runner.once('close', resolve));
+  await until(() => existsSync(paused), 'head reaches final admission read under its queue lock');
+  console.log(`Admission paused: ${readFileSync(paused, 'utf8')}`);
+  await cp(paused, join(evidence, 'admission-paused.json'));
+  cli(['rule', 'set', 'admission-budget', '--until', '1h', '--start-priority', '1', 'Budget set during final admission']);
+  console.log(`Rule set returned before admission resumed at ${new Date().toISOString()}`);
+  writeFileSync(release, 'go');
+  assert.equal(await ended, 0, stderr);
+  console.log(JSON.stringify({ stdout, stderr }));
+  const id = stdout.trim().split('\n').at(-1);
+  await until(() => existsSync(join(jobDir(p, id), 'fake-blocked-1')), 'priority 2 engine starts under active priority 1 rule');
+  assert.match(cli(['rule']), /admission-budget.*start priority 1/);
+  assert.equal(jobFile(p, id, 'priority'), '2');
+  assert.equal(jobFile(p, id, 'queued'), '');
+  assert.equal(jobFile(p, id, 'state'), 'running');
+  await cp(jobDir(p, id), join(evidence, 'admission-confirmed-job'), { recursive: true, filter: (path) => !lstatSync(path).isFIFO() });
+  await cp(join(p.parent, '.limen/rules/admission-budget'), join(evidence, 'admission-confirmed-rule'), { recursive: true });
+  console.log('REPRODUCED: priority 2 engine started while admission-budget --start-priority 1 holds');
+  console.log(jobFile(p, id, 'log'));
+  await writeFile(join(jobDir(p, id), 'fake-gate'), 'go\n');
+  assert.equal(waitJob(seat, id), 'done');
+  cli(['rule', 'end', 'admission-budget', 'review cleanup']);
+} finally {
+  runner?.kill();
+  await p.cleanup();
+}
