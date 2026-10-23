@@ -1,0 +1,22 @@
+[
+	{
+		"width": 1280,
+		"scrollWidth": 1280,
+		"foregrounds": ["oklch(0 0 none)"],
+		"background": "oklch(1 0 none)",
+		"colorScheme": "light",
+		"preCount": 10,
+		"exactContent": true,
+		"height": 3072
+	},
+	{
+		"width": 390,
+		"scrollWidth": 390,
+		"foregrounds": ["oklch(0 0 none)"],
+		"background": "oklch(1 0 none)",
+		"colorScheme": "light",
+		"preCount": 10,
+		"exactContent": true,
+		"height": 5500
+	}
+]

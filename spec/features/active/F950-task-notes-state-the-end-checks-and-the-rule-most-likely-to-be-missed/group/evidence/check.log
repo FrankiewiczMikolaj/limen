@@ -1,0 +1,182 @@
+npm warn Unknown user config "min-release-age". This will stop working in the next major version of npm.
+
+> @overment/limen@0.1.0 check
+> tsc --noEmit && biome check --error-on-warnings . && node --test --test-concurrency=4 --test-timeout=180000 --test-force-exit test/*.test.ts
+
+Checked 150 files in 355ms. No fixes applied.
+(node:39307) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ detached Pi teams keep common and private selections through workers, reviews and continuation (83408.371542ms)
+✔ hosted Pi teams keep common and private selections through workers, reviews and continuation (88760.930167ms)
+✔ invalid group selections never activate or consume jobs, including later teams and OMP (13718.51475ms)
+✔ a repeated start keeps the original selections, even after a path disappears (16167.28775ms)
+(node:39308) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ each spawn refusal exits 1, names its cause and leaves no job, worktree or branch (15155.2345ms)
+✔ a detached job runs in its own worktree from the base with the exact task and a clean engine environment (12044.492375ms)
+✔ a workspace job works in one child repository (10266.1345ms)
+(node:39309) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ S10: only an authorized request rings the doorbell, the App replies once each way and never approves (30581.849667ms)
+(node:39310) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a devin job pushes its branch, follows its session and fast-forwards the worktree to the session's commit (8243.906833ms)
+✔ a rewritten branch or a sleeping session fails the job; stop and timeout end the session; no file holds the key (20505.638125ms)
+(node:43757) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a hosted job's task never travels as argv, and it finishes done with its handoff when the session ends (15798.801584ms)
+✔ a live OMP job stays running while Herdr reports done, then after Herdr loses its agent row (88fd5ac) (13503.487791ms)
+✔ two competing sweeps start exactly one replacement for a killed hosted supervisor (5754dad) (6888.492375ms)
+✔ hosted Pi stop records stopped once and closes the job's tab (18786.01825ms)
+✔ in Herdr a spawn with no mode flag runs detached under its --timeout, not in a hosted pane (5794.8625ms)
+(node:44303) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (22325.981333ms)
+✖ stop, timeout, the tool cap and a stalled tool each end a job once and wake its session once; 80% of a timeout steers once; the plant's limits file yields to an env var (32732.182875ms)
+✔ wakes of jobs that end while muted arrive after /limen on, in one turn, each exactly once (F042) (10360.329541ms)
+✔ limen watch and unwatch move a job's wake to another session (13513.034042ms)
+(node:44816) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a second init removes old hook copies, so a coordinator gets each guidance source once (14750.277375ms)
+✔ a running worker gets each steer once and in order; an ended one refuses a late steer and writes nothing (8171.683292ms)
+✔ a worker prompt carries register and styleguide once, vision and board pointers, and no board body (1.098375ms)
+✔ continue resumes the parent's session, linked, with its extensions or a replacement (10056.9975ms)
+(node:48488) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a running, an empty and a failed job are refused (33583.436875ms)
+✔ another target, a group member, a staged target and a dirty file in the merge are refused (14140.578417ms)
+✔ a ticket that fails the strict check is refused with the keeper command (11756.996917ms)
+✔ a branch that adds test lines past the cap is refused and names the numbers (3858.990792ms)
+✔ a done job fast-forwards without --yes off a TTY, a landed branch is deleted, and a merge lands beside an uncommitted file and closes its ticket (16199.9945ms)
+✔ a land that conflicts beside an uncommitted file aborts and leaves the checkout as it was (4002.667917ms)
+(node:50783) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ ticket new takes the next number past folders, limen branches and job labels (1147.074125ms)
+✔ ticket new refuses an unknown place id before any file exists (1167.428667ms)
+✔ picture build --dir takes a plant root from any folder and stops on a folder with no map (1949.09375ms)
+✔ keeper refuses a running job, then starts on a new branch at the candidate tip (13061.085083ms)
+✔ ticket-author resolves aliased paths and invents no author for others (7091.667041ms)
+(node:53199) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a done job pings only the target its ticket author maps to (9036.568291ms)
+✔ a continuation from a subdirectory keeps the parent's config and author route (6542.006875ms)
+✔ a failed job's ping reaches each target until it answers for good, and never twice after it accepted (15896.01575ms)
+✔ a ping whose deliverer was killed mid-send goes out with the next limen command (11069.246875ms)
+✔ no secret or target URL leaves the request header, and nothing names the quiet job (1572.158917ms)
+✔ each coordinator turn end pings once with its last message and ticket, also after a normal exit (2318.472375ms)
+(node:55043) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a stale lead registration starts nothing; two concurrent activations by the lead start one roster in one cabinet (19782.254958ms)
+✔ launches queued behind a slow sibling wait past the old 10-second lock deadline, and one slot makes one member (22918.688ms)
+✔ a member's finish completes while another process holds the cabinet; its lifecycle event follows once the lock frees (4300.459833ms)
+✔ each recipient reads a finding once, the lead hears it as a followUp, and a synthesis write sends a lead-step ping (6810.175208ms)
+✔ a second group runs two routes through draft, critique and final, and the lead hears its result once (23696.895584ms)
+✔ close refuses a member with uncommitted work until it is clean; each lead step pings once (4319.390666ms)
+(node:59350) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ spawn returns before --prepare; prune keeps live, nested and starting work, drops and explains the rest (40435.192791ms)
+✔ a killed wrapper is reaped at once and a stopped job leaves no escaped child; each wakes the coordinator once (15078.044042ms)
+✔ seat registrations survive a dead-owner registry lock under contention (11565.918959ms)
+(node:60573) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ runtime remains dependency-free and TypeScript basenames stay unambiguous (806.079875ms)
+✔ shipped template history starts at the current template (9.56725ms)
+✔ test/ stays within the line cap that spec/vision.md sets (58.945167ms)
+(node:60696) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ each ticket fault is reported at its own file and line with a fix, and the valid fields still load (197.763417ms)
+(node:60790) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ worktreeState reads a tree with stale stat data without rewriting its index (1662.482875ms)
+✔ an idle group member closes after its turn in a tree that is no checkout (F1083); a lone job stays open (21.722416ms)
+(node:61229) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a running record reads by its owner and its last event, never as working when either is stale (3.266792ms)
+✔ a job turns quiet after 5 minutes without an event, or 15 while it runs a test or check (0.143333ms)
+✔ a finished job shows its end for an hour, then leaves the page (0.096833ms)
+✔ the reader reads detached and hosted job folders the same way (240.978833ms)
+✔ a coordinator's workers and a group's teams nest as one tree with their states counted (256.205458ms)
+(node:61376) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ only a done job that is not a scout is sent to landing (6.118292ms)
+(node:61411) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ guidance reminders name the unread lines for the edited area, once until read or compaction (8.868292ms)
+(node:61439) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (1018.901208ms)
+(node:61522) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the sender sends nothing for a bad credential, destination, target list or author map, and prints no secret (10083.452416ms)
+✔ the private receipt channel drops malformed and secret-bearing sender lines (0.423375ms)
+(node:63031) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ an ended turn signals what its todos, goal, stop and owned jobs call for, naming the blocker or next todo (30.705875ms)
+(node:63144) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a second listener never takes a live claim, even one aged past 30 seconds while its owner's heartbeat is fresh (11.425417ms)
+✔ a dead owner's claim is recovered: an unaccepted one is released, an accepted one spends one attempt and is delivered again (7.525083ms)
+✔ after two unsuccessful attempts the claim stays blocked for a human and no listener retries it (113.337959ms)
+(node:63190) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a pi-claude route loads Pi's installed bridge package; OMP gets it as one pi-claude/<model> id (31.774167ms)
+✔ a line split across chunks yields one event when its end arrives, and flush emits a trailing partial line (0.921083ms)
+✔ only an assistant's error or aborted stop reason reaches the result; other lines never pose as a reply (0.347292ms)
+(node:63207) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ malformed lines are reported at their own line and never overwrite the first good value (5.078958ms)
+✔ quoted lists keep their commas and quotes; prototype keys are ordinary data (0.462042ms)
+✔ Markdown never emits raw HTML or executable links but keeps safe links and formatting (2.485833ms)
+(node:63229) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a job resolves by full id, id suffix, exact label or label prefix, and only when one job matches (0.792166ms)
+✔ a job id hoists the feature number, keeps a bounded slug, and ends in a random suffix (1.739125ms)
+✔ a timeout needs a unit, is positive, and fits Node's maximum timer (0.293416ms)
+(node:63303) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a recycled pid with another birth is never signaled and is named for cleanup; the recorded birth is signaled (2812.1905ms)
+✔ the reaper keeps a live owner and finalizes a dead owner and a stranger at its pid (1691.268ms)
+ℹ tests 80
+ℹ suites 0
+ℹ pass 78
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 225180.211417
+
+✖ failing tests:
+
+test at test/s3-finish-wake.test.ts:112:1
+✖ stop, timeout, the tool cap and a stalled tool each end a job once and wake its session once; 80% of a timeout steers once; the plant's limits file yields to an env var (32732.182875ms)
+  AssertionError [ERR_ASSERTION]: stall woke its session once
+  
+  1 !== 0
+  
+      at wokeOnce (file:///Users/overment/.overment/limen/test/s3-finish-wake.test.ts:66:10)
+      at TestContext.<anonymous> (file:///Users/overment/.overment/limen/test/s3-finish-wake.test.ts:133:2)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual'
+  }
+
+test at test/structure.test.ts:24:1
+✖ runtime remains dependency-free and TypeScript basenames stay unambiguous (806.079875ms)
+  AssertionError [ERR_ASSERTION]: TypeScript basenames must be unique
+  
+  131 !== 228
+  
+      at TestContext.<anonymous> (file:///Users/overment/.overment/limen/test/structure.test.ts:30:9)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:332:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 131,
+    expected: 228,
+    operator: 'strictEqual'
+  }

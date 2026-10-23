@@ -1,0 +1,3 @@
+warn source.missing nodes/limen.picture.build.md:9: source "test/picture-overlay.test.ts" does not exist in the project root
+warn ticket.duplicate-id spec/features/active/F778-job-done-notifications/ticket.md:1: F778 is also used by spec/features/active/F778-coordinator-and-lead-finish-signal/ticket.md, so this ticket is left out; fix: give this folder and its heading an unused F number (limen ticket new picks one)
+picture: 23 places, 41 edges; wrote /Users/overment/.overment/limen/.limen/picture/map.html

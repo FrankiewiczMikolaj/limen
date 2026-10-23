@@ -1,0 +1,32 @@
+(node:67912) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ stop, timeout, the tool cap and a stalled tool each end a job once and wake its session once; 80% of a timeout steers once; the plant's limits file yields to an env var (18620.515041ms)
+(node:67914) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ runtime remains dependency-free and TypeScript basenames stay unambiguous (561.597375ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19007.368583
+
+✖ failing tests:
+
+test at test/structure.test.ts:24:1
+✖ runtime remains dependency-free and TypeScript basenames stay unambiguous (561.597375ms)
+  AssertionError [ERR_ASSERTION]: TypeScript basenames must be unique
+  
+  131 !== 228
+  
+      at TestContext.<anonymous> (file:///Users/overment/.overment/limen/test/structure.test.ts:30:9)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:332:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 131,
+    expected: 228,
+    operator: 'strictEqual'
+  }

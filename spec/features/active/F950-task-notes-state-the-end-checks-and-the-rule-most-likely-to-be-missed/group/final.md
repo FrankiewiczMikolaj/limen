@@ -1,144 +1,82 @@
-# Final task-note prompt
+# Final review proposal
 
-Effectiveness is unproven. Both studies found no clear effect. This text claims no delivery benefit. Each round result is present. None records a route failure.
+The coordinator edited the group result for Adam to review. This is not an approved or installed prompt. Effectiveness is unproven.
 
-This is a proposal. It does not change Limen code, hooks, tests, or installed prompts.
+The unedited group result is in `proposals/group-final.md` and `proposals/group-final.json`. The round results are in `findings/`.
 
-## Disagreements and decisions
+## Substitution rules
 
-1. Open state. Team-1 dropped the second list. Team-2 kept one short `Not proven yet` line. Team-3 used an unticked box. Decision: one short `Not proven yet` line, plus a `Seen:` place under the line that has evidence. Reason: a full second copy drifts and the finish check then counts each 🔴 point twice. A tick reads as done. Deleting a line does not save it on a continuation: `limen continue` copies `note.first.md` only when that file is not empty (`src/commands/continue.ts`), and `recordNote` does not replace an existing first file. `Seen:` names where the evidence is, not what a run returned. A count, a verdict, or command output does not belong there.
-
-2. Example 3 miss rule. Team-1 and the revised team-2 text use the host-code sentence. Team-3 uses "Show every place that sets it." Decision: the host-code sentence is the Miss line. The list of places is an End line. Reason: the miss is the rule that can still fail after the End lines pass. A list can exist and still include a place that is not host code. Team-3's "report a non-host setter as a finding" allows that failure if it is named.
-
-3. Evidence in the note. Team-1 kept evidence out of the note. Team-2 and team-3 store a place pointer. Decision: `Shown by:` is the plan. `Seen:` is the place, written only after the agent has seen the evidence. Reason: the note file is what the next prompt reads. A deleted line is not a record. A result in the pointer is the log the supplied notes already are.
-
-4. Missing note. Team-3 first replaced "From memory" with a task-file read. All three revised texts keep "From memory". Decision: keep that sentence, then name `{jobDir}/task.md`. Reason: `test/u14-task-note.test.ts` matches `From memory`. `publishJob` writes `task.md` for every job it publishes, so the path is real. The path is not a new function argument.
-
-5. Finish sentence. Team-2's first draft tied it to owning the finish tool. Team-1 and team-3 tied it to the call. Decision: send it only when the check answers a `finish` call. Reason: `hook/finish.ts` registers `finish` for every job, then passes `finishTool` true only from that tool. The settle turn passes false. A detached job has the tool and can still omit the sentence.
-
-6. Long acceptance lists. Team-2 writes every binding check. Team-1 and team-3 point at the task's own list. Decision: one End line points at the list and gives its size. Do not copy it. Do not mark the other items dropped. The Note check gives one line for each item. Reason: a copy is a task copy. "Dropped" misreports a real check. The size makes a missing item visible before the finish.
-
-7. Markers. Team-3 drops 🔴 on note lines because every line would be 🔴. Decision: keep 🔴 on Miss, End, and Not proven yet. Reason: the current mark sentence, which the test matches, names each 🔴 point. The part name carries the distinction. 🟡 in this note is only a `changed` line or a `Seen` line. ⚪ stays for an assumption that cannot change the end. An assumption that can change a line is not ⚪.
-
-8. Reminders. Team-2 first copied a reminder that states an end into the note. Team-3's first steer copied a changed reminder into the note while noteStart forbade the copy. Decision: do not copy reminders into Miss or End. A steer that changes a reminder adds one changed line that names it. Do not edit the reminders file. Reason: `noteCheck` already shows the reminders text. A copy takes the Miss slot and counts the reminder twice.
-
-9. Invented proof. Team-2's first example 3 named sources that are not in the excerpt. Team-3's first example 3 required a probe and a render. Team-2's revised example 1 says "the value Limen uses". Decision: `Shown by:` uses the excerpt's objects only. Do not invent a run, a file, or a mechanism.
-
-10. "Just raise". Team-1 first read it as "no other limit moved". Decision: quote the decision. Do not add a separate constraint the excerpt does not state.
-
-11. Example 8 work-order line. It is in the saved note, not in the task excerpt. Decision: the example plan does not import it. The prompt keeps a carried restriction that says what a later check must do. Reason: the rewrite is a plan from the excerpt, written before new evidence.
-
-## Placeholders
-
-- `{jobDir}` is the job folder.
-- `{note path}` is `{jobDir}/note.md`.
-- `{first path}` is `{jobDir}/note.first.md`. On a continuation it may be an earlier job's first note, and only if that file was not empty.
-- `{reminders path}` is the path `projectReminders` returns when `.agents/limen/reminders.md` exists and is not empty.
-- `{reminders text}` is that trimmed text.
-- `{now}` is the trimmed note when it exists and is not empty.
-- `{first}` is the trimmed first file when it exists and is not empty.
-- `{FORMAT}` is the FORMAT string below.
-
-A no-reminders string does not contain the word "reminder".
+- Bracketed conditions select text. They are not sent to the agent.
+- `{notePath}` is the job folder's `note.md`; `{taskPath}` is its `task.md`.
+- `{noteNow}` and `{firstNote}` are trimmed current and first-note contents. The first note can belong to an earlier continued job.
+- `{remindersPath}` and `{remindersText}` are the path and trimmed content returned by `projectReminders`.
+- `{FORMAT}` inserts the FORMAT string below.
+- Text without a condition is always sent within that named string.
+- The reminders condition requires a nonempty reminders file. The first-note condition also requires a nonempty current note.
+- The final finish sentence is sent only when `finishTool` is true. A settle check omits it.
 
 ## Prompt
 
 ```text
 FORMAT
-Format: a nested list in plain technical English. Short, clear sentences. One fact on each line.
-Put detail under its main point. Add a time only when it helps.
-Write about six lines in three parts. A binding check is not dropped to save a line.
-Each line starts with a marker: 🔴 must deliver or must keep, 🟡 a record under a point, ⚪ an assumption that cannot change the end.
-Do not copy the task. Do not write what a run returned. Keep an exact command, limit, path, or count when it defines a check.
-A forbidden check stays forbidden. If you cannot run it, add "(not run: <reason>)". This note is not permission to run it.
-Shown by: is how a person can see the check. Use a command or file only when the task names it. Do not invent a run.
-Seen: is where the evidence is, not what it showed. Do not put a count, a verdict, or command output there.
-Miss: one 🔴 line. Quote the task rule a busy agent will most likely break while the End lines can still pass. An End line with evidence does not clear it.
-End: two to four 🔴 lines. What a person can see at the end. If the task's acceptance list is longer than four, one End line points to that list and gives its size. Do not copy the list. Do not mark the other items dropped.
-Not proven yet: one 🔴 line. Name each End line and the Miss line that has no Seen line. Use the same short name as that line. Do not write "both" or "everything". Write "none" only when every End line and the Miss line has a Seen line.
-Those lines start not proven. Do not delete a line to mean proven. Unknown is not proven.
-If an assumption can change a line, it is not ⚪. A ⚪ line is not evidence.
-When a point changes, keep its line and add under it: "🟡 changed: ... Reason: ...". Do not edit the old line. Change its name in Not proven yet in the same edit. If the change makes a Seen line stale, remove that Seen line and put the name back. Example:
-- 🔴 Miss: The limit counts per key, not per caller. Shown by: two callers on one key share one count.
-- 🔴 End: A new key is refused at the stated limit. Shown by: the refusal for one new key, and the stated limit in src/cache.ts.
-  - 🟡 changed 14:05: the stated limit is 60 requests per minute, not 100. Reason: the owner steered.
-- 🔴 End: An old key keeps the limit it had before this change. Shown by: one old key past the new key's limit.
-- 🔴 Not proven yet: limit counts per key; refusal at the stated limit; old key keeps its limit.
-- ⚪ Assume the proof uses a test key, not a customer key.
+Write a plan, not a task copy or a result log. Use plain technical English. Aim for six lines in three parts:
+- Done means: two to four end checks. Each line states what must be true, then "Shown by:" and the command or observation that would prove it.
+- Easy to miss: the one task rule that the quickest way to finish could skip or break. Quote it. Add "Shown by:" and how to check that it was followed.
+- Not proven yet: short names of the end checks and the easy-to-miss rule that lack evidence. Name each one.
+Keep exact commands, limits, paths, and counts when they define acceptance. Reference a longer acceptance list by its location and item count; do not copy it or omit its checks.
+Each check starts unproven. Remove its name from Not proven yet only after you see evidence that it holds. Add "Seen: <evidence location>" to that check. Give a pointer, not results. A pointer alone is not proof. The easy-to-miss rule needs its own evidence.
+Keep each check in the note after it is proven. Write "Not proven yet: none" only when every check and the rule have evidence. Unknown stays unproven. Do not add context, steps, assumptions, or test totals.
 
 noteStart
-Sent once, on the first prompt of each job, a continued job too. The reminders block is sent only when that file exists and is not empty. The rest is always sent. This is not a new runtime test. noteStart branches only on reminders.
-
-[limen] Before other work, read your note in {note path}, or write it if there is none.
+[limen] Before other work, read {notePath}, or write it if there is none.
 {FORMAT}
-If the note already exists, read it against this task before you act. Keep each 🔴 point that still binds. A line that says what a later check must do is a restriction. Keep it as Miss or End. A line that only says what already happened is a result. Do not copy its numbers or its verdict. If that line shows a limit that still binds, write the limit as Miss or End before you leave the result line. Do not treat an earlier Seen line as your evidence until you have seen the evidence yourself. Every line you have not seen evidence for stays in Not proven yet. Removing a line does not store it in {first path}. That file may already be an earlier job's first note, and only if that file was not empty. Add End lines for this task. Do not replace the note with results.
-
-Sent only when the reminders file exists and is not empty. The reminder text stays on the next line:
-Project reminders ({reminders path}). Keep each 🔴 one as you keep your 🔴 points:
-{reminders text}
-A 🟡 line in that file keeps that file's meaning. Do not treat it as a change line. Do not copy a reminder into Miss or End.
+Read an existing note against this task. Keep restrictions that still apply. Replace past results with the end checks or limits they reveal. Reuse earlier evidence only after you inspect it and confirm that it still applies; do not rerun a check just because this is a continued job.
+[Only when project reminders exist]
+Project reminders ({remindersPath}):
+{remindersText}
+Follow each binding reminder. Do not copy them into the note.
 
 noteSteer
-Added after each steer message. One subject is sent.
-
-No reminders:
-[limen] If this steer changes a Miss line, an End line, or its name in Not proven yet, add a line under that point in {note path}: "🟡 changed: ... Reason: ...".
-Keep the old line. Do not edit it in place. Change the line and its name in Not proven yet in the same edit. If the steer makes a Seen line stale, remove that Seen line and put the name back in Not proven yet. If the steer changes no point, do not edit the note. A new restriction is a 🔴 point. Unknown stays not proven.
-
-With reminders:
-[limen] If this steer changes a Miss line, an End line, its name in Not proven yet, or a project reminder, add a line under that point in {note path}: "🟡 changed: ... Reason: ...".
-Keep the old line. Do not edit it in place. Change the line and its name in Not proven yet in the same edit. If the steer makes a Seen line stale, remove that Seen line and put the name back in Not proven yet. If the steer changes no point, do not edit the note. A new restriction is a 🔴 point. Unknown stays not proven. Do not edit the reminders file. For a changed reminder, add one line whose text is: reminder, then its first words, then the reason. Do not copy the reminder into Miss or End.
+[limen] If this steer changes an end check or the easy-to-miss rule, keep the old line and append "Changed: <new requirement>. Reason: <what changed it>" under it in {notePath}. The new requirement now applies. Put affected checks back in Not proven yet and remove stale Seen pointers. Add any new obligation as unproven. Leave an unrelated note unchanged.
+[Only when project reminders exist]
+If a reminder changes, record the changed requirement by reference in the note. Do not edit the reminders file.
 
 noteCheck
-Sent once, before the finish. Order: note now, note at the start, reminders, the mark sentence, then one closing sentence. The finish sentence is sent only when this check answers a finish call. The settle sentence is sent only when the check is the extra turn before a detached run settles. A hosted job does not get that turn.
-
-Note present:
+[When the current note exists]
 [limen] Your note now:
-{now}
-
-Note missing:
-[limen] You wrote no note in {note path}. From memory, list the 🔴 points of this job.
-Those points are the Miss line and the End lines. None of them is proven yet. The task file is {jobDir}/task.md if you need the words.
-
-First file present, not empty, and different from the note now:
+{noteNow}
+[When the current note is missing or empty]
+[limen] No note exists in {notePath}. Read {taskPath} and reconstruct the end checks and the easy-to-miss rule. Do not assume they are proven.
+[When the current note exists and a nonempty first note differs]
 Your note at the start:
-{first}
-
-Reminders present:
+{firstNote}
+[Only when project reminders exist]
 Project reminders:
-{reminders text}
-
-No reminders:
-In your final message, under the heading "Note check", mark each 🔴 point delivered, changed or dropped, and give the reason.
-
-With reminders:
-In your final message, under the heading "Note check", mark each 🔴 point and each 🔴 project reminder delivered, changed or dropped, and give the reason.
-
-Then, in every check:
-Also mark a point not proven when it is still named in Not proven yet, or when you cannot name evidence outside the note. Not proven is not changed, and it is not dropped. Unknown is not delivered. The Miss line is kept, broken, or not proven. If you cannot tell, mark it not proven. Unknown is not kept. An End line with evidence does not clear the Miss line. A delivered mark needs a Seen place you can name. A 🔴 line that was in the note at the start and is gone now, with no changed line under it, is dropped. Name it. If one End line points to the task's acceptance list, give one line for each item on that list. Do not run a check to change a mark. A check the task forbids stays not proven.
-
-This check answers a finish call:
+{remindersText}
+[Always]
+Compare the note with the task and later instructions. Under "Note check" in your final message, give one line per end check. Mark it proven, not proven, changed, or dropped. Proven needs evidence and its location. Not proven needs what is missing. Changed or dropped needs the instruction that changed its scope. Give one line per item in a referenced acceptance list. Account for any obligation missing from the current note.
+Give the easy-to-miss rule its own line: followed, broken, or not proven, with evidence or the gap. Passing the end checks does not prove that the rule was followed. Read Not proven yet; none of its entries can be marked proven without evidence.
+[Only when project reminders exist]
+Report each binding project reminder as followed, broken, or not proven, with evidence or the gap.
+[Always]
+Do not repeat a run-once check or run a forbidden check to clear the note. Report any remaining gap without claiming completion.
+[Only when this check answers a finish call]
 Then call finish again. Its handoff is that whole final message, with the "Note check".
-
-This check is the extra turn before a detached run settles:
-End your final message there.
 ```
-
-The FORMAT block is 497 words and 20 lines. The current FORMAT string is about 116 words. The cost on a live prompt was not measured.
 
 ## Examples
 
-The new notes are plans before new evidence. The old notes are the `note` fields in `/Users/overment/Downloads/limen-note-examples-data/examples.json`.
+These are plans before new evidence exists. The source excerpts contain ellipses. The old notes are unchanged.
 
-### 1
+### Example 1
 
-Task lines:
+```text
+Adam decision (2026-10-23): "Just raise the prepare and tool stall limits for cargo plants."
+Do not stop the clocks while a build waits.
+Do not change the job time limit.
+```
 
-1. Adam decision (2026-10-23): "Just raise the prepare and tool stall limits for cargo plants."
-2. Do not stop the clocks while a build waits.
-3. Do not change the job time limit.
-
-Old note:
+Before:
 
 ```text
 …
@@ -149,25 +87,25 @@ Old note:
 …
 ```
 
-New note:
+After:
 
 ```text
-- 🔴 Miss: Do not stop the clocks while a build waits. Shown by: the clocks still run while a build waits.
-- 🔴 End: The cargo plant prepare limit is raised. Shown by: the prepare limit value. The decision says "Just raise the prepare and tool stall limits for cargo plants."
-- 🔴 End: The cargo plant tool stall limit is raised. Shown by: the tool stall limit value.
-- 🔴 End: The job time limit is unchanged. Shown by: the job time limit value.
-- 🔴 Not proven yet: clocks still run; raised prepare limit; raised tool stall limit; unchanged job time limit.
+- Done means: the cargo plant prepare limit is raised. Shown by: its value before and after the change.
+- Done means: the cargo plant tool stall limit is raised. Shown by: its value before and after the change.
+- Done means: the job time limit is unchanged. Shown by: its value before and after the change.
+- Easy to miss: "Do not stop the clocks while a build waits." Shown by: the clocks advance through a build wait.
+- Not proven yet: prepare limit; tool stall limit; job time limit; clocks during a wait.
 ```
 
-### 3
+### Example 3
 
-Task lines:
+```text
+the composer draws trusted setting, App and conversation rows
+Only host code can give Compose the `setting`, `app` and `thread` resolver.
+Show every place that sets it.
+```
 
-1. the composer draws trusted setting, App and conversation rows
-2. Only host code can give Compose the `setting`, `app` and `thread` resolver.
-3. Show every place that sets it.
-
-Old note:
+Before:
 
 ```text
 …
@@ -180,24 +118,24 @@ Old note:
 …
 ```
 
-New note:
+After:
 
 ```text
-- 🔴 Miss: Only host code can give Compose the `setting`, `app` and `thread` resolver. Shown by: why each named place is host code.
-- 🔴 End: Every place that sets that resolver is named. Shown by: the list of places.
-- 🔴 End: The composer draws trusted setting, App and conversation rows. Shown by: those rows.
-- 🔴 Not proven yet: only host code gives the resolver; every setter is named; trusted rows are drawn.
+- Done means: the review answers whether only host code can give Compose the setting, app, and thread resolver. Shown by: source evidence for that answer.
+- Done means: the review covers the composer's trusted setting, App, and conversation rows. Shown by: evidence for each row type.
+- Easy to miss: "Show every place that sets it." Shown by: the review lists every resolver setter and explains whether each is host code.
+- Not proven yet: host-only resolver access; trusted row types; every setter shown.
 ```
 
-### 8
+### Example 8
 
-Task lines:
+```text
+Record these as decided in the doc and the ADR draft.
+(1) re-run the video-first chain cases offline with the VIDEO receipt issued first, so the 8/10 result is confirmed or corrected;
+report the new numbers;
+```
 
-1. Record these as decided in the doc and the ADR draft.
-2. (1) re-run the video-first chain cases offline with the VIDEO receipt issued first, so the 8/10 result is confirmed or corrected;
-3. report the new numbers;
-
-Old note:
+Before:
 
 ```text
 …
@@ -208,11 +146,12 @@ Old note:
   - 🟡 No independent review of this round. Self-check only.
 ```
 
-New note:
+After:
 
 ```text
-- 🔴 Miss: "with the VIDEO receipt issued first". The old 8/10 is not the new numbers. Shown by: the re-run record shows the VIDEO receipt first.
-- 🔴 End: The doc and the ADR draft both record these decisions. Shown by: both files.
-- 🔴 End: The report gives the new numbers and says whether the 8/10 is confirmed or corrected. Shown by: that report.
-- 🔴 Not proven yet: VIDEO receipt first; decisions in both files; new numbers confirm or correct the 8/10.
+- Done means: the doc and ADR draft record the decisions. Shown by: each named decision in both files.
+- Done means: the video-first chain cases are rerun offline. Shown by: the offline rerun record.
+- Done means: the report gives new numbers and confirms or corrects 8/10. Shown by: the report matches the new rerun record.
+- Easy to miss: "with the VIDEO receipt issued first". Shown by: the saved receipt order for each rerun case.
+- Not proven yet: decisions in both files; offline rerun; new numbers; VIDEO receipt first.
 ```

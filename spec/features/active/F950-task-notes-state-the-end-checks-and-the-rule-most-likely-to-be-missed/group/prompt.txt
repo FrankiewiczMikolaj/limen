@@ -1,0 +1,44 @@
+FORMAT
+Write a plan, not a task copy or a result log. Use plain technical English. Aim for six lines in three parts:
+- Done means: two to four end checks. Each line states what must be true, then "Shown by:" and the command or observation that would prove it.
+- Easy to miss: the one task rule that the quickest way to finish could skip or break. Quote it. Add "Shown by:" and how to check that it was followed.
+- Not proven yet: short names of the end checks and the easy-to-miss rule that lack evidence. Name each one.
+Keep exact commands, limits, paths, and counts when they define acceptance. Reference a longer acceptance list by its location and item count; do not copy it or omit its checks.
+Each check starts unproven. Remove its name from Not proven yet only after you see evidence that it holds. Add "Seen: <evidence location>" to that check. Give a pointer, not results. A pointer alone is not proof. The easy-to-miss rule needs its own evidence.
+Keep each check in the note after it is proven. Write "Not proven yet: none" only when every check and the rule have evidence. Unknown stays unproven. Do not add context, steps, assumptions, or test totals.
+
+noteStart
+[limen] Before other work, read {notePath}, or write it if there is none.
+{FORMAT}
+Read an existing note against this task. Keep restrictions that still apply. Replace past results with the end checks or limits they reveal. Reuse earlier evidence only after you inspect it and confirm that it still applies; do not rerun a check just because this is a continued job.
+[Only when project reminders exist]
+Project reminders ({remindersPath}):
+{remindersText}
+Follow each binding reminder. Do not copy them into the note.
+
+noteSteer
+[limen] If this steer changes an end check or the easy-to-miss rule, keep the old line and append "Changed: <new requirement>. Reason: <what changed it>" under it in {notePath}. The new requirement now applies. Put affected checks back in Not proven yet and remove stale Seen pointers. Add any new obligation as unproven. Leave an unrelated note unchanged.
+[Only when project reminders exist]
+If a reminder changes, record the changed requirement by reference in the note. Do not edit the reminders file.
+
+noteCheck
+[When the current note exists]
+[limen] Your note now:
+{noteNow}
+[When the current note is missing or empty]
+[limen] No note exists in {notePath}. Read {taskPath} and reconstruct the end checks and the easy-to-miss rule. Do not assume they are proven.
+[When the current note exists and a nonempty first note differs]
+Your note at the start:
+{firstNote}
+[Only when project reminders exist]
+Project reminders:
+{remindersText}
+[Always]
+Compare the note with the task and later instructions. Under "Note check" in your final message, give one line per end check. Mark it proven, not proven, changed, or dropped. Proven needs evidence and its location. Not proven needs what is missing. Changed or dropped needs the instruction that changed its scope. Give one line per item in a referenced acceptance list. Account for any obligation missing from the current note.
+Give the easy-to-miss rule its own line: followed, broken, or not proven, with evidence or the gap. Passing the end checks does not prove that the rule was followed. Read Not proven yet; none of its entries can be marked proven without evidence.
+[Only when project reminders exist]
+Report each binding project reminder as followed, broken, or not proven, with evidence or the gap.
+[Always]
+Do not repeat a run-once check or run a forbidden check to clear the note. Report any remaining gap without claiming completion.
+[Only when this check answers a finish call]
+Then call finish again. Its handoff is that whole final message, with the "Note check".

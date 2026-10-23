@@ -1,0 +1,143 @@
+{
+	"id": "92c4ecad-6a31-4272-a732-69e2420b9396",
+	"root": "/Users/overment/.overment/limen",
+	"feature": "spec/features/active/F950-task-notes-state-the-end-checks-and-the-rule-most-likely-to-be-missed",
+	"planningSource": "committed",
+	"lead": "01a168da-08c2-7359-a86d-18afe8fe7f02",
+	"leadPane": "w1FA:p1",
+	"startedAt": 1792760664129,
+	"teams": ["team-1", "team-2", "team-3"],
+	"routes": {
+		"team-1": {
+			"engine": "pi",
+			"provider": "xai",
+			"model": "grok-4.7",
+			"thinking": "high"
+		},
+		"team-2": {
+			"engine": "pi",
+			"provider": "openrouter",
+			"model": "meta/muse-wonder",
+			"thinking": "high"
+		},
+		"team-3": {
+			"engine": "pi",
+			"provider": "pi-claude",
+			"model": "claude-opus-5-5",
+			"thinking": "xhigh"
+		}
+	},
+	"workersPerTeam": 0,
+	"rounds": ["draft", "critique", "revise", "final"],
+	"round": 3,
+	"deadline": 1792766064129,
+	"reserveMs": 60000,
+	"stopped": true,
+	"closed": true,
+	"mode": "detached",
+	"members": [
+		{
+			"id": "2026-10-23-f950-team-1-grok-4-7-draft-2c6981c0",
+			"team": "team-1",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"round": 0,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:13:34.251Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-2-meta-muse-wonder-dra-4042953b",
+			"team": "team-2",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"round": 0,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:06:57.962Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-3-claude-opus-5-5-draf-5c671473",
+			"team": "team-3",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"round": 0,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:14:01.808Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-1-grok-4-7-critique-91819485",
+			"team": "team-1",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-1-grok-4-7-draft-2c6981c0",
+			"round": 1,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:19:50.107Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-2-meta-muse-wonder-cri-0e974d62",
+			"team": "team-2",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-2-meta-muse-wonder-dra-4042953b",
+			"round": 1,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:28:45.292Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-3-claude-opus-5-5-crit-8ed6f68f",
+			"team": "team-3",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-3-claude-opus-5-5-draf-5c671473",
+			"round": 1,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:20:40.047Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-1-grok-4-7-revise-2b09c0c3",
+			"team": "team-1",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-1-grok-4-7-critique-91819485",
+			"round": 2,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:34:19.744Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-2-meta-muse-wonder-rev-5d7f8a08",
+			"team": "team-2",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-2-meta-muse-wonder-cri-0e974d62",
+			"round": 2,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:31:48.211Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-3-claude-opus-5-5-revi-ffad838d",
+			"team": "team-3",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-3-claude-opus-5-5-crit-8ed6f68f",
+			"round": 2,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:34:49.735Z"
+		},
+		{
+			"id": "2026-10-23-f950-team-1-grok-4-7-final-99335099",
+			"team": "team-1",
+			"role": "coordinator",
+			"deadline": 1792766064129,
+			"parent": "2026-10-23-f950-team-1-grok-4-7-revise-2b09c0c3",
+			"round": 3,
+			"state": "done",
+			"finishedAt": "2026-10-23T13:38:52.651Z"
+		}
+	],
+	"teamExtensions": {
+		"team-1": [],
+		"team-2": [],
+		"team-3": []
+	},
+	"finishedAt": 1792762733401
+}
