@@ -18,6 +18,15 @@ The earlier full check recorded 78 of 80 tests passing: one wake test saw an ext
 
 Neither `test/s3-finish-wake.test.ts` nor `test/structure.test.ts` changed in this candidate. The reviewer ran the whole suite, including both files; neither failed in its clean worktree. That worktree lacks the main checkout's retained `.limen/` evidence, so its structure pass does not establish that the main checkout's scan is repaired. The wake failure's cause remains unproved.
 
+## Main checkout after landing
+
+- `npm run typecheck` and pinned Biome passed.
+- `node --test --test-concurrency=2 --test-timeout=120000 --test-force-exit test/u14-task-note.test.ts test/s4-steering.test.ts` passed all five focused tests.
+- `node --test --test-name-pattern='runtime remains dependency-free' test/structure.test.ts` failed: 132 unique TypeScript basenames among 229 files. The retained-evidence scan is still not repaired. Its output is filed in `evidence/main-structure.log`; no assertion or evidence file was removed to make it pass.
+- The full suite and the wake test were not rerun on main after landing. The pinned independent review ran the full suite and passed all 80 tests. The earlier wake failure remains reported, not repaired.
+
+The main static and focused outputs are retained in `evidence/main-static.log` and `evidence/main-focused.log`.
+
 ## Boundary
 
 The change updates prompt strings, their focused regressions, and the README. Note persistence is unchanged. No parser, workflow gate, dependency, or GitHub Actions check was added. No delivery benefit is claimed. The final push uses a `[skip ci]` tip commit to suppress the repository's push workflow, as Adam requested.

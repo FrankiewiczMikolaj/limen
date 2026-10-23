@@ -1,0 +1,17 @@
+(node:32412) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a second init removes old hook copies, so a coordinator gets each guidance source once (4496.478333ms)
+✔ a running worker gets each steer once and in order; an ended one refuses a late steer and writes nothing (3523.540958ms)
+✔ a worker prompt carries register and styleguide once, vision and board pointers, and no board body (0.346416ms)
+✔ continue resumes the parent's session, linked, with its extensions or a replacement (3787.8765ms)
+(node:32413) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (536.214125ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12170.537625
