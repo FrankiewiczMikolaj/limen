@@ -170,8 +170,7 @@ test("two competing sweeps start exactly one replacement for a killed hosted sup
 	await until(dir, () => starts(second) >= 2);
 	assert.equal(jobFile(p, second, "state"), "running");
 	await release(dir);
-	assert.equal(waitJob(p, second, { env }), "done");
-	assert.equal(jobFile(p, second, "result"), "omp done");
+	assert.deepEqual([waitJob(p, second, { env }), jobFile(p, second, "result")], ["done", "omp done"]);
 	assert.equal(starts(second), 2, "one replacement supervisor, not two");
 	assert.ok(!jobFile(p, second, "log").includes("failed:"));
 });

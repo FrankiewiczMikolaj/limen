@@ -77,8 +77,7 @@ test("a rewritten branch or a sleeping session fails the job; stop and timeout e
 	const head = git(worktree, "rev-parse", "HEAD");
 	sessionPushes(jobFile(p, rewritten, "branch"), true);
 	await session("b", "running", "waiting_for_user", ["Rewrote it."]);
-	assert.equal(waitJob(p, rewritten), "failed");
-	assert.equal(git(worktree, "rev-parse", "HEAD"), head);
+	assert.deepEqual([waitJob(p, rewritten), git(worktree, "rev-parse", "HEAD")], ["failed", head]);
 	assert.match(jobFile(p, rewritten, "log"), /failed: devin session b left .* does not fast-forward the worktree/);
 	await session("c", "suspended", "inactivity");
 	const slept = plant.spawnJob(p, "Task c", ["--engine", "devin"], { env });

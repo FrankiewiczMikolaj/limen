@@ -67,9 +67,7 @@ test("a done job pings only the target its ticket author maps to", async () => {
 	await settled(id);
 	const [ping, ...rest] = payloads();
 	assert.deepEqual(rest, []);
-	assert.equal(ping?.url, URLS[0]);
-	assert.equal(ping?.body.event, "job.done");
-	assert.equal(ping?.body.jobId, id);
+	assert.deepEqual([ping?.url, ping?.body.event, ping?.body.jobId], [URLS[0], "job.done", id]);
 	assert.equal(requests(p)[0]?.headers.authorization, SECRETS[0]);
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });

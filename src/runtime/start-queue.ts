@@ -152,6 +152,13 @@ const heldText = (rules: readonly SeatRule[]): string =>
 	rules
 		.map((rule) => `held by rule ${rule.name} until ${localTime(rule.until)} (start priority ${rule.startPriority})`)
 		.join("; ");
+/** A job that rules hold. A rule change is a new hold, so the job's `queued` file is written again. */
+const heldDecision = (rules: readonly SeatRule[], ahead: number): Decision => ({
+	start: false,
+	kind: `rules ${rules.map((rule) => rule.version).join(" ")}`,
+	detail: heldText(rules),
+	ahead,
+});
 
 /**
  * Marks a job queued before its handshake, so no reader sees it running as started; logs gate values it ignored. A job
@@ -233,11 +240,10 @@ async function enqueue(entry: Entry): Promise<void> {
 }
 async function decide(entry: Entry, gate: StartGate | undefined, stop: AbortSignal): Promise<Decision> {
 	const ahead = (await liveEntries()).filter((other) => other.id !== entry.id && order(other, entry) < 0).length;
-	// A held job sorts after every job it could start, so it never blocks the head. A rule change is a new hold.
+	// A held job sorts after every job it could start, so it never blocks the head.
 	const holding = holdingRules(entry.priority);
 	if (holding.length > 0) {
-		const kind = `rules ${holding.map((rule) => rule.version).join(" ")}`;
-		return { start: false, kind, detail: heldText(holding), ahead };
+		return heldDecision(holding, ahead);
 	}
 	if (!gate) {
 		return { start: true, detail: "the gate is off" };
@@ -261,20 +267,24 @@ async function decide(entry: Entry, gate: StartGate | undefined, stop: AbortSign
 			ahead: 0,
 		};
 	}
-	// Under the lock the head is checked again, so two jobs that sampled at once never both start inside one settle.
-	const claimed = await groupLock(
+	// Under the lock the rules, the head and the settle are checked again: a rule set while this job sampled the load
+	// still holds it, and two jobs that sampled at once never both start inside one settle.
+	return groupLock(
 		queueDir(),
-		async () => {
+		async (): Promise<Decision> => {
+			const holdingNow = holdingRules(entry.priority);
+			if (holdingNow.length > 0) {
+				return heldDecision(holdingNow, 0);
+			}
 			if ((await liveEntries())[0]?.id !== entry.id || (await settleLeft(gate)) > 0) {
-				return false;
+				return { start: false, kind: "raced", detail, ahead: 0 };
 			}
 			await atomicWrite(join(queueDir(), "last-start"), `${new Date().toISOString()}\n`);
 			await rm(entryPath(entry.id), { force: true });
-			return true;
+			return { start: true, detail };
 		},
 		"wait",
 	);
-	return claimed ? { start: true, detail } : { start: false, kind: "raced", detail, ahead: 0 };
 }
 async function started(jobDir: string, entry: Entry, detail: string, waited: boolean): Promise<void> {
 	if (!waited) {
