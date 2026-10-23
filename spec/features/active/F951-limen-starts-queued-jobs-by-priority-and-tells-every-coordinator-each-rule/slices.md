@@ -12,6 +12,7 @@ Adam's decision 99 (2026-10-23) approved fixes 2, 3 and 4 of `~/playground/alice
 - Spawn says `queued` with the reading and the count ahead, and still prints the ID last. `limen jobs` shows pulse `queued` with the wait and the reason. `limen queue` lists the order and the current reading.
 - `limen stop` ends a queued job `stopped`. An entry whose wrapper is dead is removed and does not block the queue. The job timeout and a group deadline are computed when the engine starts; their values do not change.
 - A job that waited tells its coordinator once when it starts, on the route its finish uses: the Pi wake hook for a subscribed session, `herdr agent prompt` to a recorded `origin-pane`. The text names the job, the wait, and the reading, and says no action is needed. Its receipt is a separate family: it never counts as the completion delivery. The Pi hook's "started" toast must not fire while the job only waits.
+- A start notice is news only while the job runs. If the job ended before the Pi hook delivered the notice, no stale notice follows; the completion wake carries the notice's line instead, so the coordinator always learns the wait. The Herdr route sends the notice before the engine starts. (From S1 review 1.)
 - `limen continue` of a detached job queues the same way.
 - Templates and docs: spawn when work is ready; Limen queues and tells you when it starts; never check or poll the load before a spawn.
 
