@@ -28,6 +28,7 @@ const STYLE = "style-marker-s4";
 const REGISTER = "register-marker-s4";
 const VISION = "vision-marker-s4";
 const BOARD = "board-body-marker-s4";
+const RULE = "seat-rule-marker-s4";
 const [, FRAME = "", CUE = ""] = readFileSync(`${PACKAGE}templates/capability.md`, "utf8").split(/\s*## \w+\s*|\s+$/);
 
 let p: Plant;
@@ -48,6 +49,9 @@ before(async () => {
 	for (const [path, text] of Object.entries(files)) {
 		writeFileSync(join(p.root, path), text);
 	}
+	const rule = { name: "s4", text: RULE, until: "2999-01-01T00:00:00Z", setBy: "", setAt: "", version: "1" };
+	mkdirSync(join(p.parent, ".limen/rules/s4"), { recursive: true });
+	writeFileSync(join(p.parent, ".limen/rules/s4/rule.json"), JSON.stringify(rule));
 	git(p.root, "add", "-A");
 	git(p.root, "commit", "-q", "-m", "project guidance and old hook copies");
 	first = join(p.parent, "first.ts");
@@ -86,6 +90,7 @@ test("a second init removes old hook copies, so a coordinator gets each guidance
 	const system = readFileSync(join(coord, "fake-system.txt"), "utf8");
 	const seen = [STYLE, REGISTER, VISION, BOARD, FRAME].map((marker) => count(system, marker));
 	assert.deepEqual(seen, [1, 1, 1, 1, 1], "styleguide, register, vision, board, capability frame");
+	assert.equal(count(readFileSync(join(coord, "fake-context.txt"), "utf8"), RULE), 1, "a seat rule rides the turn");
 	assert.deepEqual(readdirSync(join(p.root, ".pi/extensions")), ["limen.ts"]);
 	assert.deepEqual(readdirSync(join(p.root, ".omp/extensions")), ["limen.ts"]);
 });
@@ -122,6 +127,7 @@ test("a worker prompt carries register and styleguide once, vision and board poi
 	assert.ok(context.includes("`spec/build.md`"), "board pointer");
 	assert.equal(count(system + context, VISION), 0, "a worker reads the vision itself");
 	assert.equal(count(system + context, BOARD), 0, "a worker never gets the board body");
+	assert.equal(count(system + context, RULE), 0, "seat rules are for coordinators");
 });
 
 test("continue resumes the parent's session, linked, with its extensions or a replacement", () => {

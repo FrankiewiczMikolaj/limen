@@ -1,8 +1,13 @@
-// U3: what one ended coordinator turn tells the shepherd. A blocker always counts; any other end waits for the
-// coordinator's own running jobs; an aborted turn means the owner is at the pane and never counts.
+// U3: what a coordinator is told. One ended turn tells the shepherd: a blocker always counts; any other end waits for
+// the coordinator's own running jobs; an aborted turn means the owner is at the pane and never counts. A completion
+// wake sends only a done job that is not a scout to landing; a done scout has nothing to land (F936).
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { type CoordinatorTurn, turnSignal } from "../src/integrations/coordinator-signal.ts";
+import { completionWake } from "../src/job/wake-text.ts";
 
 const todo = (content: string, status: string) => ({ content, status });
 const goal = (status: string) => ({ id: "g", objective: "Ship F781", status });
@@ -27,4 +32,18 @@ test("an ended turn signals what its todos, goal, stop and owned jobs call for, 
 	}
 	assert.match(turnSignal({ ...base, todos: blocked })?.reason ?? "", /\(needs owner\); last message: Report sent$/);
 	assert.match(turnSignal({ ...base, todos: open })?.reason ?? "", /next: Land F781; last message: Report sent$/);
+});
+
+test("only a done job that is not a scout is sent to landing", async (t) => {
+	const dir = await mkdtemp(join(tmpdir(), "u12-"));
+	t.after(() => rm(dir, { recursive: true, force: true }));
+	await writeFile(join(dir, "task.md"), "Scout F001.\n");
+	await writeFile(join(dir, "tool-calls"), "4\n");
+	const wake = (state: string) =>
+		completionWake(dir, "F001", state, "id", "limen/id", "", false, "Inspect it before landing.");
+	assert.doesNotMatch(wake("failed"), /landing/);
+	assert.match(wake("done"), /before landing/);
+	await writeFile(join(dir, "role"), "scout\n");
+	assert.match(wake("done"), /Nothing to land/);
+	assert.doesNotMatch(wake("done"), /before landing|land it/);
 });

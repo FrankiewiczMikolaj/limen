@@ -145,34 +145,22 @@ test("a ping whose deliverer was killed mid-send goes out with the next limen co
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {
 	assert.equal(wait(quiet), "done");
 	assert.equal(requests(p).length, 9);
-	assert.ok(
-		requests(p).every(
-			(request) =>
-				request.url.startsWith("https://hooks.s7.test/") && SECRETS.includes(request.headers.authorization ?? ""),
-		),
-	);
+	const sealed = (request: ReturnType<typeof requests>[number]) =>
+		request.url.startsWith("https://hooks.s7.test/") && SECRETS.includes(request.headers.authorization ?? "");
+	assert.ok(requests(p).every(sealed));
 	assert.ok(payloads().every((ping) => ping.body.jobId !== quiet));
 	const leaks = (text: string) =>
 		[...SECRETS.map((secret) => secret.slice(7)), "hooks.s7.test"].filter((value) => text.includes(value));
-	for (const request of requests(p)) {
-		assert.deepEqual(
-			leaks(JSON.stringify({ ...request, url: "", headers: { ...request.headers, authorization: "" } })),
-			[],
-		);
-	}
-	for (const result of runs) {
-		assert.deepEqual(leaks(result.stdout + result.stderr), []);
-	}
-	for (const id of ids) {
-		for (const entry of readdirSync(jobDir(p, id), { recursive: true, withFileTypes: true })) {
-			if (entry.isFile()) {
-				assert.deepEqual(
-					leaks(readFileSync(join(entry.parentPath, entry.name), "utf8")),
-					[],
-					join(entry.parentPath, entry.name),
-				);
-			}
-		}
+	const rest = requests(p).map((request) => ({
+		...request,
+		url: "",
+		headers: { ...request.headers, authorization: "" },
+	}));
+	assert.deepEqual(leaks(JSON.stringify(rest)), []);
+	assert.deepEqual(leaks(runs.map((result) => result.stdout + result.stderr).join("")), []);
+	for (const entry of ids.flatMap((id) => readdirSync(jobDir(p, id), { recursive: true, withFileTypes: true }))) {
+		const path = join(entry.parentPath, entry.name);
+		assert.deepEqual(entry.isFile() ? leaks(readFileSync(path, "utf8")) : [], [], path);
 	}
 });
 

@@ -109,6 +109,18 @@ limen board [--write]
 
 NOW and PROVEN in `spec/build.md` are generated from the feature lanes: NOW lists `active/`, PROVEN the last ten landed tickets and one count line per month folder. TRACK, NEXT, PARKED and DROPPED stay as the coordinator wrote them. `limen board` prints the board with each active ticket's running job, or its last job when none runs: failed, done but not landed, or landed. It lists running jobs that name no active ticket below NOW. `--write` rewrites NOW and PROVEN in the file.
 
+### Seat-wide rules
+
+Give every coordinator on the seat one rule until a time, change it, end it, or list the rules that hold.
+
+```text
+limen rule
+limen rule set NAME --until 90m|12h|3d|"YYYY-MM-DD HH:MM"|ISO [--start-priority 1|2|3] "text"
+limen rule end NAME [reason]
+```
+
+A rule is one record per name under the Limen home (`~/.limen/rules/NAME/`, or `$LIMEN_HOME/.limen/rules/NAME/`): the text, the end time, who set it, the start priority, and one receipt per pinged tab. `--until` takes a duration, a local date and time, or an ISO time with a zone. Setting a name that holds is a change. A set, a change and an end each send one `herdr agent prompt` to every live coordinator tab: a registration under `<project>/.limen/coordinators/` in a project of the seat registry, with a live process and no shutdown mark, the newest one on each pane. The pane that ran the command is not pinged. A text that may have reached a pane is never sent again. A detached timer ends the rule once at its end time and pings every live tab with what the rule held. When that timer died, the next `limen` command run where Herdr is reachable starts a new one. A rule that holds is shown in each coordinator's turn context and at the top of `limen board`; it never enters `spec/build.md`.
+
 ### Map build and refresh
 
 Build the architecture map, serve it with live job activity, or do one quiet refresh pass.

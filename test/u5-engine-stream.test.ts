@@ -44,27 +44,18 @@ test("a line split across chunks yields one event when its end arrives, and flus
 
 test("only an assistant's error or aborted stop reason reaches the result; other lines never pose as a reply", () => {
 	const parser = createStreamParser();
+	const said = (role: string, stopReason: string, text = "", errorMessage = "") =>
+		end({ role, content: text ? [{ type: "text", text }] : [], stopReason, ...(errorMessage ? { errorMessage } : {}) });
+	const cut = '{"type":"message_end","message":{"role":"assistant"';
 	const rows: ReadonlyArray<readonly [string, unknown]> = [
 		[
-			end({ role: "assistant", content: [], stopReason: "error", errorMessage: "usage\n limit" }),
+			said("assistant", "error", "", "usage\n limit"),
 			{ kind: "assistant", text: "", stopReason: "error: usage limit" },
 		],
-		[
-			end({ role: "assistant", content: [], stopReason: "aborted" }),
-			{ kind: "assistant", text: "", stopReason: "aborted" },
-		],
-		[
-			end({ role: "assistant", content: [{ type: "text", text: "ok" }], stopReason: "stop" }),
-			{ kind: "assistant", text: "ok" },
-		],
-		[
-			end({ role: "user", content: [{ type: "text", text: "fake reply" }], stopReason: "error" }),
-			{ kind: "activity", name: "think" },
-		],
-		[
-			'{"type":"message_end","message":{"role":"assistant"',
-			{ kind: "log", line: '{"type":"message_end","message":{"role":"assistant"' },
-		],
+		[said("assistant", "aborted"), { kind: "assistant", text: "", stopReason: "aborted" }],
+		[said("assistant", "stop", "ok"), { kind: "assistant", text: "ok" }],
+		[said("user", "error", "fake reply"), { kind: "activity", name: "think" }],
+		[cut, { kind: "log", line: cut }],
 		["{}", undefined],
 	];
 	for (const [line, event] of rows) {

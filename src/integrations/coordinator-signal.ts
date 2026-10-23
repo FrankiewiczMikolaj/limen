@@ -347,16 +347,8 @@ export async function sweepCoordinators(root: string): Promise<void> {
 	const base = join(root, ".limen", "coordinators");
 	for (const name of await readdir(base).catch(() => [] as string[])) {
 		const dir = join(base, name);
-		const pid = Number(await textFile(join(dir, "pid")));
-		if (!Number.isSafeInteger(pid) || pid <= 0) {
-			continue;
-		}
-		const outcome = await processInfo(pid);
-		if (outcome.kind === "unavailable") {
-			continue;
-		}
-		const born = await textFile(join(dir, "born"));
-		if (outcome.kind === "present" && (!born || outcome.process.born === born)) {
+		const { pid, state } = await registeredProcess(dir);
+		if (state !== "dead") {
 			continue;
 		}
 		const exit = await sessionExit(
@@ -388,6 +380,45 @@ export async function sweepCoordinators(root: string): Promise<void> {
 		);
 		await rm(dir, { recursive: true, force: true });
 	}
+}
+
+export type LiveCoordinator = { readonly session: string; readonly pane: string; readonly startedAt: number };
+
+/**
+ * The coordinators of one project that run now in a Herdr pane: a registration with a pane, no `shutdown` mark, and a
+ * live process, as the sweep judges it.
+ */
+export async function liveCoordinators(root: string): Promise<readonly LiveCoordinator[]> {
+	const base = join(root, ".limen", "coordinators");
+	const live: LiveCoordinator[] = [];
+	for (const session of await readdir(base).catch(() => [] as string[])) {
+		const dir = join(base, session);
+		const pane = await textFile(join(dir, "pane"));
+		if (!pane || existsSync(join(dir, "shutdown")) || (await registeredProcess(dir)).state !== "live") {
+			continue;
+		}
+		live.push({ session, pane, startedAt: Date.parse(await textFile(join(dir, "started-at"))) || 0 });
+	}
+	return live;
+}
+
+/**
+ * A registration's process: live when its pid runs with the recorded start time, or before one is recorded; dead when
+ * it does not run; unknown without a pid or when the process query fails.
+ */
+async function registeredProcess(
+	dir: string,
+): Promise<{ readonly pid: number; readonly state: "live" | "dead" | "unknown" }> {
+	const pid = Number(await textFile(join(dir, "pid")));
+	if (!Number.isSafeInteger(pid) || pid <= 0) {
+		return { pid, state: "unknown" };
+	}
+	const outcome = await processInfo(pid);
+	if (outcome.kind === "unavailable") {
+		return { pid, state: "unknown" };
+	}
+	const born = await textFile(join(dir, "born"));
+	return { pid, state: outcome.kind === "present" && (!born || outcome.process.born === born) ? "live" : "dead" };
 }
 
 /** The newest omp `session_exit` record written after this registration started. Only the file's tail is read. */

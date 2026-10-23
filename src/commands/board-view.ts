@@ -5,6 +5,7 @@ import { formatAge } from "../job/view.ts";
 import { readTickets } from "../picture/tickets.ts";
 import { commitList, limenRoot, unlandedBranches, workspaceRepository } from "../project/git.ts";
 import { renderBoard, writeBoard } from "../project/lanes.ts";
+import { activeRules, ruleLine } from "../project/seat-rules.ts";
 import { shownState } from "./jobs.ts";
 
 const HELP =
@@ -41,6 +42,11 @@ export async function boardCommand(args: readonly string[], cwd: string): Promis
 		return;
 	}
 	const board = renderBoard(text ?? "# Build\n", (await readTickets(root)).tickets);
+	// Seat-wide rules head the printed board only; they never enter spec/build.md.
+	const rules = activeRules().map((rule) => ruleLine(rule));
+	if (rules.length) {
+		console.log(["## RULES (seat-wide, from limen rule; not in spec/build.md)", ...rules, ""].join("\n"));
+	}
 	console.log(withJobs(board, await readJobs(root)).trimEnd());
 	if (text !== undefined && board !== text) {
 		console.log("\nspec/build.md is behind the lanes; limen board --write rewrites NOW and PROVEN.");

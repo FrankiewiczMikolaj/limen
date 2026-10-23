@@ -13,6 +13,7 @@ import { openCommand } from "./commands/open.ts";
 import { pictureCommand } from "./commands/picture.ts";
 import { planningCommand } from "./commands/planning-source.ts";
 import { pruneCommand } from "./commands/prune.ts";
+import { endDueRules, ruleCommand } from "./commands/rule.ts";
 import { spawnCommand } from "./commands/spawn.ts";
 import { statusCommand } from "./commands/status.ts";
 import { steerCommand } from "./commands/steer.ts";
@@ -46,6 +47,7 @@ const COMMANDS = {
 	jobs: jobsCommand,
 	status: statusCommand,
 	prune: pruneCommand,
+	rule: ruleCommand,
 	watch: watchCommand,
 	unwatch: unwatchCommand,
 	open: openCommand,
@@ -74,6 +76,7 @@ const COMMANDS = {
 	| "jobs"
 	| "status"
 	| "prune"
+	| "rule"
 	| "watch"
 	| "unwatch"
 	| "open"
@@ -117,6 +120,10 @@ usage:
   limen jobs [--running|--active|--all|--label PREFIX|<id|suffix|label>]
   limen status [--all]                          # plant inbox: running, candidates to inspect, needs a decision (last 7 days), coordinator tabs
   limen prune [--retire [--dry-run]]           # --retire deletes finished, failed, or stopped job records whose branch is landed (ancestor or cherry-pick) or deleted
+  limen rule                                    # the seat-wide rules that hold now
+  limen rule set NAME --until 90m|12h|3d|"YYYY-MM-DD HH:MM"|ISO [--start-priority 1|2|3] "text"  # one rule for every coordinator; a set or change pings each live coordinator tab once
+  limen rule end NAME [reason]                  # end it now; each live coordinator tab gets one end ping, as at its end time
+  limen rule timer <rule-folder> <version>      # internal: end one version of a rule once, at its end time
   limen watch <id|suffix|label> | --running
   limen unwatch <id|suffix|label> | --all
   limen open <id|suffix|label>
@@ -168,6 +175,12 @@ export async function main(args: readonly string[], cwd = process.cwd()): Promis
 		// A webhook is a side channel: a bad queue entry never stops the command the human asked for.
 		if (!(name === "webhook" && rest[0] === "deliver")) {
 			await resendNearbyPings(cwd).catch(() => {});
+		}
+		// A rule whose timer died still ends once; this only starts a detached timer.
+		try {
+			endDueRules(args);
+		} catch {
+			// A rule record is a side channel too.
 		}
 		await COMMANDS[name as keyof typeof COMMANDS](rest, cwd);
 	} catch (error) {
