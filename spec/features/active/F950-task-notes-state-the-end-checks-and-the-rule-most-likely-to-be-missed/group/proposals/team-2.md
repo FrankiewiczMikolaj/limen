@@ -1,140 +1,145 @@
-# Team-2 draft proposal: task notes state the end checks and the rule most likely to be missed
+# Team-2 revised proposal: task notes state the end checks and the rule most likely to be missed
 
-This is a proposal only. It changes no Limen code, hook, test, or installed prompt.
+This revision replaces the team-2 draft. It is a proposal only. It changes no Limen code, hook, test, or installed prompt.
 Effectiveness is unproven. Two studies of the current note hook found no clear effect on delivery, with low confidence. This text must not be described as an improvement until a later study shows one.
 
 ## The one thing the agent must write
 
-For each end check, the agent must write the observable proof that would show it, and must keep every check that has no such proof in a named `Not proven yet` list. A check without a named proof is a task copy. A result without a check it proves is a log. The single line that prevents the most important miss is separate: the one task rule a busy agent is most likely to break while every end check still passes.
+For each end check, the agent must write how a person could repeat it, and must keep every check that has no evidence in a named `Not proven yet` line. A check without a named way to show it is a task copy. A result without a check it proves is a log. The single line that prevents the most important miss is separate: the one task rule a busy agent is most likely to break while every end check still passes, and it stays in `Not proven yet` until it has evidence of its own.
 
-In short: **name the proof before the work, name the one rule that can still be broken, and do not clear a check without evidence you can point to.**
+In short: **name how each check is shown before the work, name the one rule that can still be broken, and clear neither without evidence you can point to.**
 
-## Design choices and tensions
+## What this revision changed, and why
 
-- **Short against complete.** The cap is about six lines and three parts. The note therefore holds end checks, not steps, files read, or context. If a task has more than four true end checks, the agent groups checks that share one proof. It does not drop a binding restriction: a restriction that can fail the work belongs either in a check or in `Easy to miss`.
-- **Evidence against a result log.** Evidence enters the note only as a one-line pointer under the check it proves, for example the command and where its output is. The note does not retell numbers, times, or steps. Full results stay in the final message, the job log, or the files the task names. This keeps crossing-off honest without turning the note into a second report.
-- **Crossing off against forbidden proof.** A note is not permission to run a forbidden check. If the task bars the only proof, the check stays in `Not proven yet` and the boundary is the `Easy to miss` line. Unknown is not passed.
-- **Plan against steering.** A steer that changes scope does not rewrite history. The old line stays, a `changed` line gives the reason, and every affected check returns to `Not proven yet` until new evidence exists.
-- **Continued work against inherited proof.** A copied note is a claim by an earlier agent. The continuing agent re-reads it against the current task, keeps what still binds, and moves any check it cannot point to evidence for into `Not proven yet`. It does not inherit a pass.
+Accepted from the critiques. Each item names who proved it.
+
+- **One word, one thing.** The draft used `Proof:` for the planned way to show a check and for the evidence pointer after the work. Team-3 proved the collision. The plan now says `Shown by:` and the evidence record says `Seen:`. (Team-3, point 1.)
+- **`Not proven yet` now names each check.** The draft's examples wrote "both Done checks", which its own FORMAT forbade. The list is now one line that names each unproven check and the rule, by short name. (Team-3, point 2.)
+- **No invented runtime condition.** The draft presented the continued-job block as a condition Limen tests. It does not: `noteStart` reads only the reminders (`src/job/task-note.ts` lines 24-32). That text is now a plain paragraph sent on every first prompt, written so the agent applies it only when a note already exists. No code condition is proposed. (Team-1; team-3, point 3.)
+- **The finish sentence is tied to the call path, not to having the tool.** The draft conditioned it on "this job has the finish tool". Every job with the finish hook registers that tool (`hook/finish.ts` line 55); the check answers `check(true)` from a `finish` call (line 65) and `check(false)` from a settle turn (lines 86, 94). The variant is now labelled by which path sent the check. (Team-3, point 4.)
+- **The examples use only the excerpt on Adam's page.** The draft's example 3 named sources and actions from the full record behind the ellipses, and example 1 used the full record's plant setting. Both are rewritten from the three task lines shown. No word in a new note now needs the record behind the cut. (Team-1; team-3, point 5.)
+- **Example 1 splits its two rules.** The clock rule and the job-time-limit rule are now separate Done checks, and only the clock rule is `Easy to miss`, because pausing a waiting build's clocks is the quick fix the task forbids. The job limit is a check, not half of the rule line. (Team-1; team-3, point 6.)
+- **No check groups two rules.** The draft allowed grouping checks that share one proof, and its example 8 grouped the rerun, the receipt order, and the numbers. Grouping is now banned for distinct rules. Each rule gets its own check and its own name in `Not proven yet`. (Team-2's own critique of team-1's merged lines, applied at home; team-3 on example 8.)
+- **`Easy to miss` needs its own evidence.** The draft let a writer claim "Not proven yet: none" while the rule had no evidence. The rule now sits in `Not proven yet` until it has a `Seen:` line, and the finish check marks it kept, broken, or not proven. This takes team-1's rule, which both other critiques kept. (Team-1.)
+- **Two original FORMAT sentences are back.** The draft dropped "Put detail under its main point" and "Add a time only when it helps" while claiming that no obligation was dropped. Both sentences are restored word for word. (Team-1.)
+- **A carried result line is sorted, not deleted.** The draft told a continued agent to move inherited numbers out. This revision takes team-1's classification, which team-3 also kept: a line that says what a later check must do is a restriction and stays as a check or as the rule; a line that only says what happened does not carry its numbers into this note, but if it reveals a gap or a limit that still binds, that gap or limit is written as a check or as the rule. Blanket deletion could remove a finding that still binds. (Team-1; team-3, kept item 7.)
+- **Reminders are not copied into the note.** The draft made a 🔴 reminder that states an end state also appear in the note. The finish check already shows the reminders and asks about each one; a copied reminder would be counted twice and could take the task rule's one slot. (Team-3, point 7.)
+- **The FORMAT example now shows a `changed` line**, with values that change (a refusal at the 101st request, changed to the 61st). The draft claimed the changed example was kept in substance and showed none. (Team-3, point 8.)
+- **An assumption that can change a result is a check.** The draft dropped the ⚪ marker and left that risk open, as its own critique of team-1 showed. Now any assumption that could change whether a check passes becomes a Done check or the rule line, and stays in `Not proven yet`. A minor assumption that cannot change a check earns no line. The ⚪ loss is still deliberate and still named.
+
+## What this revision rejected, and why
+
+- **Team-3's tick as the only not-proven state.** One list does avoid drift. But a tick reads as "done", as team-3 itself names, and after context is summarized a tick with a short pointer is hard to tell from a pass someone asserted. The brief also asks for three visible parts, and the finish check reads the `Not proven yet` list. The drift cost is met instead by one `Not proven yet` line with short names, and by a steer rule that edits the check and its name in the same edit. One state per fact is kept where it matters: the name is a label, not a second statement of the check.
+- **Team-3's pointer check for a long acceptance list.** One line that points at the task's list keeps the note short by keeping the checks out of it, and its finish check expands the list only at the end. A missed item would surface after the work. This revision gives way on line count instead: a binding check is never dropped and never hidden behind a pointer.
+- **Team-3's task-file reconstruction when no note exists.** The task file is on disk, and team-3's code claim is correct (`src/job/publication.ts` writes `task.md` for each published job). But the current finish text says "From memory", the current test matches that text (`test/u14-task-note.test.ts`), and the finish check is a report on the work, not a fresh reading assignment. Keeping the current sentence also keeps this proposal to wording inside the four strings, with no new placeholder. The cost is named in team-3's critique and accepted.
+- **Team-1's Open lines as full duplicate checks.** This revision keeps team-1's idea that the rule has its own unproven life, but not its second full copy of every check, for the drift and double-counting reasons in team-2's critique.
+- **Team-1's instruction to delete predecessor result lines.** See the classification rule above.
+- **Any sentence inviting proof runs at the finish.** Team-3's "you may still prove an open check now" is not taken, and nothing like it is added. A run-once task can be breached by a finish-time run that the task otherwise allows.
+- **A stock command in the FORMAT example.** Team-3's example carries "`npm test` passes". The example here names a repeatable act for its own two checks and nothing else, so no agent copies a command the task did not name.
+
+## Tensions, restated
+
+- **Short against complete.** The starting aim is about six lines: two to four Done lines, one rule line, one `Not proven yet` line, plus a `Seen:` or `changed:` subline when one exists. If a task binds more than four end checks, the count gives way. A binding check is never dropped, merged into another rule, or left behind a pointer to fit the aim.
+- **Evidence against a result log.** Evidence enters the note only as `Seen: <where the evidence is>`, one line under the check it clears. No numbers, counts, verdicts, or steps. Those belong in the final message, the job log, or the files the task names.
+- **Crossing off against forbidden proof.** A check stays in `Not proven yet` if the task forbids the only way to show it. The note is never permission to run a forbidden check.
+- **Markers.** 🔴 marks each point that must be delivered or kept, which is every point line in the three parts; the parts differ by their labels, not by marker. Under a point, 🟡 marks a record line only, and the record says which kind it is: `Seen:` or `changed:`. These meanings govern `note.md`; the reminders file keeps its own markers and is never rewritten by this format. The ⚪ marker is gone from the note, under the assumption rule above.
 
 ## Placeholders
 
 These names appear in the proposed strings. They are display placeholders for this proposal, not new runtime code.
 
-- `{JOB_DIR}`: the job folder for this job.
-- `{NOTE_PATH}`: `{JOB_DIR}/note.md`.
-- `{FIRST_NOTE_PATH}`: `{JOB_DIR}/note.first.md`, the first version of the note.
-- `{REMINDERS_PATH}`: the project reminders file, `.agents/limen/reminders.md` beside the project's other Limen guidance.
-- `{REMINDERS_TEXT}`: the text of that file, when it exists and is not empty.
-- `{NOTE_NOW}`: the current text of `{NOTE_PATH}`.
-- `{NOTE_FIRST}`: the text of `{FIRST_NOTE_PATH}`.
-- `{CHANGED_LINE}`: the literal line shape `"🟡 changed: ... Reason: ..."`.
+- `{NOTE_PATH}`: the job folder's `note.md` (`join(jobDir, "note.md")` in the current code).
+- `{FIRST_NOTE_PATH}`: the job folder's `note.first.md`.
+- `{REMINDERS_PATH}`: the path `projectReminders` returns for `.agents/limen/reminders.md`.
+- `{REMINDERS_TEXT}`: that file's trimmed text, when the file exists and is not empty.
+- `{NOTE_NOW}`: the current note text, trimmed.
+- `{NOTE_FIRST}`: the first note text, trimmed.
 
 ## Proposed FORMAT
 
-This replaces the current `FORMAT` string in `src/job/task-note.ts` (the prompt that tells the agent how to write `note.md`).
+This replaces the current `FORMAT` string in `src/job/task-note.ts`.
 
 ```text
 Format: a nested list in plain technical English. Short, clear sentences. One fact on each line.
+Put detail under its main point. Add a time only when it helps.
 Write the note as a plan for the end. It is not a copy of the task and not a log of work done.
-Use three parts, in this order, in at most about six lines:
-- 🔴 Done means:
-  - 🔴 One check a person can run or see, with its proof named after "Proof:". Write two to four checks. Group checks that share one proof.
-- 🔴 Easy to miss: the one task rule a busy agent is most likely to break while the Done checks still pass.
-- 🔴 Not proven yet: each Done check that has no evidence yet. Name the check, not "everything".
-Each Done check states an end state and the exact command, look, file, or output that shows it. Keep an exact command, limit, or restriction only when it defines a check or the Easy-to-miss rule. Do not copy other task sentences. Do not write steps, files you will read, or work already done.
-When evidence for a check exists, remove that check from "Not proven yet" and add one short line under its Done check: "  - 🟡 Proof: <where the evidence is>". Give a pointer, not a result summary. Cross off no check without a pointer. Unknown is not passed.
-If the task forbids the only proof for a check, keep the check in "Not proven yet" and put the forbidden boundary in "Easy to miss". The note never gives permission to run a forbidden check.
-When a point changes, keep its line and add a line under it: "🟡 changed: ... Reason: ...". If a change alters a Done check, put that check back in "Not proven yet" until new evidence exists.
-Write "none" after "Not proven yet:" only when every Done check has a Proof pointer.
+Use three parts, in this order:
+- 🔴 Done means: <one end state a person can run or see>. Shown by: <the exact command, look, file, or output that shows it>.
+- 🔴 <one end state>. Shown by: <how it is shown>.
+Write two to four Done checks, one rule in each. If the task binds more than four end checks, write them all: the line count gives way, a binding check does not.
+- 🔴 Easy to miss: <the one task rule a busy agent is most likely to break while the Done checks still pass>.
+- 🔴 Not proven yet: <the short name of each Done check with no evidence>; <the short name of the Easy-to-miss rule>. Name each one. Do not write "both" or "everything".
+Keep an exact command, limit, or restriction only when it defines a check or the Easy-to-miss rule. Do not copy other task sentences. Do not write steps or work already done.
+🔴 marks a point that must be delivered or kept. Under a point, 🟡 marks a record line only: "Seen:" for evidence, "changed:" for a change. An assumption that could change whether a check passes is a Done check or the Easy-to-miss rule. There is no other assumption line.
+When you can point to evidence for a check, remove its name from "Not proven yet" and add under its Done line: "  - 🟡 Seen: <where the evidence is>". Give a pointer, not a result. Do the same under Easy to miss when you can point to evidence that the rule held. Clear nothing without a Seen line. Unknown is not passed.
+Write "Not proven yet: none" only when every Done check and Easy to miss has a Seen line.
+If the task forbids the only way to show a check, keep its name in "Not proven yet". This note never gives permission to run a forbidden check.
+When a point changes, keep its line and add under it: "  - 🟡 changed: ... Reason: ...". Change its name in "Not proven yet" in the same edit. If the change makes an old Seen line stale, remove that Seen line and put the name back in "Not proven yet".
 Example:
-- 🔴 Done means:
-  - 🔴 A caller who sends a 101st request in one minute for one key gets a refusal. Proof: send 101 requests for one key and see the refusal.
-  - 🔴 A caller who sends 100 requests in one minute for one key still succeeds. Proof: send 100 requests for one key and see success.
+- 🔴 Done means: a caller who sends a 101st request in one minute for one key gets a refusal. Shown by: send 101 requests for one key and see the refusal.
+  - 🟡 changed: the 61st request gets a refusal. Reason: the owner steered.
+- 🔴 A caller who sends 100 requests in one minute for one key still succeeds. Shown by: send 100 requests for one key and see success.
 - 🔴 Easy to miss: the limit counts per key, not per caller.
-- 🔴 Not proven yet: both Done checks.
+- 🔴 Not proven yet: refusal at the limit; success under the limit; the limit counts per key.
 ```
-
-What changed from the current FORMAT, and why:
-
-- The current FORMAT sorts lines by weight (🔴, 🟡, ⚪) but does not say what the note must answer. The proposal keeps a nested list and short lines, and replaces the open topic list with the three named parts. The ⚪ marker is dropped from the starting note: an assumption that can change the end belongs in `Easy to miss` or as a check; a minor assumption that cannot change the end does not earn a line in a six-line note. This is a deliberate loss, named here so it is not silent. If Adam wants assumptions kept, the place for one is a single 🟡 line under `Easy to miss`.
-- The current rate-limit example shows facts about a feature. The proposed example shows checks and their proofs, so the example itself teaches the shape.
-- The current `changed` example is kept in substance: keep the old line, add the dated reason under it. No date or time is required unless it helps, as now.
 
 ## Proposed noteStart
 
-This replaces `noteStart` in `src/job/task-note.ts` (sent once, in the first prompt of each job, a continued one too). Text in `[IF ...]` blocks is included only when the condition holds. Limen already tests these conditions; the proposal changes wording, not conditions.
+This replaces `noteStart` in `src/job/task-note.ts` (added once, to the first prompt of each job, a continued one too). The reminders block is included only when the reminders file exists and is not empty, as the current code does. Every other line is always sent. No new runtime condition is proposed; the continued-job paragraph is prose that the agent applies when it finds an existing note.
 
 ```text
 [limen] Before other work, read your note in {NOTE_PATH}, or write it if there is none.
 {FORMAT}
-[IF the note already exists and describes earlier work, for example work by a predecessor job]
-Read it against this task before you act. Keep each line that still binds. Keep the old line and add a "🟡 changed: ... Reason: ..." line under any point this task changes. Move every Done check you cannot point to evidence for into "Not proven yet". Do not treat an earlier agent's Proof pointer as your evidence until you have seen the evidence yourself.
-[IF project reminders exist at {REMINDERS_PATH}]
-Project reminders ({REMINDERS_PATH}). Keep each 🔴 one as you keep your 🔴 points. A 🔴 reminder that states an end state also belongs in Done means or in Easy to miss; do not leave it only in this list:
-{REMINDERS_TEXT}
+If a note already exists, read it against this task before you act. Keep each line that still binds. A line that says what a later check must do is a restriction: keep it as a Done check or as Easy to miss. A line that only says what already happened is a result: do not carry its numbers or its verdict into this note, but if it reveals a gap or a limit that still binds, write that gap or limit as a Done check or as Easy to miss. Keep the old line and add a "🟡 changed: ... Reason: ..." line under any point this task changes. Do not treat an earlier agent's Seen line as your evidence until you have seen the evidence yourself. Every check you have not seen evidence for stays in Not proven yet.
+[reminders exist] Project reminders ({REMINDERS_PATH}). Keep each 🔴 one as you keep your 🔴 points:
+[reminders exist] {REMINDERS_TEXT}
 ```
 
-Notes on conditions:
-
-- Missing note: the first line already covers it ("or write it if there is none"). No separate variant is needed, and no separate variant existed.
-- Continued job: the current text says only "a continued one too" in a code comment. The proposal makes the continued case explicit in the prompt, because a copied note is the case where inherited results most easily enter as fact. The condition is stated for the agent ("if the note already exists and describes earlier work") rather than as a new runtime test.
-- Reminders: the current code includes the reminders path and text only when the file exists and is not empty. That condition and the 🔴 obligation are kept. The proposal adds one sentence: a reminder that defines acceptance must also appear as a check or as the easy-to-miss rule, so the finish check can test it.
+The last two lines above are the reminders variant. With no reminders file, the string ends after the continued-job paragraph, and the word "reminders" does not appear in it.
 
 ## Proposed noteSteer
 
-This replaces `noteSteer` in `src/job/task-note.ts` (added to each steer message). It has two conditional wordings, as the current code does, plus a scope sentence that applies in both.
+This replaces `noteSteer` in `src/job/task-note.ts` (added to each steer message). The subject differs when project reminders exist, as in the current code.
 
 ```text
-[IF project reminders exist]
-[limen] If this steer changes a Done check, the Easy-to-miss rule, a Not-proven-yet item, or a project reminder, add a line under that point in {NOTE_PATH}: "🟡 changed: ... Reason: ...". Keep the old line. If the steer changes scope, put every affected Done check back in "Not proven yet" until new evidence exists. If the steer changes no point in the note, do not edit the note.
-[IF no project reminders exist]
-[limen] If this steer changes a Done check, the Easy-to-miss rule, or a Not-proven-yet item, add a line under that point in {NOTE_PATH}: "🟡 changed: ... Reason: ...". Keep the old line. If the steer changes scope, put every affected Done check back in "Not proven yet" until new evidence exists. If the steer changes no point in the note, do not edit the note.
+[with reminders] [limen] If this steer changes a Done check, the Easy-to-miss rule, its name in Not proven yet, or a project reminder, add a line under that point in {NOTE_PATH}: "🟡 changed: ... Reason: ...".
+[no reminders] [limen] If this steer changes a Done check, the Easy-to-miss rule, or its name in Not proven yet, add a line under that point in {NOTE_PATH}: "🟡 changed: ... Reason: ...".
+[both] Keep the old line. Change the check and its name in Not proven yet in the same edit. If the steer changes scope, remove the Seen line of each check it makes stale and put that check's name back in Not proven yet. If the steer changes no point in the note, do not edit the note.
 ```
-
-What changed: the current text names "a point in your note". The proposal names the three parts, so a steer that changes only the easy-to-miss rule is not missed. "Do not edit the note" for an unrelated steer is new and explicit; it stops steers from growing the note into a log.
 
 ## Proposed noteCheck
 
-This replaces `noteCheck` in `src/job/task-note.ts` (sent once, before the finish; it carries the note now, the note at the start when it differs, and the project reminders). Blocks are included only when their condition holds, as the current code does. The final-message instruction differs when the job has the finish tool.
+This replaces `noteCheck` in `src/job/task-note.ts` (sent once, before the finish). Blocks are included only when their stated condition holds, matching the tests the current code already makes: the note text is not empty; a first note exists and differs; reminders exist and are not empty. The last block depends on which path sent the check: a `finish` call, or the extra turn before a detached run settles.
 
 ```text
-[IF the note exists]
-[limen] Your note now:
-{NOTE_NOW}
-[IF no note exists]
-[limen] You wrote no note in {NOTE_PATH}. From memory, list the Done checks, the Easy-to-miss rule, and the checks with no proof, for this job.
-[IF the note exists, a first version exists, and the two differ]
-Your note at the start:
-{NOTE_FIRST}
-[IF project reminders exist]
-Project reminders:
-{REMINDERS_TEXT}
-In your final message, under the heading "Note check", give one line for each item below. State only what you can point to evidence for.
-- Each Done check: delivered, changed, or dropped, with the reason. Name the Proof pointer for each delivered check. A check still in "Not proven yet" is not delivered; say it is not proven and name what is missing.
-- The Easy-to-miss rule: kept or broken, with the evidence you can point to. If you cannot tell, say so; unknown is not kept.
-- [IF project reminders exist] Each 🔴 project reminder: delivered, changed, or dropped, with the reason.
-- [IF the note at the start is shown above] Each Done check or Easy-to-miss rule that was in the note at the start and is gone now, with no "changed" line under it: name it as dropped and give the reason.
-[IF this job has the finish tool]
-Then call finish again. Its handoff is that whole final message, with the "Note check".
-[IF this job has no finish tool]
-End your final message there.
+[note exists] [limen] Your note now:
+[note exists] {NOTE_NOW}
+[no note] [limen] You wrote no note in {NOTE_PATH}. From memory, list the 🔴 points of this job.
+[first exists and differs] Your note at the start:
+[first exists and differs] {NOTE_FIRST}
+[reminders exist] Project reminders:
+[reminders exist] {REMINDERS_TEXT}
+[no reminders] In your final message, under the heading "Note check", mark each 🔴 point delivered, changed or dropped, and give the reason.
+[reminders exist] In your final message, under the heading "Note check", mark each 🔴 point and each 🔴 project reminder delivered, changed or dropped, and give the reason.
+Then add these marks, one line each:
+- Each check still named in Not proven yet: mark it not proven, and name what is missing. Not proven is not delivered. Unknown is not passed.
+- Each delivered Done check: name its Seen pointer. A delivered mark with no pointer you can name is not proven.
+- The Easy-to-miss rule: mark it kept, broken, or not proven. Name the evidence you can point to. If you cannot tell, mark it not proven.
+- [first note shown] Each point in the note at the start that is gone now and has no "changed" line under it: mark it dropped, and give the reason.
+Do not run a check now to change a mark. Report the state the work reached. A check the task forbids stays not proven.
+[this check answers a finish call] Then call finish again. Its handoff is that whole final message, with the "Note check".
+[this check is the extra turn before a run settles] End your final message there.
 ```
 
-What changed and what is kept:
-
-- Kept: the missing-note fallback, the start-note comparison only when it differs, the reminders block only when reminders exist, the `delivered, changed or dropped` verdict with a reason, and the finish-tool sentence only when the job has that tool. No original obligation is dropped.
-- The current text asks about each 🔴 point. The proposal asks about each Done check, the one easy-to-miss rule, and each 🔴 reminder, because those are the lines the new FORMAT creates. The start-note comparison gains a purpose: a check that vanished without a `changed` line must be named as dropped, which is the silent-drop case the current text cannot catch.
-- "Not proven" is a required answer, not a failure of the format. This answers the ticket requirement that the final proposal states the checks with no evidence.
+Kept from the current text, deliberately: "From memory" for a missing note; "Your note at the start:" only when a first note differs; the reminders block only when reminders exist; the first mark sentence, including its reminders wording; and the finish sentence only when the check answers a `finish` call. Changing any of these strings later costs a test change in `test/u14-task-note.test.ts`, which matches several of them. That cost belongs to the implementation decision, not to this proposal, and it is why the kept strings stay kept.
 
 ## The three rewrites
 
-Rules used for all three rewrites, from the brief:
+Rules for all three, restated after the critiques:
 
-- Each task is shown in exactly three short lines drawn only from its supplied task excerpt in `/Users/overment/Downloads/limen-note-examples-data/examples.json`. The excerpts contain ellipses. No missing text was invented.
-- Each old note is the supplied note excerpt from the same source, verbatim, ellipses included.
-- Each new note is a plan written before new evidence exists. It claims no result. Every check starts in `Not proven yet`.
-- Exact limits and restrictions are kept only where the excerpt states them.
+- Each task is shown in exactly three short lines drawn only from its supplied task excerpt in `/Users/overment/Downloads/limen-note-examples-data/examples.json`. The excerpts contain ellipses. No missing text was invented, and no word from the full record behind an ellipsis appears in a new note.
+- Each old note is that source's `note` excerpt, verbatim, ellipses included.
+- Each new note is a plan written before new evidence exists. It claims no result. Every check and the rule start in `Not proven yet`, named one by one.
 
 ### Example 1: plant limits (a hard boundary)
 
@@ -160,14 +165,14 @@ Why this old note fails the proposed shape: it is all evidence with no end state
 New note, as a plan before evidence:
 
 ```text
-- 🔴 Done means:
-  - 🔴 A cargo plant can raise its prepare limit and its tool stall limit, and Limen uses the raised values. Proof: set raised values for a cargo plant and show Limen reading them.
-  - 🔴 A waiting build does not stop either clock, and the job time limit is unchanged. Proof: show both clocks still running during a wait, and show the job limit value before and after.
-- 🔴 Easy to miss: raising the limits by stopping the clocks while a build waits, or by changing the job time limit. Both are forbidden.
-- 🔴 Not proven yet: both Done checks.
+- 🔴 Done means: the prepare limit for cargo plants is raised. Shown by: the raised prepare value Limen uses for a cargo plant.
+- 🔴 The tool stall limit for cargo plants is raised. Shown by: the raised tool stall value Limen uses for a cargo plant.
+- 🔴 The job time limit is unchanged. Shown by: the job time limit value, before and after this work.
+- 🔴 Easy to miss: do not stop the clocks while a build waits.
+- 🔴 Not proven yet: raised prepare limit; raised tool stall limit; unchanged job time limit; clocks not stopped.
 ```
 
-Note on this rewrite: the excerpt does not state where the plant setting lives or what values to choose. The new note does not invent them. In a real job the agent would read the full task in its job folder and replace "a cargo plant can raise" with the exact setting the full task names, before other work.
+Why this rule: the fast way to make a waiting build safe is to pause its clocks, and the task forbids exactly that. The job time limit is a separate check with its own proof, not part of this line.
 
 ### Example 3: trusted rows (a reviewer trust rule)
 
@@ -190,19 +195,18 @@ Old note, verbatim:
 …
 ```
 
-Why this old note fails the proposed shape: the verdict and the test counts are results. They answer "what happened", not "what must be true and how would a person see it". The two gaps it found (no permanent forged-approval test; thread rows resolving inside a message) are the valuable lines, and in the old note they sit as asides under a verdict.
+Why this old note fails the proposed shape: the verdict and the test counts are results. They answer "what happened", not "what must be true and how would a person see it". The gaps it found are its valuable lines, and they sit as asides under a verdict.
 
 New note, as a plan before evidence:
 
 ```text
-- 🔴 Done means:
-  - 🔴 Every place that sets the `setting`, `app`, or `thread` resolver is host code, and the list is complete. Proof: show the search that finds every setter and name each place.
-  - 🔴 No non-host source (a generated tree, an App tree, a message body, Markdown) can set, inherit, or reach that resolver. Proof: show a forged attempt from each such source failing to reach it.
-- 🔴 Easy to miss: reporting PASS from the places that set the resolver, without showing that no other place can reach it. The task asks for every place, not the expected places.
-- 🔴 Not proven yet: both Done checks.
+- 🔴 Done means: every place that sets the `setting`, `app`, or `thread` resolver is shown. Shown by: the list of places that set it.
+- 🔴 The composer draws trusted setting, App and conversation rows. Shown by: the composer drawing those rows.
+- 🔴 Easy to miss: only host code can give Compose the `setting`, `app` and `thread` resolver.
+- 🔴 Not proven yet: every setter shown; trusted rows drawn; only host code gives the resolver.
 ```
 
-Note on this rewrite: the excerpt names only the resolver-origin check. A real reviewer note would add one Done check per further check in the full task, grouped by shared proof, and would keep the review boundaries (for example read-only limits) in `Easy to miss` if that is the rule most likely to be broken. This rewrite does not invent those checks from the cut-off text.
+Why this rule: three teams picked three different lines for this example. Team-1 picked this host-code line; team-3 picked "show every place"; the team-2 draft picked completeness. This revision picks the host-code line as the rule, because it is the boundary the task states, and puts completeness where it can be checked: the first Done check fails if the list is short, whatever the list contains. The rule keeps its own place in `Not proven yet`, so a complete list of setters does not clear it until the agent can point to evidence that each one is host code. The draft's second check, which named sources that appear only behind the excerpt's ellipses, is gone.
 
 ### Example 8: continued mixing-trap design (a continued task)
 
@@ -223,40 +227,40 @@ Old note, verbatim:
   - 🟡 No independent review of this round. Self-check only.
 ```
 
-Why this old note fails the proposed shape: it is a results ledger for a continued job. The numbers may be true, but they are the predecessor's claims carried forward, and no line says what this round must prove again or what limit survives (video first helps only when the harness works in list order; live QA must check the work order). Under the proposed noteStart, a continuing agent must move inherited numbers out of the note and into a pointer, and must re-prove or mark unproven.
+Why this old note fails the proposed shape: it is a results ledger carried into a continued job. No line says what this round must show again, and its one forward-looking line (live QA must check the work order) is buried among numbers. Under the proposed `noteStart`, a continuing agent keeps that line as a restriction if it still binds, carries no numbers forward, and puts every check it has not seen evidence for in `Not proven yet`. That classification is stated here, outside the new note, because the work-order line comes from the old note and not from this round's task lines; the new note below uses only the task lines.
 
 New note, as a plan before evidence (written at the start of the continued round):
 
 ```text
-- 🔴 Done means:
-  - 🔴 The doc and the ADR draft record the decisions named in this task as decided. Proof: show the decided wording in both files.
-  - 🔴 The video-first chain cases are re-run offline with the VIDEO receipt issued first, and the new numbers confirm or correct the old 8/10. Proof: show the re-run output with the VIDEO receipt first and state the new numbers beside the old 8/10.
-- 🔴 Easy to miss: treating the earlier 8/10, or the earlier chain numbers in the copied note, as this round's result. This round's re-run must issue the VIDEO receipt first; a re-run in the old order proves nothing about the flaw.
-- 🔴 Not proven yet: both Done checks.
+- 🔴 Done means: the doc and the ADR draft record these decisions as decided. Shown by: the decided wording in both files.
+- 🔴 The video-first chain cases are re-run offline. Shown by: the re-run record.
+- 🔴 The new numbers are reported, and they confirm or correct the 8/10 result. Shown by: the report of the new numbers from that re-run.
+- 🔴 Easy to miss: the VIDEO receipt is issued first.
+- 🔴 Not proven yet: decisions recorded in both files; chain cases re-run offline; new numbers reported; VIDEO receipt first.
 ```
 
-Note on this rewrite: the old note's limit (video first catches an unlabelled hand-off only when the harness works in list order) is a candidate `Easy to miss` line for a later implementation round. It is not used here because, for this round, the easier miss is re-running in the wrong receipt order and reporting the old number as confirmed. Only one rule earns the line; the other belongs in the work's own documents, not the note.
+Why this rule: a re-run in the old receipt order produces numbers that look like a confirmation and prove nothing about the flaw the task names. The receipt order is the one miss that leaves no visible sign, so it is the rule, and the rerun and the report are separate checks with separate names.
 
 ## What this proposal preserves from the current prompt
 
-- Project reminders ride in `noteStart` and again in `noteCheck`, only when the file exists and is not empty, and each 🔴 reminder must be answered at the finish.
-- A steering message can change the note only through a kept old line plus a `changed` line with a reason.
-- A continued job gets the note instruction in its first prompt, and now also gets told how to treat a predecessor's note.
-- A missing note is named as missing; the agent must reconstruct the checks from memory at the finish, and reconstruction is not evidence.
-- When the start note differs, both versions reach the finish check, and a silently dropped check must be named.
-- The finish-tool sentence appears only when the job has the finish tool.
-- Unknown is never passed: not for a check, not for the easy-to-miss rule, not for a reminder.
+- Project reminders ride in `noteStart` and again in `noteCheck`, only when the file exists and is not empty, and each 🔴 reminder must be answered at the finish. They are not copied into the note.
+- A steering message changes the note only through a kept old line plus a `🟡 changed:` line with a reason, and a check and its `Not proven yet` name change in the same edit. A steer that changes no point does not edit the note.
+- A continued job gets the note instruction in its first prompt, gets told how to sort a predecessor's lines, and never inherits a `Seen:` line as its own evidence.
+- A missing note is named as missing; the agent lists the 🔴 points from memory at the finish, and reconstruction is not evidence.
+- When the start note differs, both versions reach the finish check, and a point that vanished without a `changed` line must be named as dropped.
+- The finish sentence appears only when the check answers a `finish` call.
+- Unknown is never passed: not for a check, not for the rule, not for a reminder.
+- The original sentences "Put detail under its main point" and "Add a time only when it helps" are in the FORMAT again.
 
 ## What this proposal does not do
 
-- It does not change any code, condition, file name, or timing in `src/job/task-note.ts`. Only the four strings change, if Adam approves.
+- It does not change any code, condition, file name, timing, or test in `src/job/task-note.ts`, `hook/finish.ts`, or `test/u14-task-note.test.ts`. Only the four strings would change, if Adam approves, and the strings this revision deliberately keeps are named above.
 - It proposes no runtime parsing of the note, no gate, and no new state. Limen still copies, logs, and shows the note without parsing it.
-- It claims no delivery benefit. The two studies behind this ticket found no clear effect of the current hook, with low confidence, and parts of their data cannot be compared (cost counters changed meaning between the sets). The honest claim is narrower: the current notes demonstrably contain task copies and result logs (examples 2 and 4 in the supplied set are final notes that still list commands to run), and this shape names the line those notes lack.
-- It does not resolve the ⚪ question. Dropping the minor/assumption marker from the starting shape is the proposal's clearest loss. The critique round should attack it.
+- It claims no delivery benefit. The narrower claim stands: the current notes demonstrably contain task copies and result logs (examples 2 and 4 in the supplied set are final notes that still list commands to run), and this shape names the lines those notes lack.
 
-## Open questions for critique
+## Still uncertain
 
-- Does grouping checks that share one proof hide a check that needs its own proof?
-- Does the one-line Proof pointer give a reviewer enough to trust a crossed-off check, or does it push all trust into the final message?
-- Is one `Easy to miss` line enough when a task has two independent hard boundaries, as example 1 does (no stopped clocks; no changed job limit)? This draft folds both into one line; that may be the first thing to revise.
-- Should `Not proven yet` name checks by copying their first words, which risks task-copy drift, or by short labels the agent invents, which risks vagueness?
+- Nothing shows that agents will keep the note near six lines when a task binds more checks, name each unproven check instead of writing "both", or keep `Seen:` to a pointer.
+- The excerpts' ellipses may hide a sharper rule in any of the three examples. The rewrites now use only what Adam's page shows, so a hidden rule is a limit of the examples, stated rather than filled.
+- One `Easy to miss` line is a bet. Example 1 has two hard boundaries; this revision makes one of them a check and the other the rule, but a task could have two rules that are each easy to miss and neither checkable as an end state.
+- The FORMAT text is longer than the current one. The cost on a first prompt was not measured by any team.
