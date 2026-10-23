@@ -27,7 +27,7 @@ type Entry = {
 /** The job's `queued` file: present from the wrapper's first moment until the job leaves the queue. */
 type Queued = { readonly since: string; readonly detail?: string; readonly ahead?: number };
 type Decision =
-	| { readonly start: true; readonly reading: Reading }
+	| { readonly start: true; readonly detail: string }
 	| { readonly start: false; readonly kind: string; readonly detail: string; readonly ahead: number };
 
 export const GATE_FILE = "start-gate.json";
@@ -143,7 +143,7 @@ function gateOpen(reading: Reading, gate: StartGate): boolean {
 }
 
 /** Marks a job queued before its handshake, so no reader sees it running as started; logs gate values it ignored. */
-export async function enterStartQueue(jobDir: string): Promise<StartGate | undefined> {
+export async function enterStartQueue(jobDir: string): Promise<boolean> {
 	const { gate, ignored } = startGate();
 	if (ignored.length > 0) {
 		await appendLimenLog(jobDir, `start gate: ignored ${ignored.join("; ")}`);
@@ -151,15 +151,16 @@ export async function enterStartQueue(jobDir: string): Promise<StartGate | undef
 	if (gate) {
 		await atomicWrite(`${jobDir}/queued`, `${JSON.stringify({ since: new Date().toISOString() })}\n`);
 	}
-	return gate;
+	return gate !== undefined;
 }
 
 /**
  * Holds the job in the seat queue until it is first in priority, then queue-time order, the settle interval since the
- * last start has passed, and its reading passes the gate. Only the first job samples the load. Returns false when the
- * job was stopped while it waited. A job that waited leaves `start-notice` for its coordinator.
+ * last start has passed, and its reading passes the gate. Only the first job samples the load. The gate is read again
+ * on each poll, so an edit to the seat's file reaches waiting jobs. Returns false when the job was stopped while it
+ * waited. A job that waited leaves `start-notice` for its coordinator.
  */
-export async function waitForStart(jobDir: string, gate: StartGate, stop: AbortSignal): Promise<boolean> {
+export async function waitForStart(jobDir: string, stop: AbortSignal): Promise<boolean> {
 	const id = basename(jobDir);
 	const since = readQueued(jobDir)?.since ?? new Date().toISOString();
 	const entry: Entry = {
@@ -174,17 +175,20 @@ export async function waitForStart(jobDir: string, gate: StartGate, stop: AbortS
 	try {
 		while (!stop.aborted) {
 			await enqueue(entry);
-			const decision = await decide(entry, gate, stop).catch((error: unknown) => {
-				if (stop.aborted) {
-					return undefined;
-				}
-				throw error;
-			});
+			const { gate } = startGate();
+			const decision = gate
+				? await decide(entry, gate, stop).catch((error: unknown) => {
+						if (stop.aborted) {
+							return undefined;
+						}
+						throw error;
+					})
+				: ({ start: true, detail: "the gate is off" } as const);
 			if (!decision) {
 				return false;
 			}
 			if (decision.start) {
-				await started(jobDir, entry, gate, decision.reading, shown !== undefined);
+				await started(jobDir, entry, decision.detail, shown !== undefined);
 				return true;
 			}
 			if (
@@ -249,16 +253,9 @@ async function decide(entry: Entry, gate: StartGate, stop: AbortSignal): Promise
 		},
 		"wait",
 	);
-	return claimed ? { start: true, reading } : { start: false, kind: "raced", detail, ahead: 0 };
+	return claimed ? { start: true, detail } : { start: false, kind: "raced", detail, ahead: 0 };
 }
-async function started(
-	jobDir: string,
-	entry: Entry,
-	gate: StartGate,
-	reading: Reading,
-	waited: boolean,
-): Promise<void> {
-	const detail = readingText(reading, gate);
+async function started(jobDir: string, entry: Entry, detail: string, waited: boolean): Promise<void> {
 	if (!waited) {
 		await appendLimenLog(jobDir, `start gate: open; ${detail}`);
 		return;

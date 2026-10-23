@@ -94,12 +94,14 @@ export async function runInternalJob(): Promise<void> {
 	});
 	const profile = await jobProfile(jobDir);
 	// A group member runs on its group's deadline and a Devin job runs in the cloud; both start at once.
-	const gate = membership || profile.id === "devin" ? undefined : await enterStartQueue(jobDir);
-	if (process.env.LIMEN_SETUP_KEEP || gate) {
-		// Spawn waits for this handshake, not for the queue or setup, so it returns before prune and --prepare run.
+	const gate = !(membership || profile.id === "devin") && (await enterStartQueue(jobDir));
+	// Spawn waits for this handshake, not for the queue or setup, so it returns before prune and --prepare run.
+	// One handshake per run: a second one races the first one's `born` write and can crash the wrapper.
+	const early = Boolean(process.env.LIMEN_SETUP_KEEP || gate);
+	if (early) {
 		await writeHandshake(jobDir);
 	}
-	if (gate && !(await waitForStart(jobDir, gate, stop.signal))) {
+	if (gate && !(await waitForStart(jobDir, stop.signal))) {
 		const requested = await textFile(`${jobDir}/stop-requested`);
 		const reason = requested || "stopped while queued";
 		await finalizeJob(jobDir, requestedTerminal(reason), reason, shutdownDeadline);
@@ -248,7 +250,9 @@ export async function runInternalJob(): Promise<void> {
 		child.once("error", (error) => resolve({ code: null, signal: null, error }));
 		child.once("close", (code, signal) => resolve({ code, signal }));
 	});
-	await writeHandshake(jobDir);
+	if (!early) {
+		await writeHandshake(jobDir);
+	}
 	await atomicWrite(`${jobDir}/state`, "running\n");
 	await appendLimenLog(jobDir, "worker started");
 	const enginePid = child.pid;
