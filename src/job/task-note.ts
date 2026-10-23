@@ -3,38 +3,60 @@ import { join, resolve } from "node:path";
 import { readOptional } from "../project/inherit.ts";
 
 // The agent writes the note in its job folder; the project may keep reminders beside its other Limen guidance.
-// Limen copies, logs and shows both, and never parses them.
+// Limen copies, logs and shows both, and never parses them. Adam approved the wording below as written (F950).
 const NOTE = "note.md";
 const FIRST = "note.first.md";
+const TASK = "task.md";
 const REMINDERS = ".agents/limen/reminders.md";
-const CHANGED = '"🟡 changed: ... Reason: ..."';
 const FORMAT = [
-	"Format: a nested list in plain technical English. Short, clear sentences. One fact on each line.",
-	"Each line starts with a marker: 🔴 must deliver or must keep, 🟡 useful context, ⚪ minor or assumption.",
-	"Put detail under its main point. Add a time only when it helps.",
-	`When a point changes, keep its line and add a line under it: ${CHANGED}. Example:`,
-	"- 🔴 Add a rate limit to the public API. Due 2026-10-24.",
-	"  - 🔴 The limit is 100 requests per minute for each key.",
-	"    - 🟡 changed 14:05: the limit is 60 requests per minute. Reason: the owner steered.",
-	"  - 🟡 The API uses the Redis client in src/cache.ts.",
-	"  - ⚪ Assume that old keys keep the old limit.",
+	"Write a plan, not a task copy or a result log. Use plain technical English. Aim for six lines in three parts:",
+	'- Done means: two to four end checks. Each line states what must be true, then "Shown by:" and the command or ' +
+		"observation that would prove it.",
+	"- Easy to miss: the one task rule that the quickest way to finish could skip or break. Quote it. " +
+		'Add "Shown by:" and how to check that it was followed.',
+	"- Not proven yet: short names of the end checks and the easy-to-miss rule that lack evidence. Name each one.",
+	"Keep exact commands, limits, paths, and counts when they define acceptance. " +
+		"Reference a longer acceptance list by its location and item count; do not copy it or omit its checks.",
+	"Each check starts unproven. Remove its name from Not proven yet only after you see evidence that it holds. " +
+		'Add "Seen: <evidence location>" to that check. Give a pointer, not results. A pointer alone is not proof. ' +
+		"The easy-to-miss rule needs its own evidence.",
+	'Keep each check in the note after it is proven. Write "Not proven yet: none" only when every check and the rule ' +
+		"have evidence. Unknown stays unproven. Do not add context, steps, assumptions, or test totals.",
 ].join("\n");
 
 /** Added once, to the first prompt of each job, a continued one too. */
 export function noteStart(jobDir: string): string {
 	const reminders = projectReminders(jobDir);
 	return [
-		`[limen] Before other work, read your note in ${join(jobDir, NOTE)}, or write it if there is none.`,
+		`[limen] Before other work, read ${join(jobDir, NOTE)}, or write it if there is none.`,
 		FORMAT,
-		...(reminders ? [`Project reminders (${reminders.path}). Keep each 🔴 one as you keep your 🔴 points:`] : []),
-		...(reminders ? [reminders.text] : []),
+		"Read an existing note against this task. Keep restrictions that still apply. " +
+			"Replace past results with the end checks or limits they reveal. " +
+			"Reuse earlier evidence only after you inspect it and confirm that it still applies; " +
+			"do not rerun a check just because this is a continued job.",
+		...(reminders
+			? [
+					`Project reminders (${reminders.path}):`,
+					reminders.text,
+					"Follow each binding reminder. Do not copy them into the note.",
+				]
+			: []),
 	].join("\n");
 }
 
 /** Added to each steer message. */
 export function noteSteer(jobDir: string): string {
-	const subject = projectReminders(jobDir) ? "a point in your note or a project reminder" : "a point in your note";
-	return `[limen] If this steer changes ${subject}, add a line under that point in ${join(jobDir, NOTE)}: ${CHANGED}.`;
+	return [
+		"[limen] If this steer changes an end check or the easy-to-miss rule, keep the old line and append " +
+			`"Changed: <new requirement>. Reason: <what changed it>" under it in ${join(jobDir, NOTE)}. ` +
+			"The new requirement now applies. Put affected checks back in Not proven yet and remove stale Seen pointers. " +
+			"Add any new obligation as unproven. Leave an unrelated note unchanged.",
+		...(projectReminders(jobDir)
+			? [
+					"If a reminder changes, record the changed requirement by reference in the note. Do not edit the reminders file.",
+				]
+			: []),
+	].join("\n");
 }
 
 /** Sent once, before the finish: the note now, the note at the start, and the project reminders. */
@@ -42,15 +64,29 @@ export function noteCheck(jobDir: string, finishTool: boolean): string {
 	const now = readOptional(join(jobDir, NOTE))?.trim();
 	const first = readOptional(join(jobDir, FIRST))?.trim();
 	const reminders = projectReminders(jobDir);
-	const points = reminders ? "🔴 point and each 🔴 project reminder" : "🔴 point";
 	return [
 		...(now
 			? ["[limen] Your note now:", now]
-			: [`[limen] You wrote no note in ${join(jobDir, NOTE)}. From memory, list the 🔴 points of this job.`]),
+			: [
+					`[limen] No note exists in ${join(jobDir, NOTE)}. Read ${join(jobDir, TASK)} and reconstruct the end checks ` +
+						"and the easy-to-miss rule. Do not assume they are proven.",
+				]),
 		...(now && first && first !== now ? ["Your note at the start:", first] : []),
 		...(reminders ? ["Project reminders:", reminders.text] : []),
-		`In your final message, under the heading "Note check", mark each ${points} delivered, changed or dropped, ` +
-			"and give the reason.",
+		"Compare the note with the task and later instructions. " +
+			'Under "Note check" in your final message, give one line per end check. ' +
+			"Mark it proven, not proven, changed, or dropped. Proven needs evidence and its location. " +
+			"Not proven needs what is missing. Changed or dropped needs the instruction that changed its scope. " +
+			"Give one line per item in a referenced acceptance list. " +
+			"Account for any obligation missing from the current note.",
+		"Give the easy-to-miss rule its own line: followed, broken, or not proven, with evidence or the gap. " +
+			"Passing the end checks does not prove that the rule was followed. " +
+			"Read Not proven yet; none of its entries can be marked proven without evidence.",
+		...(reminders
+			? ["Report each binding project reminder as followed, broken, or not proven, with evidence or the gap."]
+			: []),
+		"Do not repeat a run-once check or run a forbidden check to clear the note. " +
+			"Report any remaining gap without claiming completion.",
 		...(finishTool ? ['Then call finish again. Its handoff is that whole final message, with the "Note check".'] : []),
 	].join("\n");
 }

@@ -83,28 +83,32 @@ See the [Picture guide](docs/picture.md) for navigation and updates.
 
 ## Task-note experiment (started 2026-10-22)
 
-The experiment started on 2026-10-22 at 12:17 CEST (UTC+2), when this change landed on `main`. Jobs that started before that time have no note.
+The experiment started on 2026-10-22 at 12:17 CEST (UTC+2), when this change landed on `main`. Jobs that started before that time have no note. On 2026-10-23 the note became the plan below (F950). Notes from before that change use the earlier 🔴 / 🟡 / ⚪ marker lines.
 
 **What changed.** Every Limen job keeps a task note in `.limen/jobs/<id>/note.md`. Team coordinators of a group get one too; the top-level coordinator session does not. The agent writes the note. Limen copies and shows it, and never parses it.
 
-- **The format.** A nested log list in plain technical English: short sentences, one fact on each line. Each line starts with a marker: 🔴 must deliver or must keep, 🟡 useful context, ⚪ minor or assumption. Detail goes under its main point. A change is a new line under the point it changes, such as `🟡 changed: ... Reason: ...`; the old line stays.
+- **The format.** A plan in plain technical English, about six lines in three parts, with no colored markers. It is not a task copy or a result log.
+  - `Done means:` two to four end checks. Each states what must be true, then `Shown by:` and the command or observation that would prove it.
+  - `Easy to miss:` the one task rule that the quickest way to finish could skip or break, quoted, with its own `Shown by:`.
+  - `Not proven yet:` the short names of the end checks and the rule that lack evidence.
+  - A check stays in the note after it is proven and gets `Seen: <evidence location>`: a pointer, not results.
 - **The files.** Limen keeps the first version of the note as `note.first.md`, and adds a `note changed` line to the job log at each change. `limen continue` copies both files into the new job folder.
-- **Three injections.** The first prompt of each job, also a continued one, asks the agent to read or write the note, with the format and one example. Each steer asks the agent to add a changed line when the steer changes a point. Once before the finish, Limen shows the note now, the note at the start and the project reminders. The agent marks each 🔴 point delivered, changed or dropped, with the reason, under the heading "Note check" in its final message. Without a note, the agent lists its 🔴 points from memory.
+- **Three injections.** The first prompt of each job, also a continued one, asks the agent to read or write the note, with the format. A continued job reads its note against the new task and reuses earlier evidence only after it confirms that the evidence still applies. When a steer changes an end check or the easy-to-miss rule, the agent keeps the old line, adds `Changed: <new requirement>. Reason: <what changed it>` under it, and puts the affected checks back in `Not proven yet`. Once before the finish, Limen shows the note now, the note at the start when it differs, and the project reminders. Under the heading "Note check" in its final message, the agent marks each end check proven, not proven, changed or dropped, and the easy-to-miss rule followed, broken or not proven, each with its evidence or the gap. Without a note, the agent reconstructs the end checks and the rule from the job's `task.md`.
 - **Before the finish.** The first `finish` call gets the check and does not end the job. A detached run that ends without `finish` gets the check as one more turn (Pi 1.2.0 or later, and OMP). A hosted job whose agent never calls `finish` gets no check. The log records `note check sent`. Devin jobs run no Limen hooks and get no note.
 
-**Project reminders.** A project can name points that every job must keep. Write them in `.agents/limen/reminders.md`, in the same format, and commit the file:
+**Project reminders.** A project can name rules that every job must follow. Write them in `.agents/limen/reminders.md` and commit the file:
 
 ```markdown
-- 🔴 Every database migration has a down step.
-- 🟡 The staging database resets each night.
+- Every database migration has a down step.
+- The staging database resets each night.
 ```
 
-Limen adds the file to the first prompt and to the check before the finish, and the steer line names the reminders. The agent checks each 🔴 reminder as it checks a 🔴 point of its note. When the file is absent, no injection mentions reminders. Limen reads the file in the project root, so an edit applies to the next prompt, steer or check.
+Limen adds the file to the first prompt and to the check before the finish, and the steer line asks the agent to record a changed reminder by reference in its note. The agent follows each binding reminder and does not copy the reminders into its note. Its "Note check" reports each binding reminder as followed, broken or not proven. When the file is absent or empty, no injection mentions reminders. Limen reads the file in the project root, so an edit applies to the next prompt, steer or check.
 
 **How to measure, after about one week.** Compare the jobs that started before the start time with the jobs that started after it:
 
-1. The share of finishes that report each 🔴 point.
-2. The 🔴 points that were changed or dropped, and whether each has a reason.
+1. The share of finishes that report each end check and the easy-to-miss rule (each 🔴 point in an earlier note).
+2. The end checks that were changed or dropped, and whether each names the instruction that changed it.
 3. The reviewer FAIL rate.
 4. The steers and `limen continue` runs for each job.
 5. The share of notes written in the first turns of the job.
