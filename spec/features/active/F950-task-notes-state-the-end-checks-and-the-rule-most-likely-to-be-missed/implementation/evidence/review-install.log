@@ -1,0 +1,8 @@
+npm warn Unknown user config "min-release-age". This will stop working in the next major version of npm.
+
+added 12 packages, and audited 13 packages in 734ms
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
