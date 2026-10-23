@@ -64,10 +64,8 @@ function wokeOnce(ids: Readonly<Record<string, string>>, listeners: readonly str
 	for (const [name, id] of Object.entries(ids)) {
 		const [wake, ...extra] = listeners.flatMap((dir) => wakes(dir, id));
 		assert.equal(extra.length, 0, `${name} woke its session once`);
-		assert.ok(
-			wake?.text?.includes(jobFile(p, id, "label")) && wake.text.includes(jobFile(p, id, "state")),
-			`${name} wake names its label and state`,
-		);
+		const named = wake?.text?.includes(jobFile(p, id, "label")) && wake.text.includes(jobFile(p, id, "state"));
+		assert.ok(named, `${name} wake names its label and state`);
 	}
 }
 

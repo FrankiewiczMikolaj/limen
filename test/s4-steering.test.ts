@@ -147,10 +147,7 @@ test("continue resumes the parent's session, linked, with its extensions or a re
 	assert.equal(jobFile(p, inherited, "note.md"), "- Done means: now.");
 	assert.ok(jobFile(p, inherited, "fake-context.txt").includes(`/jobs/${inherited}/note.md, or write it`));
 	const resumed = readFileSync(join(jobDir(p, inherited), "session/fake.jsonl"), "utf8");
-	assert.ok(
-		resumed.startsWith(transcript) && resumed.length > transcript.length,
-		"the child's transcript extends the parent's",
-	);
+	assert.ok(resumed.startsWith(transcript) && resumed.length > transcript.length, "the child's transcript grows");
 	assert.deepEqual(extensions(inherited).slice(-1), [first]);
 	const replaced = continued(["--extension", second, "--timeout", "10m", "--priority", "1"]);
 	assert.deepEqual(extensions(replaced).slice(-1), [second]);

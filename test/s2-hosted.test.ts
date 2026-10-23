@@ -128,11 +128,8 @@ test("a hosted job's task never travels as argv, and it finishes done with its h
 	first = spawnJob(p, "say hi\nfinish\nfinish F001 handoff", ["--tab", "--label", "F001 hosted"], { env });
 	assert.equal(waitJob(p, first, { env }), "done");
 	assert.equal(jobFile(p, first, "result"), "F001 handoff");
-	const argv = engineArgv(pane(first));
-	assert.ok(
-		argv.every((arg) => !arg.includes("F001 handoff") && !/[\r\n]/.test(arg)),
-		"no task text in argv",
-	);
+	const leaked = engineArgv(pane(first)).filter((arg) => arg.includes("F001 handoff") || /[\r\n]/.test(arg));
+	assert.deepEqual(leaked, [], "no task text in argv");
 });
 
 let second = "";

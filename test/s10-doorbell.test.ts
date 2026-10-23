@@ -200,11 +200,8 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	poll();
 	const replies = posts();
 	const sent = replies.map((request) => `${request.method} ${request.url}`);
-	assert.deepEqual(
-		sent,
-		Array(2).fill(`POST https://api.github.com/repos/${REPO}/issues/4/comments`),
-		"one start and one terminal reply; none for the forged claim; no review",
-	);
+	const reply = `POST https://api.github.com/repos/${REPO}/issues/4/comments`;
+	assert.deepEqual(sent, [reply, reply], "one start and one terminal reply; none for the forged claim; no review");
 	assert.deepEqual((await readdir(claims)).sort(), ["104.json", "issue-5.json"]);
 	poll();
 	assert.equal(posts().length, 2, "a poller restart posts nothing twice");
