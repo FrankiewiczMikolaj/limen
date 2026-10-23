@@ -146,11 +146,7 @@ test("a killed wrapper is reaped at once and a stopped job leaves no escaped chi
 	const session = spawn(
 		join(p.bin, "pi"),
 		["--extension", WAKE, "--session-dir", join(coordinator, "session"), `@${join(coordinator, "task.md")}`],
-		{
-			cwd: p.root,
-			env: { ...p.env, ...env },
-			stdio: "ignore",
-		},
+		{ cwd: p.root, env: { ...p.env, ...env }, stdio: "ignore" },
 	);
 	// A later job's wake orders the count: a duplicate for either earlier job would have arrived before it.
 	const last = spawnJob(p, "say last", [], { env });

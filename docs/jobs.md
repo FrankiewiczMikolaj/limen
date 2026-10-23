@@ -153,8 +153,25 @@ Limen copies the saved session into a new linked job. The new job keeps the work
 |---|---|---|
 | Time | 90 minutes (change it with `--timeout 20m`) | None |
 | Tool-start events | 900 (`LIMEN_MAX_TOOL_CALLS`) | None |
+| `--prepare` command | 5 minutes (`LIMEN_PREPARE_MS`, or the plant limits file) | 5 minutes |
+| Stalled tool | 3 minutes (`LIMEN_TOOL_STALL_MS`, or the plant limits file) | None |
 
-**Stalled tools.** Detached jobs retain the three-minute CPU-idle tool containment rule; `LIMEN_TOOL_STALL_MS` changes that confirmation time. Hosted observation never signals an engine or its children: a quiet external wait is not proof of a stuck tool. Explicit stops and configured group deadlines still apply.
+A prepare command that runs out of time is stopped, and the job log records `prepare failed: timed out`. The job still starts.
+
+**Stalled tools.** Detached jobs retain the three-minute CPU-idle tool containment rule; `LIMEN_TOOL_STALL_MS` or the plant limits file changes that confirmation time. Hosted observation never signals an engine or its children: a quiet external wait is not proof of a stuck tool. Explicit stops and configured group deadlines still apply.
+
+**Plant limits.** A plant can set the prepare limit and the stalled-tool time in a tracked file, `.agents/limen/limits.json`. Cargo plants use it. Their builds wait for each other: a Mac-wide cargo wrapper that queues builds, or cargo's own lock on a build directory. A prepare command that builds Rust can need more than 5 minutes. A cargo command that waits on cargo's lock uses no CPU, so the stalled-tool rule can stop it. A cargo plant commits this file:
+
+```json
+{ "prepare": "20m", "toolStall": "15m" }
+```
+
+- Values use the `--timeout` form: `90s`, `20m`, `2h`.
+- `LIMEN_PREPARE_MS` or `LIMEN_TOOL_STALL_MS`, when it is set, wins over the file.
+- A plant with no file keeps 5 minutes and 3 minutes.
+- Limen reads the file in the project root each time it uses a limit, so an edit applies to running jobs too.
+- The job log names each entry that Limen ignores, such as an unknown key or a value without a unit.
+- The file does not change the job time limit.
 
 **Hosted ownership.** On Linux, Limen checks that a hosted Pi job still owns its pane. While it does, the job shows no ownership note. A pane reload keeps that proof, and a reload is not completion. When Limen loses the proof, the job shows an `ownership` note. See [How it works](#how-it-works) for what counts as proof.
 

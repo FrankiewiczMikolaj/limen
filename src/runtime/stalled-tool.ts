@@ -1,11 +1,11 @@
 import { execFile } from "node:child_process";
+import { limitMs } from "../project/limits.ts";
 import { type JobProcess, processInfo } from "./contain.ts";
 
 const DEFAULT_TOOL_STALL_MS = 3 * 60_000;
 const PROCESS_SAMPLE_MS = 2_000;
 export function toolStallMs(): number {
-	const configured = Number(process.env.LIMEN_TOOL_STALL_MS);
-	return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TOOL_STALL_MS;
+	return limitMs("toolStall", DEFAULT_TOOL_STALL_MS);
 }
 
 type Row = { pid: number; ppid: number; cpu: number; state: string };

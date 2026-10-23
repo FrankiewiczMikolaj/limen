@@ -109,20 +109,24 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	assert.doesNotMatch(done, /produced nothing/);
 });
 
-test("stop, timeout and the tool cap each end a job once and wake its session once; 80% of a timeout steers once", async () => {
+test("stop, timeout, the tool cap and a stalled tool each end a job once and wake its session once; 80% of a timeout steers once; the plant's limits file yields to an env var", async () => {
+	writeFileSync(join(p.root, ".agents/limen/limits.json"), '{"prepare":"1s","toolStall":"2s","timeout":"2h"}\n');
 	const ids = {
 		stopped: job("block", "b stopped"),
 		timeout: job("block", "b timeout", ["--timeout", "3s"]),
 		cap: job("tool ls\nblock", "b tool cap", [], { PI_SESSION_ID: "coord", LIMEN_MAX_TOOL_CALLS: "1" }),
+		stall: job("idle", "b stall", ["--prepare", "sleep 30"]),
+		kept: job("say kept", "b kept", ["--prepare", "sleep 2"], { PI_SESSION_ID: "coord", LIMEN_PREPARE_MS: "60000" }),
 	};
 	await until(jobDir(p, ids.stopped), () => existsSync(join(jobDir(p, ids.stopped), "fake-blocked-1")));
 	assert.equal(limen(p, ["stop", ids.stopped, "test stop"]).status, 0);
 	const states = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, waitJob(p, id)]));
-	assert.deepEqual(states, { stopped: "stopped", timeout: "failed", cap: "failed" });
+	assert.deepEqual(states, { stopped: "stopped", timeout: "failed", cap: "failed", stall: "failed", kept: "done" });
 	assert.equal(jobFile(p, ids.timeout, "log").match(/steered: 1 min left before the timeout: /g)?.length, 1);
-	// Timeout and the tool cap race the engine's exit and log one terminal line;
-	// a stop logs two (stop.ts's 25 ms grace races the finalize) until F928 lands: then count ids.stopped too.
-	for (const id of [ids.timeout, ids.cap]) {
+	assert.match(jobFile(p, ids.stall, "log"), /timeout is not a limit.*timed out after 1 s.*CPU-idle child for 2s/s);
+	assert.doesNotMatch(jobFile(p, ids.kept, "log"), /prepare failed/);
+	// One terminal line each; a stop logs two until F928 lands (stop.ts's 25 ms grace races the finalize).
+	for (const id of [ids.timeout, ids.cap, ids.stall]) {
 		assert.equal(jobFile(p, id, "log").match(/\] (?:done|failed|stopped):/g)?.length, 1, id);
 	}
 	await delivered(Object.values(ids));

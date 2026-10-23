@@ -2,6 +2,9 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { pruneForJob } from "../commands/prune.ts";
 import { appendLimenLog } from "../job/record.ts";
+import { limitMs, PLANT_LIMITS, plantLimits } from "../project/limits.ts";
+
+const DEFAULT_PREPARE_MS = 5 * 60_000;
 
 /** Why the engine cannot start in the job's worktree: it is gone or is no Git checkout. Undefined when it can. */
 export function worktreeMissing(worktree: string): string | undefined {
@@ -14,6 +17,7 @@ export function worktreeMissing(worktree: string): string | undefined {
  * The setup spawn hands to the job's owner after publication, so spawn returns before it: prune finished worktrees,
  * then run `--prepare` in the worktree. `LIMEN_SETUP_KEEP` names the spawner's checkout and marks a start that owes
  * setup; a continue or a recovery does not set it. Each step logs its result and time; neither failure ends the job.
+ * The log also names each entry of the plant's limits file that Limen ignores.
  */
 export async function setUpJob(jobDir: string, worktree: string): Promise<void> {
 	const keep = process.env.LIMEN_SETUP_KEEP;
@@ -26,13 +30,16 @@ export async function setUpJob(jobDir: string, worktree: string): Promise<void> 
 		(removed) => appendLimenLog(jobDir, `prune: removed ${removed} in ${seconds(pruneStart)}`),
 		(error: unknown) => appendLimenLog(jobDir, `prune failed after ${seconds(pruneStart)}: ${String(error)}`),
 	);
+	const { ignored } = plantLimits(root);
+	if (ignored.length > 0) {
+		await appendLimenLog(jobDir, `limits: ignored in ${PLANT_LIMITS}: ${ignored.join("; ")}`);
+	}
 	const command = process.env.LIMEN_SETUP_PREPARE?.trim();
 	if (command) {
-		await runPrepare(jobDir, worktree, command);
+		await runPrepare(jobDir, worktree, command, limitMs("prepare", DEFAULT_PREPARE_MS, root));
 	}
 }
-async function runPrepare(jobDir: string, worktree: string, command: string): Promise<void> {
-	const timeoutMs = Number(process.env.LIMEN_PREPARE_MS) || 300_000;
+async function runPrepare(jobDir: string, worktree: string, command: string, timeoutMs: number): Promise<void> {
 	const start = Date.now();
 	let output = "";
 	const failure = await new Promise<string | undefined>((resolve) => {

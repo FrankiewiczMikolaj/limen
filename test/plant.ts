@@ -19,10 +19,7 @@ export type Plant = {
 	cleanup(): Promise<void>;
 };
 export type Run = { readonly stdout: string; readonly stderr: string; readonly status: number };
-export type RunOptions = {
-	readonly cwd?: string;
-	readonly env?: Readonly<Record<string, string>>;
-};
+export type RunOptions = { readonly cwd?: string; readonly env?: Readonly<Record<string, string>> };
 
 export const TICKET = "spec/features/active/F001-demo/ticket.md";
 const ticket = `---
