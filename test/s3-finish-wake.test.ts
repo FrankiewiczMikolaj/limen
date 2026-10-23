@@ -185,16 +185,19 @@ test("a held gate queues jobs by priority; a queued job tells its session once t
 	const shown = limen(p, ["jobs", later], { env: { LIMEN_REAP_CONFIRM_MS: "1" } }).stdout;
 	assert.match(shown, / · queued · waiting \d+s: CPU 10% idle \(gate 25%\), memory 80% free \(gate 20%\), 2 ahead · /);
 	assert.ok(!engineEvents(coord).some((event) => event.text?.startsWith("limen: late started")), "no toast yet");
+	sessions[0]?.kill("SIGSTOP"); // The quick job ends while its listener sleeps, before its start notice.
 	writeFileSync(reading, '{"cpuIdle":90,"memoryFree":80}');
+	assert.equal(waitJob(p, timed), "done");
+	sessions[0]?.kill("SIGCONT");
 	const noticed = (id: string) => existsSync(join(jobDir(p, id), "notify/delivered/_start.coord"));
 	await until(jobDir(p, later), () => noticed(later) && noticed(urgent));
 	await Promise.all([later, urgent].map((id) => release(jobDir(p, id))));
-	assert.equal([later, urgent, timed, stopped].map((id) => waitJob(p, id)).join(), "done,done,done,stopped");
+	assert.equal([later, urgent, stopped].map((id) => waitJob(p, id)).join(), "done,done,stopped");
 	const started = (id: string) => /\[limen (\S+)\] start queue: started/.exec(jobFile(p, id, "log"))?.[1] ?? "";
 	assert.ok(started(urgent) < started(timed) && started(timed) < started(later), "priority, then queue time");
 	assert.equal(jobFile(p, stopped, "log").match(/\] stopped:/g)?.length, 1, "a queued stop finalizes once");
-	await delivered([later, urgent]);
-	// The start notice is its own receipt: it comes first, and the finish still wakes the session once.
-	const heard = [later, urgent].map((id) => wakes(coord, id).map((wake) => wake.text?.includes(") started after ")));
-	assert.deepEqual(heard.flat(), [true, false, true, false]);
+	await delivered([later, urgent, timed]);
+	// The start notice is its own receipt and comes first; a job that ended before it carries its line in the finish wake.
+	const heard = [later, urgent, timed].map((id) => wakes(coord, id).map((w) => w.text?.includes(") started after ")));
+	assert.deepEqual(heard.flat(), [true, false, true, false, true]);
 });

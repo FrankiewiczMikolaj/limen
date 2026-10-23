@@ -40,7 +40,7 @@ test("only a done job that is not a scout is sent to landing", async (t) => {
 	await writeFile(join(dir, "task.md"), "Scout F001.\n");
 	await writeFile(join(dir, "tool-calls"), "4\n");
 	const wake = (state: string) =>
-		completionWake(dir, "F001", state, "id", "limen/id", "", false, "Inspect it before landing.");
+		completionWake(dir, "F001", state, "id", "limen/id", "", { instruction: "Inspect it before landing." });
 	assert.doesNotMatch(wake("failed"), /landing/);
 	assert.match(wake("done"), /before landing/);
 	await writeFile(join(dir, "role"), "scout\n");

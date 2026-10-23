@@ -433,7 +433,7 @@ export default function limenWake(pi: PiApi): void {
 				!existsSync(join(job, "notify", "delivered", "_fallback"))
 			);
 		};
-		const message = completionWake(job, label, state, id, branch, repo, fallback);
+		const message = completionWake(job, label, state, id, branch, repo, { fallback, session: sessionId });
 		const routed = claimDelivery(
 			job,
 			slot,

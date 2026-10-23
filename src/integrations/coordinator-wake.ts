@@ -122,7 +122,7 @@ async function wakeMessage(jobDir: string): Promise<string | undefined> {
 	if (!membership) {
 		const keeper = state === "done" ? ` ${keeperHint(jobDir, id)}` : "";
 		const instruction = `Start with \`limen jobs ${id}\`. Inspect its diff, commits, final message, and checks before landing. If a check blocks landing, name that check and resume a focused fix.${keeper} Keep the user informed; ask only when a genuine product decision needs them.`;
-		return completionWake(jobDir, label || id, state, id, branch, repo, false, instruction);
+		return completionWake(jobDir, label || id, state, id, branch, repo, { instruction });
 	}
 	await appendLimenLog(
 		jobDir,

@@ -110,10 +110,8 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 	context.after(p.cleanup);
 	git(p.root, "remote", "add", "origin", `https://github.com/${REPO}.git`);
 	await mkdir(join(p.root, ".limen/github/claims"), { recursive: true });
-	await writeFile(
-		join(p.root, ".limen/github/binding.json"),
-		JSON.stringify({ repo: REPO, coordinator: "coord:p1", user: "worker", connectedAt: "2026-09-24T00:00:00Z" }),
-	);
+	const binding = { repo: REPO, coordinator: "coord:p1", user: "worker", connectedAt: "2026-09-24T00:00:00Z" };
+	await writeFile(join(p.root, ".limen/github/binding.json"), JSON.stringify(binding));
 	const state = join(p.parent, "poller");
 	await mkdir(state, { mode: 0o700 });
 	const key = join(p.parent, "app.pem");
