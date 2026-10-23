@@ -10,9 +10,9 @@ From the lead's tool, with the repository as its working directory. A Sol and tw
 
 ```sh
 limen group start spec/features/active/FNNN-name \
-  --team omp:openai-codex/gpt-6.1-sol:high \
-  --team omp:pi-claude/claude-opus-5-5:high \
-  --team omp:pi-claude/claude-opus-5-5:high \
+  --team pi:openai-codex/gpt-6.1-sol:high \
+  --team pi:pi-claude/claude-opus-5-5:high \
+  --team pi:pi-claude/claude-opus-5-5:high \
   --rounds draft,critique,final
 ```
 

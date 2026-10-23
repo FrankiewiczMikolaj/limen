@@ -142,6 +142,8 @@ curl -fsSL https://github.com/can1357/oh-my-pi/releases/download/v18.6.1/omp-lin
 echo "$omp_sha  $HOME/.local/bin/omp.new" | sha256sum -c -
 chmod 0755 ~/.local/bin/omp.new && mv ~/.local/bin/omp.new ~/.local/bin/omp
 grep -qF '.local/bin' ~/.bashrc 2>/dev/null || printf '\n[ -d "$HOME/.local/bin" ] && PATH="$HOME/.local/bin:$PATH"\n' >> ~/.bashrc
+# This seat runs OMP only; without an engine named, Limen starts new jobs on Pi.
+grep -qF 'LIMEN_ENGINE' ~/.bashrc 2>/dev/null || printf '\nexport LIMEN_ENGINE=omp\n' >> ~/.bashrc
 ```
 - Checksum source: omp [SHA256SUMS.txt](https://github.com/can1357/oh-my-pi/releases/download/v18.6.1/SHA256SUMS.txt) (same digests as the [v18.6.1](https://github.com/can1357/oh-my-pi/releases/tag/v18.6.1) asset list). **STOP** if a `sha256sum -c` line does not end in `OK`.
 - **HUMAN · laptop** (not from another server): `ssh -t $SEAT_HOST`. In that seat shell, run `gh auth login --hostname github.com --git-protocol https --web`, then `gh auth setup-git`, then `omp` and log in to the model provider.

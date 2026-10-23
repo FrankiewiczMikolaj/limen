@@ -47,7 +47,7 @@ type GroupStartOptions = {
 const GROUP_START =
 	"run limen group start FEATURE --team ENGINE:PROVIDER/MODEL:THINKING (once per team) [--rounds draft,critique,final] [--workers N] [--timeout 90m]";
 const INVALID_START = `invalid or repeated group start argument; ${GROUP_START}`;
-const INVALID_TEAM = `invalid --team; ${GROUP_START}, for example --team omp:openai-codex/gpt-6.1-sol:high`;
+const INVALID_TEAM = `invalid --team; ${GROUP_START}, for example --team pi:openai-codex/gpt-6.1-sol:high`;
 const BOTH_MODES =
 	"choose either hosted tabs or detached jobs, not both; run limen group start FEATURE with one of --tab or --detached";
 

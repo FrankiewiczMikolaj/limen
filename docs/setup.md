@@ -8,8 +8,8 @@ Install Limen, define the project, and ask an agent to do the work.
 
 - **Operating system:** macOS or Linux. Limen does not support Windows.
 - **Tools:** Node.js 24 or later, and Git.
-- **Engine:** the selected engine (`omp` or `pi`) on `PATH`.
-- **Last known-good versions:** omp 18.4.4 and Herdr 0.9.1. Limen records the versions on each job, but it does not refuse other versions.
+- **Engine:** Pi (`pi`, the default) or OMP (`omp`) on `PATH`.
+- **Last known-good versions:** pi 1.2.0, omp 18.4.4 and Herdr 0.9.1. Limen records the versions on each job, but it does not refuse other versions.
 
 ## Install
 
@@ -24,9 +24,10 @@ npm install
 npm link
 ```
 
-For interactive OMP jobs in Herdr, install the integration:
+For interactive jobs in Herdr, install the integration for each engine you use:
 
 ```bash
+herdr integration install pi
 herdr integration install omp
 ```
 
@@ -55,7 +56,7 @@ You can also ask the agent to help define the vision and styleguide before it ch
 ### What `limen init` does
 
 - **Project files:** It creates the files that the project owns: the vision, the board, the feature lanes, and the styleguide (see [Project files](#project-files)). It does not overwrite existing project files.
-- **Hook stubs:** It creates package-hook stubs in `.pi/extensions/` and `.omp/extensions/`. A Herdr OMP coordinator needs the `.omp` stub for communication, wake, and steering, so in an existing project, run `limen init` again before you start one.
+- **Hook stubs:** It creates package-hook stubs in `.pi/extensions/` and `.omp/extensions/`. A Herdr coordinator needs its engine's stub for communication, wake, and steering, so in an existing project, run `limen init` again before you start one.
 - **Old hook copies:** It deletes old `limen-*.ts` hook copies in both extension directories, so that they cannot load next to the stubs.
 - **Leftover prompts:** `limen init --drop-leftovers` deletes only prompt copies that are still the same as the package.
 
@@ -103,8 +104,8 @@ The coordinator must pass the board choices explicitly. Package fallbacks apply 
 **Engine.** `--engine pi|omp|devin` selects the job's agent: the Pi or OMP binary on the seat, or a Devin cloud session (see [Devin cloud jobs](#devin-cloud-jobs)). The order of priority is:
 
 1. `--engine pi|omp|devin`
-2. `LIMEN_ENGINE` (for example, `LIMEN_ENGINE=pi` selects Pi)
-3. OMP, for new jobs, when neither is set
+2. `LIMEN_ENGINE` (for example, `LIMEN_ENGINE=omp` selects OMP)
+3. Pi, for new jobs, when neither is set
 
 Two exceptions apply:
 
@@ -119,13 +120,13 @@ Two exceptions apply:
 
 A Devin job takes only `--model`: it names a Devin mode, and without it the organization's default mode runs.
 
-**`pi-claude` on OMP.** Name a Claude model on the local bridge as `--model pi-claude/<model>`, for example `--model pi-claude/claude-opus-5-5`. That id loads the bridge at `~/.omp/local/pi-claude-bridge` explicitly, because jobs otherwise start with `--no-extensions`. OMP has no `pi-claude` provider. A command that requires `--provider` takes `--provider pi-claude`; Limen keeps it in the job record and off the OMP command line. `--provider pi-claude --model claude-opus-5-5` runs the same route. `spawn`, `continue` and `group start` refuse a `pi-claude` provider with another provider's model, or a missing bridge, before any job exists.
+**`pi-claude` on both engines.** A `pi-claude` model runs on the Claude Code bridge, which Limen names with `--extension`, because jobs otherwise start with `--no-extensions`. Pi loads the `pi-claude-bridge` package that `pi install` put under `~/.pi/agent/npm/node_modules` (scoped or not), and takes `--provider pi-claude --model claude-opus-5-5` or `--model pi-claude/claude-opus-5-5` as given. OMP loads the local bridge at `~/.omp/local/pi-claude-bridge` and has no `pi-claude` provider: a command that requires `--provider` takes `--provider pi-claude`, and Limen keeps it in the job record and off the OMP command line, so `--provider pi-claude --model claude-opus-5-5` means `--model pi-claude/claude-opus-5-5`. `spawn`, `continue` and `group start` refuse a missing bridge before any job exists. On OMP they also refuse a `pi-claude` provider with another provider's model. With `LIMEN_PREFLIGHT=auth`, a bridged route skips `pi auth check`, because the bridge signs in through Claude Code.
 
 **Auth.** Pi and OMP keep separate auth stores (`~/.pi` and `~/.omp`). Authenticate each engine you use. Limen does not change the settings or credentials of either engine. One wrapper and one stream parser serve both engines.
 
 ### Personal model routes and Pi extensions
 
-An owner can describe an approved model route in their active personal coordinator instructions or a session handoff: the request name, exact engine/provider/model/thinking choices, and trusted local extension paths. Keep personal paths outside shared project Git. Limen does not parse aliases, scan installed packages, or choose a route from installation alone. Resolve conflicts with project policy before launching; do not silently substitute an engine, provider or model.
+An owner can describe an approved model route in their active personal coordinator instructions or a session handoff: the request name, exact engine/provider/model/thinking choices, and trusted local extension paths. Keep personal paths outside shared project Git. Limen does not parse aliases, scan installed packages, or choose a route from installation alone; the one package it looks up is the `pi-claude` bridge above, by its fixed name. Resolve conflicts with project policy before launching; do not silently substitute an engine, provider or model.
 
 For a Pi worker, pass each selected path explicitly:
 

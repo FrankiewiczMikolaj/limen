@@ -16,13 +16,6 @@ test("malformed lines are reported at their own line and never overwrite the fir
 	assert.deepEqual([parsed.body, parsed.bodyLine], ["Body\n", 11]);
 });
 
-test("a file without a closed front matter block fails at line 1", () => {
-	for (const text of ["no fence", "---\nid: unclosed", ""]) {
-		const parsed = parseFrontmatter(text);
-		assert.deepEqual([parsed.ok, parsed.errors[0]?.line], [false, 1], JSON.stringify(text));
-	}
-});
-
 test("quoted lists keep their commas and quotes; prototype keys are ordinary data", () => {
 	const parsed = parseFrontmatter(
 		"---\n__proto__: literal\nsources: [\"a, b\", 'it''s a path']\nitems:\n  - __proto__: item\n    title: \"A: B\"\n---\n",

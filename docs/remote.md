@@ -10,7 +10,7 @@ This is operator guidance, not a provisioner. Limen does not install Tailscale o
 
 | Layer | Role | What it is not |
 |---|---|---|
-| **Seat** | Runs `omp`, `limen`, and Herdr; owns the project copy, worktrees, and job files | A second clone you `limen spawn` from |
+| **Seat** | Runs the engine (`pi`, or `omp`), `limen`, and Herdr; owns the project copy, worktrees, and job files | A second clone you `limen spawn` from |
 | **Doorbell** | An opt-in GitHub App poller, isolated under its own Unix user, routes one exact PR or issue comment, or a new issue body, to the project's persistent Herdr coordinator | A runner, a merge gate, or CI |
 
 The App identity is seat-scoped; each project opts in with `limen github connect`. No inbound port or laptop consumer. Never install the private key in a checkout or in an account that runs hosted workers.
@@ -22,7 +22,7 @@ Coordinator and workers must agree on the same `repoRoot` and `.limen/jobs/`.
 ```
 Mac (window)                         VPS (seat)
 ────────────                         ──────────
-Tailscale                            Tailscale + limen + omp + Herdr
+Tailscale                            Tailscale + limen + pi/omp + Herdr
 herdr --remote / session attach  ──► same session, same job cabinet
 browser: tailscale serve URL         app, tests, workers
 optional local git clone             never a second .limen/
@@ -32,7 +32,7 @@ Do not: SSHFS the worktrees; run a coordinator on the laptop against a different
 
 ## Daily loop
 
-1. **Direct agents** — Tailscale up, attach with `herdr --remote you@seat-name` (optional `--session` if the seat is not the default). The coordinator runs *there* on OMP. Spawn only on the seat: `--detached` unless you are attached and intend to type. Close the window; jobs keep running. No Limen command needs the laptop awake.
+1. **Direct agents** — Tailscale up, attach with `herdr --remote you@seat-name` (optional `--session` if the seat is not the default). The coordinator runs *there*. Spawn only on the seat: `--detached` unless you are attached and intend to type. Close the window; jobs keep running. No Limen command needs the laptop awake.
 2. **Judge** — wake, `limen jobs`, or `limen open`. Job files on the seat are truth; the footer can lag.
 3. **See the product**
    - Usual: preview bound to localhost on the seat, published with `tailscale serve` — open that HTTPS URL. No pull.
@@ -53,7 +53,7 @@ Do not: SSHFS the worktrees; run a coordinator on the laptop against a different
 
 Buy the box, then follow the [seat checklist](seat/README.md). Short version:
 
-1. Ubuntu LTS, 8 GB RAM, ≥150 GB disk, Tailscale, SSH key only. Node 24, Git, `gh`, `omp`, Herdr, `limen` linked from a clone of this repo.
+1. Ubuntu LTS, 8 GB RAM, ≥150 GB disk, Tailscale, SSH key only. Node 24, Git, `gh`, `pi` (or `omp` with `LIMEN_ENGINE=omp`), Herdr, `limen` linked from a clone of this repo.
 2. Clone the work **branch** (not only `origin/HEAD`). `limen init` in that checkout. Keys stay on the seat. This checkout is the only project copy that runs jobs.
 3. Bell: Moshi (`moshi-hook pair --store file`, `service install`, `loginctl enable-linger`). ntfy is fallback — [seat/](seat/README.md).
 4. Persistent Herdr session on the box. Attach with `herdr --remote`. For the GitHub doorbell, the registered coordinator must stay available in that session; ordinary seat jobs may still run detached.
@@ -171,7 +171,7 @@ Accepted claims and cursors live under `/var/lib/limen-github/state/<sha256-of-a
 
 1. Walk through the [seat checklist](seat/README.md). Ubuntu LTS, 8 GB / 150 GB+, public SSH key-only, Tailscale MagicDNS.
 2. Pair Moshi on the box (`--store file`, linger) **before** moving the coordinator. ntfy only if Moshi is out.
-3. Node 24, Git, `gh`, `omp`, Herdr, `limen` (`npm link` from `~/limen`). Checkout the work branch. `limen init`.
+3. Node 24, Git, `gh`, `pi` (or `omp` with `LIMEN_ENGINE=omp`), Herdr, `limen` (`npm link` from `~/limen`). Checkout the work branch. `limen init`.
 4. Persistent Herdr session. `herdr --remote alice` (or your `Host` alias). First smoke: `--detached`.
 5. Prove, in order: lid-closed `--detached` job → phone rings → `limen jobs` on attach shows the same id → `tailscale serve` preview opens on the Mac.
 6. Only then live on the seat. The opt-in PR doorbell needs the separate App-user setup above. `LIMEN_SPAWN` and `LIMEN_NOTIFY` do not exist.
@@ -180,4 +180,4 @@ Accepted claims and cursors live under `/var/lib/limen-github/state/<sha256-of-a
 
 - [Vision](../spec/vision.md) — durable intent, including the seat/window split.
 - [F013 remote seat](../spec/features/done/2026-09/F013-remote-seat/ticket.md) — shop manual names seat vs window.
-- [SECURITY.md](../SECURITY.md) — a job runs as you (`omp --auto-approve`), wherever the seat is.
+- [SECURITY.md](../SECURITY.md) — a job runs as you (`pi --approve`, or `omp --auto-approve`), wherever the seat is.

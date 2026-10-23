@@ -4,7 +4,7 @@ This repository uses plain specifications, Git, and `limen` to coordinate one hu
 
 ## Coordinator
 
-The coordinator is a hosted session in Herdr for this plant (`LIMEN_COORDINATOR=1`), preferably OMP; use Pi only when the task needs it. It owns tickets and `spec/build.md`, and it decides spawn and merge. It is not a limen job. A hosted limen job (`LIMEN_JOB=1`) is never the plant owner or a group lead, even when labeled "lead".
+The coordinator is a hosted session in Herdr for this plant (`LIMEN_COORDINATOR=1`), on the board's engine. It owns tickets and `spec/build.md`, and it decides spawn and merge. It is not a limen job. A hosted limen job (`LIMEN_JOB=1`) is never the plant owner or a group lead, even when labeled "lead".
 
 Ordinary workers and reviewers exist only through `limen spawn`. Never spawn a coordinator or "group lead" job, and never use `spawn --role coordinator`: a group starts only from this pane, with `limen group start`.
 
@@ -14,7 +14,7 @@ Ordinary workers and reviewers exist only through `limen spawn`. Never spawn a c
 
 | You say | Limen reality |
 |---|---|
-| The owner asks for a coordinator | Start a hosted OMP tab in the plant's Herdr space (`LIMEN_COORDINATOR=1`), or Pi when required. Never `limen spawn` a "lead" or coordinator job for that role. |
+| The owner asks for a coordinator | Start a hosted tab on the board's engine in the plant's Herdr space (`LIMEN_COORDINATOR=1`). Never `limen spawn` a "lead" or coordinator job for that role. |
 | The coordinator manages workers | That session runs `limen spawn`. |
 | Start a group | This pane runs `limen group start`. A hosted job cannot. |
 
@@ -24,8 +24,8 @@ When the owner asks for a group, teams, several models on one task, or draft and
 
 ```sh
 limen group start spec/features/active/FNNN-slug \
-  --team omp:openai-codex/gpt-6.1-sol:high \
-  --team omp:pi-claude/claude-opus-5-5:high --team omp:pi-claude/claude-opus-5-5:high \
+  --team pi:openai-codex/gpt-6.1-sol:high \
+  --team pi:pi-claude/claude-opus-5-5:high --team pi:pi-claude/claude-opus-5-5:high \
   --rounds draft,critique,final
 ```
 
@@ -85,9 +85,9 @@ Herdr is the visible layout when it is running. Job files under `.limen/jobs/` a
 
 **`--role <name>`** loads that preamble (`templates/<name>.md` or `.agents/limen/<name>.md`) and opens the space `<project> <name>s`. Default is worker. The name does not pick the spawn mode. Those spaces are for jobs. The coordinator tab belongs in the plant's limen space, not in `workers`.
 
-**Engine and models.** The owner's newer instruction, then `spec/build.md`, picks the engine, provider, model, reasoning level, timeout, and review lane (see Policy precedence); examples in this manual are not overrides. Write `<board engine>`, `<board provider>`, `<board model>`, `<board reasoning>`, and `<board timeout>` from the board's choice for the role. Package fallbacks apply only where the board is silent: new jobs run OMP, a detached job stops after 90 minutes (drop `--timeout`), and `--model` falls back to `LIMEN_WORKER_MODEL` (`LIMEN_REVIEWER_MODEL` for `--review`), then the built-in `openai-codex/gpt-6-astra:high`.
+**Engine and models.** The owner's newer instruction, then `spec/build.md`, picks the engine, provider, model, reasoning level, timeout, and review lane (see Policy precedence); examples in this manual are not overrides. Write `<board engine>`, `<board provider>`, `<board model>`, `<board reasoning>`, and `<board timeout>` from the board's choice for the role. Package fallbacks apply only where the board is silent: new jobs run Pi, a detached job stops after 90 minutes (drop `--timeout`), and `--model` falls back to `LIMEN_WORKER_MODEL` (`LIMEN_REVIEWER_MODEL` for `--review`), then the built-in `openai-codex/gpt-6-astra:high`.
 
-**`--engine pi|omp`** overrides `LIMEN_ENGINE`; with neither set, new jobs use OMP. Select Pi with `--engine pi` or `LIMEN_ENGINE=pi` only when required. Continue copies the parent engine and refuses a different `--engine`; old job records without an engine remain Pi for compatibility. Auth stores remain separate (`~/.pi`, `~/.omp`); authenticate OMP yourself. One wrapper and one stream parser serve both.
+**`--engine pi|omp`** overrides `LIMEN_ENGINE`; with neither set, new jobs use Pi. Select OMP with `--engine omp` or `LIMEN_ENGINE=omp`. Continue copies the parent engine and refuses a different `--engine`; old job records without an engine remain Pi. Auth stores remain separate (`~/.pi`, `~/.omp`); authenticate each engine you use. A `pi-claude` model loads the Claude Code bridge on either engine: Pi's installed `pi-claude-bridge` package, or OMP's `~/.omp/local/pi-claude-bridge`. One wrapper and one stream parser serve both.
 
 **Personal model routes.** For a model request supplied by an extension, read the owner's approved route from active personal instructions or the session handoff: exact engine, provider, model, reasoning and trusted local paths. Keep personal route text outside shared project Git. Resolve conflicts with project policy; do not infer a route from an installed package or silently substitute one. For Pi workers, pass repeated `--extension PATH` flags alongside the four model flags. Ambient extensions stay disabled. Ordinary continuation inherits the extension list unless supplied flags replace it. A group with recorded team selections does not allow replacement. Both still need explicit provider/model/thinking choices. A package being installed, its model appearing in the native catalog, and a successful worker check are different evidence. Without an approved usable route, report the blocker or ask.
 

@@ -72,7 +72,7 @@ export function engineProfile(id: string): EngineProfile {
 	throw new Error(`unknown engine ${id}`);
 }
 export function resolveSpawnEngine(flag?: string): EngineProfile {
-	const raw = (flag ?? process.env.LIMEN_ENGINE)?.trim() || "omp";
+	const raw = (flag ?? process.env.LIMEN_ENGINE)?.trim() || "pi";
 	if (raw === "pi" || raw === "omp" || raw === "devin") {
 		return ENGINES[raw];
 	}
@@ -96,15 +96,20 @@ export function preflightEngine(profile: EngineProfile, model?: string, provider
 			`OMP cannot serve --provider ${BRIDGE} --model ${model ?? "<none>"}; pass --model ${BRIDGE}/${name}`,
 		);
 	}
-	if (route.bridged && bridgeExtensions().length === 0) {
-		throw new Error(`--model ${route.model} needs the OMP bridge at ~/.omp/local/pi-claude-bridge, which is missing`);
+	if (route.bridged && !bridgePath(profile)) {
+		const home =
+			profile.id === "omp"
+				? "the OMP bridge at ~/.omp/local/pi-claude-bridge"
+				: "a pi-claude-bridge package (pi install) under ~/.pi/agent/npm";
+		throw new Error(`--model ${route.model} needs ${home}, which is missing`);
 	}
 	if (!(process.env.PATH ?? "").split(":").some((dir) => dir && existsSync(`${dir}/${profile.binaryDefault}`))) {
 		throw new Error(
 			`${profile.binaryDefault} is not on PATH; install it, or pass --engine ${profile.id === "omp" ? "pi" : "omp"}`,
 		);
 	}
-	if (!profile.authCheck || process.env.LIMEN_PREFLIGHT !== "auth") {
+	// The bridge signs in through Claude Code, so Pi's own auth store has no say over a bridged route.
+	if (!profile.authCheck || route.bridged || process.env.LIMEN_PREFLIGHT !== "auth") {
 		return;
 	}
 	const result = spawnSync(
@@ -242,9 +247,10 @@ export function argvFor(profile: EngineProfile, slots: EngineArgv): string[] {
 	}
 	args.push("--append-system-prompt", slots.preamble);
 	const route = engineRoute(profile, slots.provider, slots.model);
+	const bridge = route.bridged ? bridgePath(profile) : undefined;
 	const named = [
 		...slots.extensions,
-		...(route.bridged ? bridgeExtensions() : []),
+		...(bridge ? [bridge] : []),
 		...(slots.jsonMode ? [] : herdrStateExtensions(profile)),
 	];
 	const seen = new Set<string>();
@@ -275,14 +281,18 @@ export function argvFor(profile: EngineProfile, slots: EngineArgv): string[] {
 
 const BRIDGE = "pi-claude";
 
-// OMP has no `pi-claude` provider: a local bridge extension serves `pi-claude/…` ids, chosen by the model id alone.
-// So `--provider pi-claude --model claude-opus-5-5` means `--model pi-claude/claude-opus-5-5`, and a bridged
+// Both engines reach Claude Code through a bridge extension that serves `pi-claude/…` ids. Pi takes the provider
+// as given. OMP has no `pi-claude` provider and chooses its bridge by the model id alone, so on OMP
+// `--provider pi-claude --model claude-opus-5-5` means `--model pi-claude/claude-opus-5-5`, and a bridged
 // provider stays in the job record but not on argv.
 export function engineRoute(
 	profile: EngineProfile,
 	provider: string | undefined,
 	model: string | undefined,
 ): { readonly provider: string | undefined; readonly model: string | undefined; readonly bridged: boolean } {
+	if (profile.id === "pi") {
+		return { provider, model, bridged: provider === BRIDGE || !!model?.startsWith(`${BRIDGE}/`) };
+	}
 	if (profile.id !== "omp") {
 		return { provider, model, bridged: false };
 	}
@@ -292,10 +302,16 @@ export function engineRoute(
 }
 
 // `--no-extensions` hides the bridge. Name it explicitly so the model resolves while other user
-// extensions stay off.
-function bridgeExtensions(): string[] {
-	const bridge = join(homedir(), ".omp", "local", "pi-claude-bridge");
-	return existsSync(bridge) ? [realpathSync(bridge)] : [];
+// extensions stay off. OMP loads its local port; Pi loads the bridge package it installed, scoped or not.
+function bridgePath(profile: EngineProfile): string | undefined {
+	let candidates = [join(homedir(), ".omp", "local", "pi-claude-bridge")];
+	if (profile.id === "pi") {
+		const modules = join(homedir(), ".pi", "agent", "npm", "node_modules");
+		const scopes = existsSync(modules) ? readdirSync(modules).filter((name) => name.startsWith("@")) : [];
+		candidates = ["", ...scopes].map((scope) => join(modules, scope, "pi-claude-bridge"));
+	}
+	const found = candidates.find((path) => existsSync(path));
+	return found ? realpathSync(found) : undefined;
 }
 
 // `--no-extensions` also hides Herdr's state extension, so a hosted pane falls back to screen
