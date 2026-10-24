@@ -52,8 +52,6 @@ test("test/ stays within the line cap that spec/vision.md sets", async () => {
 	for (const path of await filesBelow(join(root, "test"))) {
 		lines += (await readFile(path, "utf8")).split("\n").length - 1;
 	}
-	assert.ok(
-		lines <= cap,
-		`test/ has ${lines} lines; spec/vision.md caps it at ${cap}. Remove ${lines - cap} test lines, or ask Adam to raise the cap.`,
-	);
+	const fix = `Remove ${lines - cap} test lines, or ask Adam to raise the cap.`;
+	assert.ok(lines <= cap, `test/ has ${lines} lines; spec/vision.md caps it at ${cap}. ${fix}`);
 });

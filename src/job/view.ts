@@ -124,7 +124,11 @@ export function humanDetail(record: JobRecord, paint: Paint): string {
 		return `${paint("red", "!")} ${record.id}  ${paint("red", record.invalid ?? "unreadable")}${tail}`;
 	}
 	const lines = [
-		[`${glyph(record, paint)} ${paint("bold", job.label)}`, job.phase, ...flags(record)].join(paint("dim", " · ")),
+		[
+			`${glyph(record, paint)} ${paint("bold", job.label)}`,
+			record.openChecks ? "done with open checks" : job.phase,
+			...flags(record),
+		].join(paint("dim", " · ")),
 	];
 	const put = (key: string, value: string | undefined) => {
 		if (value) {

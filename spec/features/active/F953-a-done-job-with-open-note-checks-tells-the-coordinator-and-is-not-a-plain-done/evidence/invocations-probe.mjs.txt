@@ -1,0 +1,29 @@
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+const { noteCheckOpen } = await import(process.argv[2]);
+const job = "/tmp/f953-probe/plant/.limen/jobs/j";
+const cases = [
+  ["printf '%s\\n' 'npm test'", "npm test", false],
+  ["echo \"npm test\"", "npm test", false],
+  ["echo \"a \\\" ; npm test\"", "npm test", false],
+  ["cat <<'EOF'\nnpm test\nEOF", "npm test", false],
+  ["python3 - <<EOF | tail\nnpm test\nEOF\n", "npm test", false],
+  ["cd /x && CI=1 npm  test 2>&1 | tail -5", "npm test", true],
+  ["timeout 600 npm test", "npm test", true],
+  ["(npm test)", "npm test", true],
+  ["x=$(npm test)", "npm test", true],
+  ["npm \\\n  test", "npm test", true],
+  ["npm testing", "npm test", false],
+  ["cd /x && npm run check | tail", "cd /x && npm run check", true],
+  ["echo hi", "npm run check | tail", false],
+  ["bash -c 'npm test'", "npm test", false],
+];
+for (const [command, named, expected] of cases) {
+  rmSync("/tmp/f953-probe/plant", { recursive: true, force: true });
+  mkdirSync(join(job, "session"), { recursive: true });
+  writeFileSync(join(job, "session/a.jsonl"), JSON.stringify({ message: { content: [{ type: "toolCall", arguments: { command } }] } }) + "\n");
+  writeFileSync(join(job, "result"), `## Note check\n- X: proven. \`${named}\``);
+  const ran = noteCheckOpen(job).length === 0;
+  console.log(`${ran === expected ? "ok  " : "BAD "} ran=${ran} named=${JSON.stringify(named)} command=${JSON.stringify(command)}`);
+}
+rmSync("/tmp/f953-probe/plant", { recursive: true, force: true });

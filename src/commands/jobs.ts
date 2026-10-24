@@ -430,6 +430,7 @@ async function renderReadableJob(loaded: LoadedJob): Promise<{ compact: string; 
 		...(fields.lastTool ? { lastTool: displayed(fields.lastTool, detailed) } : {}),
 		...(running && pulse ? { pulse, processAlive: alive } : {}),
 		...(pulse === "queued" && queue ? { queue } : {}),
+		...(evidence.openChecks ? { openChecks: true } : {}),
 		diffstat,
 		logTail: log.tail,
 	});
@@ -512,7 +513,7 @@ function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 		...(empty ? { producedNothing: true } : {}),
 		...(fields.lastTool ? { lastTool: displayed(fields.lastTool, detailed) } : {}),
 		...((job.phase === "failed" || job.phase === "stopped") && reason && reason !== "see log" ? { reason } : {}),
-		...(open ? { reason: `${open} open ${open === 1 ? "check" : "checks"}` } : {}),
+		...(open ? { reason: `done with ${open} open ${open === 1 ? "check" : "checks"}` } : {}),
 		elapsedMs: observedAt - facts.startedAt.getTime(),
 		silentMs: observedAt - logStat.mtimeMs,
 		...(running ? {} : { ageMs: Date.now() - observedAt }),

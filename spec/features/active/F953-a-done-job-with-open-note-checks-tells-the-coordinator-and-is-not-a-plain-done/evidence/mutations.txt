@@ -44,3 +44,12 @@ mutation: finish-webhook.ts sends no open-checks handoff (open.length < 0)
 ✖ a done job pings only the target its ticket author maps to, with its unanswered note check (1619.08475ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^Job done with open checks\. .*\n- Note check: missing from the final message$/. Input:
 
+=== mutation-5-u14.txt (after review 1)
+mutation: task-note.ts sameCommand is run.includes(want) and the transcript keeps whole commands (substring matching)
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (204.395167ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (204.395167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^E: not proven\. Limen: it names no .+\|F: not proven\. Limen: `npm test` did not/. Input:
+

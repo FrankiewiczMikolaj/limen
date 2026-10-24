@@ -45,13 +45,21 @@ Job done. Next step: land it, or name the check that still blocks landing. Done 
 Inspect the job record, branch diff and commits, log/session, and relevant checks. Then land the work at the verified commit. If a check blocks landing, name that check and resume a focused fix. If it added, moved or changed a ticket, start limen keeper <ticket> --job plain --engine <engine> --provider <provider> --model <model> --thinking <level> and land the keeper job instead. After it lands, continue with the next item on the board. Keep the user informed; ask only when genuine product ambiguity, a scope or risk tradeoff, or an irreversible action needs a human decision.
 
 === MEGA retry-copy (/Users/overment/mega/mega-challenge/.limen/jobs/2026-10-23-s01e02-retry-c4-50350856)
+worktree /Users/overment/mega/.mega-challenge-limen-worktrees/2026-10-23-s01e02-retry-c4-50350856 is gone, so files named relative to it read as missing
 open items Limen now records:
+- Resume sentence: not proven. Limen: `cd00ed1` did not run in this session and is not a file
 - C4 path: not proven. Limen: `cd00ed1` did not run in this session and is not a file
 - Debrief in the chat with the link last (change 4, added by the steer): not proven. Limen: `cd00ed1` did not run in this session and is not a file
 - Plain technical English per the clarity doc (change 3): not proven. This obligation was missing from the note. I wrote the copy to `docs/clarity.md` and to the…
 - Report back (PR link, exact sentences, detected or folded): not proven. Limen: it names no command or file in backticks
 
 === F951 S3 priority budget (/Users/overment/.overment/limen/.limen/jobs/2026-10-23-f951-low-budget-runs-priority-1-fd3e2d2b)
+worktree /Users/overment/.overment/.limen-limen-worktrees/2026-10-23-f951-low-budget-runs-priority-1-fd3e2d2b is gone, so files named relative to it read as missing
 open items Limen now records:
+- Queue hold: not proven. Limen: `test/s3-finish-wake.test.ts` did not run in this session and is not a file
+- Prose: not proven. Limen: `templates/agents.md` did not run in this session and is not a file
+- seatDir: not proven. Limen: `src/project/seat-rules.ts` did not run in this session and is not a file
 - Priority 1 starts before an earlier priority 2, and a start priority 1 rule keeps priority 2 queued until it ends: not proven. Limen: `started(urgent) < starte…
+- The shop manual says spawn when ready and never poll the load, and names `limen rule` and the priority budget: not proven. Limen: `templates/agents.md` did not…
+- `npm run check` passes and `test/` stays within its 3,500-line cap: not proven. Limen: `evidence/npm-run-check.txt` did not run in this session and is not a fi…
 

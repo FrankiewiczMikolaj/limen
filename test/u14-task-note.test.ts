@@ -62,14 +62,16 @@ test("a job's note shows once, keeps its first version, logs changes, and is che
 	assert.equal(await readFile(join(job, "result"), "utf8"), "handoff\n");
 	assert.equal(await hosted.end("final"), "done");
 	assert.equal((await readFile(join(job, "log"), "utf8")).split("] note check sent\n").length, 3);
-	// A check sent and not answered is open; a proven line needs a command the session ran or a file that exists.
+	// A check sent and not answered is open; a proven line needs a command the session ran (not echoed) or a file.
 	assert.deepEqual(noteCheckOpen(job), ["Note check: missing from the final message"]);
-	const call = { message: { content: [{ type: "toolCall", arguments: { command: "npm  run check" } }] } };
+	const command = "cd /x && CI=1 npm  run check | tail\necho 'npm test'";
+	const call = { message: { content: [{ type: "toolCall", arguments: { command } }] } };
 	await mkdir(join(job, "session"));
 	await writeFile(join(job, "session/a.jsonl"), `${JSON.stringify(call)}\n`);
 	const proven = "- **A: proven.** `npm run check`\n- B: proven `log:2`\n- C: proven\n  `note.first.md`\n- R: followed";
 	const open = (result: string) => writeFile(join(job, "result"), result).then(() => noteCheckOpen(job));
 	assert.deepEqual(await open(`## Note check\n${proven}\n# Next\n- D: not proven`), []);
-	assert.match((await open("**Note check**\n- E: proven, trust me")).join(), /^E: not proven\. Limen: it names no /);
+	const unproven = await open("**Note check**\n- E: proven, trust me\n- F: proven. `npm test` passed");
+	assert.match(unproven.join("|"), /^E: not proven\. Limen: it names no .+\|F: not proven\. Limen: `npm test` did not/);
 	assert.deepEqual(await open("**Note check**\nAll proven."), ['Note check: no line reads "<check>: <mark>"']);
 });

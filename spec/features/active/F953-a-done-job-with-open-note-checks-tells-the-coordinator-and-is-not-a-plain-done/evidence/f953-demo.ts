@@ -73,7 +73,11 @@ for (const [name, source] of observed) {
 			await cp(join(source, file), join(copy, file), { recursive: true });
 		}
 	}
-	console.log(`=== ${name} (${source})\nopen items Limen now records:`);
+	const worktree = existsSync(join(copy, "worktree")) ? (await readFile(join(copy, "worktree"), "utf8")).trim() : "";
+	// A pruned worktree takes the files its final message named; those lines now read as missing, not as unproven then.
+	const kept =
+		worktree && existsSync(worktree) ? "still exists" : "is gone, so files named relative to it read as missing";
+	console.log(`=== ${name} (${source})\nworktree ${worktree || "(none)"} ${kept}\nopen items Limen now records:`);
 	console.log(
 		`${
 			noteCheckOpen(copy)

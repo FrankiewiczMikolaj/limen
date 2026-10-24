@@ -13,6 +13,10 @@ const OPEN = "open-checks";
 const REMINDERS = ".agents/limen/reminders.md";
 // One "Note check" line: `<check>: <mark>`, then the evidence or the gap. Proven and followed close an item.
 const MARKED = /^(.+?):\s*(not proven|proven|changed|dropped|followed|broken)\b[\s.,;:]*(.*)$/i;
+// A heredoc body is data, not commands: `<<'EOF'` up to the line that ends it. The rest of the opening line stays.
+const HEREDOC = /<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/g;
+// Leading variable assignments and wrappers do not change which command runs: `CI=1 timeout 60 npm test` runs `npm test`.
+const PREFIX = /^(?:[A-Za-z_]\w*=\S*\s+|(?:time|nohup|env|command|exec)\s+|timeout\s+\S+\s+)+/;
 const SHOWN = 10;
 const FORMAT = [
 	"Write a plan, not a task copy or a result log. Use plain technical English. Aim for six lines in three parts:",
@@ -135,7 +139,9 @@ export function noteCheckOpen(jobDir: string): string[] {
 	const seen: Seen = {
 		ran: (name) => {
 			ran ??= sessionCommands(jobDir);
-			return ran.some((command) => command.includes(squash(name)));
+			const done = ran;
+			const wanted = invocations(name);
+			return wanted.length > 0 && wanted.every((want) => done.some((run) => sameCommand(run, want)));
 		},
 		roots: [...(worktree ? [worktree] : []), jobDir, resolve(jobDir, "..", "..", "..")],
 	};
@@ -216,7 +222,7 @@ function fileExists(name: string, roots: readonly string[]): boolean {
 	return (isAbsolute(path) ? [path] : roots.map((root) => resolve(root, path))).some((each) => existsSync(each));
 }
 
-/** Every shell command in the job's session transcripts, with its whitespace squashed. Pi and OMP write the same. */
+/** Every simple command the job's session transcripts ran, as `invocations` gives them. Pi and OMP write the same. */
 function sessionCommands(jobDir: string): string[] {
 	const dir = join(jobDir, "session");
 	let files: string[] = [];
@@ -234,7 +240,7 @@ function sessionCommands(jobDir: string): string[] {
 			const content: unknown = JSON.parse(line)?.message?.content;
 			for (const part of Array.isArray(content) ? content : []) {
 				if (part?.type === "toolCall" && typeof part.arguments?.command === "string") {
-					commands.push(squash(part.arguments.command));
+					commands.push(...invocations(part.arguments.command));
 				}
 			}
 		} catch {
@@ -244,6 +250,38 @@ function sessionCommands(jobDir: string): string[] {
 	return commands;
 }
 
+/**
+ * The simple commands of a shell line, each from its first word: split at an unquoted `;`, `&`, `|`, `(`, `)`, a
+ * backtick or a line end, without heredoc bodies and leading assignments or wrappers. Quoted text never starts one,
+ * so `echo 'npm test'` does not run `npm test`.
+ */
+function invocations(line: string): string[] {
+	const found: string[] = [];
+	let current = "";
+	let quote = "";
+	let escaped = false;
+	for (const char of line.replace(HEREDOC, "$3").replaceAll("\\\n", " ")) {
+		if (!(escaped || quote) && ";&|()`\n".includes(char)) {
+			found.push(current);
+			current = "";
+			continue;
+		}
+		current += char;
+		if (escaped) {
+			escaped = false;
+		} else if (char === "\\" && quote !== "'") {
+			escaped = true;
+		} else if (char === quote) {
+			quote = "";
+		} else if (!quote && (char === "'" || char === '"')) {
+			quote = char;
+		}
+	}
+	return [...found, current].map((each) => squash(each).replace(PREFIX, "")).filter(Boolean);
+}
+
+/** `npm test -- --watch=false` runs `npm test`; `npm testing` does not. */
+const sameCommand = (run: string, want: string): boolean => run === want || run.startsWith(`${want} `);
 const squash = (text: string): string => text.replace(/\s+/g, " ").trim();
 const clip = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
