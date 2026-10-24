@@ -2,6 +2,8 @@
 
 ## TRACK
 
+- **Full final messages (F955, Adam decision 114, 2026-10-24):** priority 1; Pi `pi-claude/claude-opus-5-5` xhigh implements complete coordinator delivery and the concise report-first role-prompt addition; full local check, then one Pi `openai-codex/gpt-6.1-sol` xhigh review; land and push main with a `[skip ci]` tip only when it passes.
+- **Open-note evidence repair (F953, Adam decision 115, 2026-10-24):** land the repair-4 candidate as it is, accepting review 4's quoted-source edge case as a known ticket-note limit; no further strict-command-proof reviews or follow-up ticket; push main with a `[skip ci]` tip and keep full-message work separate.
 - **Task-note implementation (F950, Adam 2026-10-23 16:03):** implement the approved `group/prompt.txt` as written with one Pi `pi-claude/claude-opus-5-5` worker at `xhigh`, then an independent Pi `openai-codex/gpt-6.1-sol` review at `xhigh`, then land on main and push using local evidence only; no GitHub Actions, no repair or masking of the old wake and structure-scan failures.
 - **Pi/OMP engines (Adam 2026-09-22):** one flag, one profile table, one wrapper, one unchanged parser; separate auth stores and same-engine continuation. This VPS plant coordinator owns the board and authorized main landings/pushes; Adam retains review ownership, with no independent reviewer. Live hosted OMP proof, doorbell, unusable-route, and restoring Claude were outside the engine slice.
 - **Standing engine (Adam 2026-10-23):** new jobs default to Pi at runtime; `--engine` overrides `LIMEN_ENGINE`. Use `--engine omp` or `LIMEN_ENGINE=omp` when OMP is required; continuation keeps the recorded engine, and old records without one remain Pi. This replaces the 2026-09-23 OMP default.
@@ -29,6 +31,9 @@
 
 <!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F955-coordinators-receive-every-agent-s-full-final-message` (🟠 ACTIVE): Coordinators receive every agent’s full final message
+- `F954-a-private-assessment-combines-verified-collaboration-counts-from-both-session-stores` (🟠 ACTIVE): A private assessment combines verified collaboration counts from both session stores
+- `F952-agents-learn-adam-s-principles-from-work-and-decisions` (🟠 ACTIVE): Agents learn Adam’s principles from work and decisions; needs Adam since 2026-10-24: Choose the global principle home, conversation access and refine schedules in ~/Downloads/limen-learning-system.html; no implementation or pilot is authorized.
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
