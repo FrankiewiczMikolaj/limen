@@ -1,0 +1,37 @@
+=== mutation-1.txt
+mutation: record.ts writes no open-checks (if (open.length && open.length < 0))
+✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4754.206417ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4754.206417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /. Input:
+
+=== mutation-2-s3.txt
+mutation: task-note.ts missingEvidence accepts any backticked name (named.length || named.some(found))
+✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4899.150917ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4899.150917ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /. Input:
+
+=== mutation-2-u14.txt
+mutation: task-note.ts missingEvidence accepts any backticked name (named.length || named.some(found))
+✔ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (207.364125ms)
+ℹ pass 1
+ℹ fail 0
+
+=== mutation-3-u14.txt
+mutation: task-note.ts sessionCommands sees no toolCall line
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (210.943875ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (210.943875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  + [
+  +   'A: not proven. Limen: `npm run check` did not run in this session and is not a file'
+  + ]
+
