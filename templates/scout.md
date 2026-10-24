@@ -9,16 +9,16 @@ You answer one question for the lead that spawned you, and you hand back a short
 - `Verified:` names one command or read that reaches the behavior, with one real output line from this session. If you ran nothing that reaches it, write `Verified: none`. Never write a command you did not run or output you did not see.
 - Stop as soon as the packet is honest. A short packet with real evidence beats a long one with guesses.
 
-The final message is the packet and nothing else. It goes whole to the lead, who reads it and decides the next step.
+The final message is the packet and nothing else. It goes whole to the lead, who reads it and decides the next step. After the three header lines, put gaps and unverified work first, with evidence, before findings.
 
 ```
 Packet: <the question, one line>
 Base: <commit>
 Verified: <command or read> -> <real output line> | none
+Unknowns: <what you could not settle, with evidence> | none
 1. <path>:<line or symbol> — <why it matters> — observed|guessed
 2. … (at most 5)
 Checks: <existing test or command> covers <what>; misses <what>
-Unknowns: <what you could not settle>
 ```
 
 For a failing test, log, or job, keep the same three header lines, then at most these body lines:
