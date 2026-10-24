@@ -10,9 +10,11 @@ import { join } from "node:path";
 const { finalizeJob } = await import(join(process.cwd(), "src/job/record.ts"));
 const { completionWake } = await import(join(process.cwd(), "src/job/wake-text.ts"));
 const { noteCheckOpen } = await import(join(process.cwd(), "src/job/task-note.ts"));
+const { renderJobDirectory } = await import(join(process.cwd(), "src/commands/jobs.ts"));
+const { humanDetail, humanRow, paintWhen } = await import(join(process.cwd(), "src/job/view.ts"));
 
 const plant = await mkdtemp(join(tmpdir(), "f953-demo-"));
-// One shell call and its result, as Pi records them; the call exited 0.
+// One bash call and its result, as Pi records them; the call exited 0. `real-shell-probe.ts` runs real shells.
 const ran = (command: string) =>
 	[
 		{ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: { command } }] },
@@ -21,12 +23,13 @@ const ran = (command: string) =>
 		.map((message) => JSON.stringify({ message }))
 		.join("\n");
 
-async function fakeJob(id: string, result: string): Promise<string> {
+async function fakeJob(id: string, result: string, command: string): Promise<string> {
 	const job = join(plant, ".limen", "jobs", id);
 	await mkdir(join(job, "session"), { recursive: true });
 	await writeFile(join(job, "task.md"), "Fix the retry copy in the resume reply.\n");
+	await Promise.all([writeFile(join(job, "label"), "retry copy\n"), writeFile(join(job, "branch"), `limen/${id}\n`)]);
 	await writeFile(join(job, "log"), "[limen 2026-10-24T12:00:00.000Z] note check sent\n");
-	await writeFile(join(job, "session", "a.jsonl"), `${ran("npm run check 2>&1 | tail -5")}\n`);
+	await writeFile(join(job, "session", "a.jsonl"), `${ran(command)}\n`);
 	await writeFile(join(job, "result"), result);
 	await finalizeJob(job, "done", "pi exited 0");
 	return job;
@@ -51,13 +54,25 @@ const open = await fakeJob(
 		"- Clarity doc: not proven. I did not read `docs/clarity.html`.",
 		'- Rule "do not deploy": followed. No deploy command ran.',
 	].join("\n"),
+	"npm run check 2>&1 | tail -5",
 );
-await show("A fake finish with open checks", open, "open");
+await show("A fake finish with open checks; its only bash call was `npm run check 2>&1 | tail -5`", open, "open");
 const plain = await fakeJob(
 	"plain",
 	["Changed the resume reply.", "", "## Note check", "- Resume sentence: proven. `npm run check` passes."].join("\n"),
+	"cd . && npm run check",
 );
-await show("A fake finish with no open item", plain, "plain");
+await show("A fake finish with no open item; its only bash call was `cd . && npm run check`", plain, "plain");
+// What `limen jobs` shows a person for each: the row, and the detail of the job with open checks.
+const jobs = join(plant, ".limen", "jobs");
+const [openView, plainView] = await Promise.all(
+	["open", "plain"].map((id) => renderJobDirectory(process.cwd(), jobs, id, "detail")),
+);
+const noPaint = paintWhen(false);
+console.log(
+	`=== limen jobs rows\n${humanRow(openView.record, 12, noPaint)}\n${humanRow(plainView.record, 12, noPaint)}\n`,
+);
+console.log(`=== limen jobs open (detail)\n${humanDetail(openView.record, noPaint).split("\n  diff")[0]}\n`);
 
 // Observed final messages, copied with their transcripts and logs; the originals are only read.
 const observed = [

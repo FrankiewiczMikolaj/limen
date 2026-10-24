@@ -502,7 +502,6 @@ function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 	const { id, detailed, fields, evidence, logStat, log } = loaded;
 	const { job, observedAt, pulse, queue, recordedTools, empty, agentStatus } = facts;
 	const reason = stopSummary(fields.stopReason || log.detail);
-	const open = evidence.openChecks ? evidence.openChecks.split("\n").length : 0;
 	const running = job.phase === "running";
 	return {
 		id,
@@ -513,7 +512,7 @@ function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 		...(empty ? { producedNothing: true } : {}),
 		...(fields.lastTool ? { lastTool: displayed(fields.lastTool, detailed) } : {}),
 		...((job.phase === "failed" || job.phase === "stopped") && reason && reason !== "see log" ? { reason } : {}),
-		...(open ? { reason: `done with ${open} open ${open === 1 ? "check" : "checks"}` } : {}),
+		...(evidence.openChecks ? { reason: "done with open checks" } : {}),
 		elapsedMs: observedAt - facts.startedAt.getTime(),
 		silentMs: observedAt - logStat.mtimeMs,
 		...(running ? {} : { ageMs: Date.now() - observedAt }),
