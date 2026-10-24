@@ -24,14 +24,8 @@ const task = prompt ? readFileSync(prompt.slice(1), "utf8") : (flag("--continue"
 const preamble = flag("--append-system-prompt") ?? "";
 mkdirSync(dir, { recursive: true });
 writeFileSync(join(dir, "fake-argv.json"), JSON.stringify(args));
-writeFileSync(
-	join(dir, "fake-env.json"),
-	JSON.stringify(
-		Object.keys(process.env)
-			.filter((name) => /^(LIMEN|HERDR|PI)_/.test(name))
-			.sort(),
-	),
-);
+const names = Object.keys(process.env).filter((name) => /^(LIMEN|HERDR|PI)_/.test(name));
+writeFileSync(join(dir, "fake-env.json"), JSON.stringify(names.sort()));
 writeFileSync(join(dir, "fake-task.txt"), task);
 if (flag("--session-dir")) {
 	mkdirSync(flag("--session-dir"), { recursive: true });
@@ -53,13 +47,8 @@ const fire = async (event, payload) => {
 	}
 	return results;
 };
-const ui = new Proxy(
-	{},
-	{
-		get: (_, method) =>
-			method === "then" ? undefined : (text) => method === "notify" && record({ event: "notify", text }),
-	},
-);
+const toast = (method) => (text) => method === "notify" && record({ event: "notify", text });
+const ui = new Proxy({}, { get: (_, method) => (method === "then" ? undefined : toast(method)) });
 const context = {
 	cwd: process.cwd(),
 	ui,

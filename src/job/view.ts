@@ -151,7 +151,8 @@ export function humanDetail(record: JobRecord, paint: Paint): string {
 		put("advisory", record.advisory);
 	} else {
 		put("ran", terminalRanLine(record, paint));
-		put("reason", record.reason);
+		// The header already says "done with open checks", and `open-checks` lists them.
+		put("reason", record.openChecks ? undefined : record.reason);
 	}
 	put("versions", record.versions);
 	put("commits", record.commits);
@@ -189,7 +190,7 @@ function glyph(record: JobRecord, paint: Paint): string {
 		return paint(record.pulse === "dead" ? "red" : "green", "●");
 	}
 	if (record.job.phase === "done") {
-		return paint("green", "✓");
+		return paint(record.openChecks ? "yellow" : "green", "✓");
 	}
 	if (record.job.phase === "failed") {
 		return paint("red", "✗");

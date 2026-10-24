@@ -3,56 +3,110 @@ import { join } from "node:path";
 import { readOptional } from "../project/inherit.ts";
 
 // Which shell commands a job's session surely ran, so a "Note check" line marked proven can name one as its evidence.
-// Limen reads the recorded tool calls and their results; it never runs or replays them.
+// Limen reads the recorded bash calls and their results; it never runs or replays them. What it cannot read is no
+// proof, and each command keeps the reason, so the open check says why.
 
 // A heredoc body is data, not commands: `<<'EOF'` up to the line that ends it, or to the end of an unfinished one.
 // The rest of the opening line stays.
 const HEREDOC = /<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?(?:\n[ \t]*\2[ \t]*(?=\n|$)|$)/g;
-// Leading assignments, `!` and wrappers do not change which command runs: `CI=1 timeout 60 npm test` runs `npm test`.
-const PREFIX = /^(?:[A-Za-z_]\w*=\S*\s+|!\s+|(?:time|nohup|env|command)\s+|timeout\s+\S+\s+)+/;
-// A chain that holds one of these may skip a later command and still exit 0: `if`, a loop or a function body may not
-// run; `exit`, `exec`, or text run by `eval`, `source` or `.` can end the shell; `trap` and `set -n` change what runs.
+// Leading assignments, `!` and wrappers that run the rest: `CI=1 timeout 60 npm test` runs `npm test`.
+const PREFIX = /^(?:[A-Za-z_]\w*=(?:'[^']*'|"[^"]*"|[^\s'"])*\s+|!\s+|(?:time|nohup|env|command)\s+|timeout\s+\S+\s+)+/;
+// A command name as written. Quotes, `\`, `$`, globs and braces can make `exit` or any other word of a name, and a
+// name that starts with `-` is an option to a wrapper: `command -p exit 0` runs `exit`.
+const NAME = /^(?:[\w@%+,./:~=][\w@%+,./:~=-]*|\[\[?)$/;
+// A call that holds one of these may skip a later command and still exit 0: `if`, a loop or a function body may not
+// run; `exit`, `exec`, or text run by `eval`, `source`, `.` or a `mapfile -C` callback can end the shell; `trap`,
+// `set -n`, `shopt`, `hash -p`, `enable` and `alias` change what a later command runs.
 const STOPPERS = new Set([
-	...["if", "then", "else", "elif", "fi", "while", "until", "for", "do", "done", "case", "esac", "select"],
+	...["if", "then", "else", "elif", "fi", "while", "until", "for", "do", "done", "case", "esac", "select", "coproc"],
 	...["function", "{", "}", "exit", "return", "exec", "logout", "eval", "source", ".", "builtin", "trap", "set"],
+	...["shopt", "hash", "enable", "alias", "mapfile", "readarray"],
 ]);
+// OMP runs one shell for the whole session, so these change what every later call runs: a function, an option, a trap.
+const KEPT = new Set(["function", "eval", "source", ".", "trap", "set", "shopt", "hash", "enable", "alias"]);
 // One chain: simple commands joined by `&&` or a pipe. Any other separator starts a list, a subshell or a substitution.
 const CHAINED = new Set(["", "&&", "|", "|&"]);
+const PIPES = new Set(["|", "|&"]);
+const SHOWN: Record<string, string> = { "\n": "a line break", "`": "a backtick" };
+/** The reason for a command that no recorded bash call names as a command. */
+export const NOT_NAMED = "no shell call names it as a command";
 
 type Piece = { readonly words: string; readonly sep: string };
+type Call = { readonly command: string; ok: boolean };
+type Message = { role?: unknown; toolCallId?: unknown; toolName?: unknown; isError?: unknown; content?: unknown };
+/** One simple command of a recorded bash call; `why` is empty when the call proves that it ran. */
+export type Run = { readonly words: string; readonly why: string };
+/** A command of a named chain that no call proves, and why. */
+export type Gap = { readonly command: string; readonly why: string };
 
-/** Every simple command that surely ran in the job's session transcripts (`surelyRan`). Pi and OMP write the same. */
-export function sessionCommands(jobDir: string): string[] {
-	const calls: { readonly id: unknown; readonly command: string }[] = [];
-	const ok = new Set<string>();
-	for (const line of transcriptLines(jobDir)) {
-		let message: { role?: unknown; toolCallId?: unknown; isError?: unknown; content?: unknown } | undefined;
-		try {
-			message = JSON.parse(line)?.message;
-		} catch {
-			continue; // A torn last line is not a call.
-		}
-		if (message?.role === "toolResult" && message.isError === false && typeof message.toolCallId === "string") {
-			ok.add(message.toolCallId);
-		}
-		for (const part of Array.isArray(message?.content) ? message.content : []) {
-			if (part?.type === "toolCall" && typeof part.arguments?.command === "string") {
-				calls.push({ id: part.id, command: part.arguments.command });
-			}
-		}
-	}
-	return calls.flatMap(({ id, command }) => surelyRan(command, typeof id === "string" && ok.has(id)));
+/**
+ * Every simple command of the job's bash calls, Pi and OMP alike. One counts when its call ended with exit 0, the call
+ * is one chain of commands joined by `&&` or a pipe, and no pipe follows it: a pipe's exit status is its last command's.
+ */
+export function sessionRuns(jobDir: string): Run[] {
+	const omp = readOptional(join(jobDir, "engine"))?.trim() === "omp";
+	return transcripts(jobDir).flatMap((lines) => {
+		let kept = "";
+		return bashCalls(lines).flatMap(({ command, ok }) => {
+			const parts = pieces(command);
+			const held = kept && `an earlier call in OMP's persistent shell holds \`${kept}\``;
+			const why = (ok ? "" : "its shell call did not end with exit 0") || held || chainWhy(command, parts);
+			kept ||= omp ? keptWord(command, parts) : "";
+			return parts.map(({ words }, index) => ({
+				words: words.replace(PREFIX, ""),
+				why: why || (PIPES.has(parts[index + 1]?.sep ?? "") ? "a `|` follows it and hides its exit status" : ""),
+			}));
+		});
+	});
 }
 
-/** True when each simple command of `named` starts one that surely ran: `npm test -- --grep x` runs `npm test`. */
-export function ranAll(ran: readonly string[], named: string): boolean {
+/** Undefined when each simple command of `named` starts one that surely ran: `npm test -- --grep x` runs `npm test`. */
+export function unproven(runs: readonly Run[], named: string): Gap | undefined {
 	const wanted = pieces(named)
 		.map((piece) => piece.words.replace(PREFIX, ""))
 		.filter(Boolean);
-	return wanted.length > 0 && wanted.every((want) => ran.some((run) => run === want || run.startsWith(`${want} `)));
+	for (const want of wanted) {
+		const matches = runs.filter(({ words }) => words === want || words.startsWith(`${want} `));
+		if (!matches.some(({ why }) => !why)) {
+			return { command: want, why: matches.at(-1)?.why ?? NOT_NAMED };
+		}
+	}
+	return wanted.length ? undefined : { command: named, why: NOT_NAMED };
 }
 
-function transcriptLines(jobDir: string): string[] {
+/** The bash calls of one transcript in order. A call is `ok` when the bash result that answers it is no error. */
+function bashCalls(lines: readonly string[]): Call[] {
+	const calls: Call[] = [];
+	const waiting = new Map<unknown, Call>();
+	for (const message of lines.map(recorded)) {
+		const answered = message.role === "toolResult" && message.toolName === "bash" && waiting.get(message.toolCallId);
+		if (answered) {
+			answered.ok = message.isError === false;
+			waiting.delete(message.toolCallId);
+		}
+		for (const part of Array.isArray(message.content) ? message.content : []) {
+			if (part?.type === "toolCall" && part.name === "bash" && typeof part.arguments?.command === "string") {
+				const call = { command: part.arguments.command, ok: false };
+				calls.push(call);
+				if (typeof part.id === "string") {
+					waiting.set(part.id, call);
+				}
+			}
+		}
+	}
+	return calls;
+}
+
+/** The message of one transcript line; a torn last line holds none. */
+function recorded(line: string): Message {
+	try {
+		return JSON.parse(line)?.message ?? {};
+	} catch {
+		return {};
+	}
+}
+
+function transcripts(jobDir: string): string[][] {
 	const dir = join(jobDir, "session");
 	let files: string[] = [];
 	try {
@@ -60,20 +114,41 @@ function transcriptLines(jobDir: string): string[] {
 	} catch {
 		// A job without a transcript ran no command Limen can see.
 	}
-	return files
-		.flatMap((file) => (readOptional(join(dir, file)) ?? "").split("\n"))
-		.filter((line) => line.includes('"toolCall"') || line.includes('"toolResult"'));
+	return files.map((file) =>
+		(readOptional(join(dir, file)) ?? "")
+			.split("\n")
+			.filter((line) => line.includes('"toolCall"') || line.includes('"toolResult"')),
+	);
 }
 
-/**
- * The simple commands of one shell call that surely ran: all of them, when the call exited 0 (`ok`) and is one chain
- * of simple commands joined by `&&` or a pipe. Exit 0 of such a chain means each command in it ran. Any other call
- * proves nothing: a `;`, a line end, `||`, `&`, parentheses or backticks may skip a command, and so may a stopper.
- */
-function surelyRan(command: string, ok: boolean): string[] {
-	const parts = ok ? pieces(command) : [];
-	const chain = parts.every(({ words, sep }) => CHAINED.has(sep) && !STOPPERS.has(firstWord(words)));
-	return chain ? parts.map(({ words }) => words.replace(PREFIX, "")).filter(Boolean) : [];
+/** Why exit 0 of this call proves nothing; empty when it is one chain of plain commands joined by `&&` or a pipe. */
+function chainWhy(command: string, parts: readonly Piece[]): string {
+	// `$'…'` quotes by other rules than '…'; Limen does not read it.
+	if (command.includes("$'")) {
+		return "its shell call holds `$'`";
+	}
+	for (const { words, sep } of parts) {
+		const word = firstWord(words);
+		if (!CHAINED.has(sep)) {
+			return `its shell call holds ${SHOWN[sep] ?? `\`${sep}\``}`;
+		}
+		// `!` turns a failure into exit 0, also for a command the shell could not find.
+		if (/(?:^|\s)!\s/.test(words.match(PREFIX)?.[0] ?? "")) {
+			return "its shell call holds `!`";
+		}
+		if (STOPPERS.has(word) || (word && !NAME.test(word))) {
+			return `its shell call holds \`${word}\``;
+		}
+	}
+	return "";
+}
+
+/** What an OMP call leaves in its persistent shell for later calls: a function definition `()` or a word of `KEPT`. */
+function keptWord(command: string, parts: readonly Piece[]): string {
+	if (/\w\s*\(\s*\)/.test(command)) {
+		return "()";
+	}
+	return parts.map(({ words }) => firstWord(words)).find((word) => KEPT.has(word)) ?? "";
 }
 
 const firstWord = (words: string): string => words.replace(PREFIX, "").split(" ")[0] ?? "";

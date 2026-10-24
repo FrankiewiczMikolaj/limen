@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { readOptional } from "../project/inherit.ts";
-import { ranAll, sessionCommands } from "./session-commands.ts";
+import { type Gap, NOT_NAMED, type Run, sessionRuns, unproven } from "./session-commands.ts";
 
 // The agent writes the note in its job folder; the project may keep reminders beside its other Limen guidance.
 // Limen copies, logs and shows both, and never parses them. Adam approved the wording below as written (F950).
@@ -83,8 +83,9 @@ export function noteCheck(jobDir: string, finishTool: boolean): string {
 		"Compare the note with the task and later instructions. " +
 			'Under the heading "Note check" in your final message, give one line per end check: ' +
 			'"- <check>: <mark>. <evidence or gap>". The mark is proven, not proven, changed, or dropped. ' +
-			"Proven names its evidence in backticks: a file, or a command from one shell call in this session " +
-			"that exited 0 and joined its commands only with && or |. " +
+			"Proven names its evidence in backticks: a file, or a command from one bash call in this session " +
+			"that exited 0 and joined its commands only with &&. A command before a | does not count, " +
+			"and a call with ;, ||, a line break, if, ! or exit proves nothing; name a saved log file instead. " +
 			"Not proven needs what is missing. Changed or dropped needs the instruction that changed its scope. " +
 			"Give one line per item in a referenced acceptance list. " +
 			"Account for any obligation missing from the current note. " +
@@ -132,16 +133,16 @@ export function noteCheckOpen(jobDir: string): string[] {
 		return ['Note check: no line reads "<check>: <mark>"'];
 	}
 	// The transcripts are read once, and only when a proven line needs them.
-	let ran: string[] | undefined;
+	let runs: Run[] | undefined;
 	const worktree = readOptional(join(jobDir, "worktree"))?.trim();
 	const seen: Seen = {
-		ran: (name) => {
-			ran ??= sessionCommands(jobDir);
-			return ranAll(ran, name);
+		unproven: (name) => {
+			runs ??= sessionRuns(jobDir);
+			return unproven(runs, name);
 		},
 		roots: [...(worktree ? [worktree] : []), jobDir, resolve(jobDir, "..", "..", "..")],
 	};
-	return items.flatMap((item) => openItem(item, seen)).map((line) => clip(line, 160));
+	return items.flatMap((item) => openItem(item, seen)).map((line) => clip(line, 240));
 }
 
 /** The open items a done job recorded, as wake lines: at most ten, then a count of the rest. */
@@ -152,7 +153,7 @@ export function openChecks(jobDir: string): string[] {
 }
 
 type Marked = { readonly name: string; readonly mark: string; readonly said: string; evidence: string };
-type Seen = { readonly ran: (name: string) => boolean; readonly roots: readonly string[] };
+type Seen = { readonly unproven: (name: string) => Gap | undefined; readonly roots: readonly string[] };
 
 /** The lines under the first "Note check" heading, up to the next Markdown heading; undefined without one. */
 function noteCheckSection(result: string): string[] | undefined {
@@ -200,7 +201,10 @@ function openItem(item: Marked, seen: Seen): string[] {
 	return why ? [`${item.name}: not proven. Limen: ${why}`] : [];
 }
 
-/** Empty when one backticked name is a command the session surely ran or a file that exists; otherwise why not. */
+/**
+ * Empty when one backticked name is a command the session surely ran or a file that exists. Otherwise why not, for the
+ * first name that a bash call names as a command, or else for the first name.
+ */
 function missingEvidence(evidence: string, seen: Seen): string {
 	const named = [...evidence.matchAll(/`([^`\n]+)`/g)]
 		.map((match) => (match[1] ?? "").trim())
@@ -208,8 +212,16 @@ function missingEvidence(evidence: string, seen: Seen): string {
 	if (!named.length) {
 		return "it names no command or file in backticks";
 	}
-	const found = (name: string) => seen.ran(name) || fileExists(name, seen.roots);
-	return named.some(found) ? "" : `no proof that \`${clip(named[0] ?? "", 60)}\` ran in this session, and no such file`;
+	const gaps: Gap[] = [];
+	for (const name of named) {
+		const gap = fileExists(name, seen.roots) ? undefined : seen.unproven(name);
+		if (!gap) {
+			return "";
+		}
+		gaps.push(gap);
+	}
+	const gap = gaps.find(({ why }) => why !== NOT_NAMED) ?? gaps[0];
+	return `no proof that \`${clip(gap?.command ?? "", 60)}\` ran (${gap?.why ?? NOT_NAMED}), and no such file`;
 }
 
 /** A path as written, or relative to one of `roots`; a `:line` or `#anchor` suffix is ignored. */
