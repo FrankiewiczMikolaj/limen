@@ -35,3 +35,7 @@ Adam (2026-10-24): "even if the note says something is wrong, it still continues
 ## Notes
 
 Evidence on the observed cases: `evidence/` in this folder.
+
+Adam decision 115 (2026-10-24, 16:50 Warsaw) accepts repair 4 as it is: code `d1db363`, evidence `19017aa`, and review 4 at `5d56698`. Land despite the recorded FAIL. For this candidate, the owner accepts the known exception to acceptance 2 and waives acceptance 5's PASS prerequisite. Do not claim that strict command-execution proof or a review PASS was achieved. No further strict-proof review round or follow-up ticket is authorized.
+
+Known limit from `review-4.md`: in OMP's persistent shell, `'.' setup.sh` can load `halt() { exit 0; }`. A later `halt && npm test` exits 0 before npm runs, yet the command can retain proven status and the wake can say plain done. The equivalent unquoted `. setup.sh` control is correctly downgraded. The real finalizer/wake reproduction failed with this false proof; it remains an accepted limit, not a fixed case.
