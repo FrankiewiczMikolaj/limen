@@ -84,7 +84,7 @@ after(async () => {
 
 test("a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session", async () => {
 	const second = coordinator("second", "coord", "block\n");
-	const handoff = `${FINAL.line}\\n## Note check\\n- Hold: not proven. No run.\\n- Cap: proven. \`npm test\``;
+	const handoff = `${FINAL.line.replace("Note check:", "Report:")}\\n## Note check\\n- Hold: not proven. No run.\\n- Cap: proven. \`npm test\``;
 	const ids = {
 		done: job(`commit\nfinish\nfinish ${handoff}`, "a done"),
 		failed: job("fail 7", "a failed"),
@@ -96,7 +96,6 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	await release(second);
 	await until(second, () => engineEvents(second).some((event) => event.event === "exit"));
 	assert.deepEqual(states, { done: "done", failed: "failed", provider: "failed" });
-	assert.equal(jobFile(p, ids.done, "result"), handoff.replaceAll("\\n", "\n"));
 	assert.equal(jobFile(p, ids.done, "log").split("note check sent").length, 2);
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
 	assert.equal(git(p.root, "rev-list", "--count", `main..${jobFile(p, ids.provider, "branch")}`), "1");

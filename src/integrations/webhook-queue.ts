@@ -234,15 +234,16 @@ function startDeliverer(dir: string): void {
 	child.once("error", () => {});
 	child.unref();
 }
-export function senderEnvironment(config: string, event: PlantEvent): NodeJS.ProcessEnv {
+export function senderEnvironment(config: string, event: PlantEvent, queue?: string): NodeJS.ProcessEnv {
 	return {
 		...process.env,
 		PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`,
 		LIMEN_FINISH_WEBHOOK_ENV: config,
 		LIMEN_FINISH_WEBHOOK_AUTHOR: event.author ?? "",
-		// Undefined drops any inherited override, so a terminal job always sends the job handoff.
-		LIMEN_FINISH_HANDOFF: event.handoff,
-		LIMEN_FINISH_MESSAGE: event.message,
+		// Queued reports stay in the file: argv and environment values have OS size limits.
+		LIMEN_FINISH_HANDOFF: queue ? undefined : event.handoff,
+		LIMEN_FINISH_QUEUE: queue,
+		LIMEN_FINISH_MESSAGE_FILE: undefined,
 		LIMEN_FINISH_KIND: event.kind,
 		LIMEN_FINISH_PLANT: event.plant,
 		LIMEN_FINISH_ID: event.id,
@@ -269,7 +270,7 @@ function send(dir: string, queued: Queued, skip: readonly number[]): Promise<Sen
 	const { promise, resolve } = Promise.withResolvers<Sent>();
 	const child = spawn(SENDER, [queued.event.title, queued.event.status, queued.event.branch], {
 		env: {
-			...senderEnvironment(queued.config, queued.event),
+			...senderEnvironment(queued.config, queued.event, `${dir}/finish-webhook-queue`),
 			LIMEN_FINISH_EVENT: queued.id,
 			LIMEN_FINISH_WEBHOOK_SKIP: skip.join(","),
 		},

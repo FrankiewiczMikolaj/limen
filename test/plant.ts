@@ -22,7 +22,6 @@ export type Run = { readonly stdout: string; readonly stderr: string; readonly s
 export type RunOptions = { readonly cwd?: string; readonly env?: Readonly<Record<string, string>> };
 
 export const TICKET = "spec/features/active/F001-demo/ticket.md";
-/** A final message past every old cut (15 lines; 1,200 and 8,000 characters), Note check last; `line` is its script form. */
 const report = `${"Done: one report line, long enough to count.\n".repeat(200)}Note check: not proven yet: none`;
 export const FINAL = { text: report, line: report.replaceAll("\n", "\\n") };
 const ticket = `---

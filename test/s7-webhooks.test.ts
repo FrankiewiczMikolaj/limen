@@ -33,7 +33,6 @@ const wait = (id: string) => {
 	return result.stdout.split(" ")[0]?.toLowerCase();
 };
 const payloads = () => requests(p).map((request) => ({ url: request.url, body: JSON.parse(request.body) }));
-// The finish path writes its final result line after the sender exits; every request it made is recorded by then.
 const settled = (id: string) =>
 	until(p.parent, () => /^(accepted|failed|skipped)/.test(jobFile(p, id, "finish-webhook")));
 
@@ -62,8 +61,11 @@ await writeFile(
 );
 
 test("a done job pings only its author's target, with open checks and its whole final message in the handoff and wait", async () => {
-	const message = FINAL.text.replace("Note check:", "Report:"); // keep the landed missing-Note-check case
-	const id = spawn(`Ticket: ${alice}\ncommit\nfinish\nfinish ${message.replaceAll("\n", "\\n")}`, "S7 alice");
+	const message = FINAL.text.repeat(20).replaceAll("Note check:", "Report:"); // past Linux's 128 KiB env-value limit
+	const task = join(p.parent, "long-task");
+	await writeFile(task, `Ticket: ${alice}\ncommit\nfinish\nfinish ${message.replaceAll("\n", "\\n")}`);
+	const id = run(["spawn", "--label", "S7 alice", "--task-file", task]);
+	ids.push(id);
 	assert.equal(wait(id), "done");
 	assert.ok(runs.at(-1)?.stdout.endsWith(`Final message:\n${message}\n`), "wait prints the whole message");
 	await settled(id);
@@ -98,11 +100,12 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 		{ match: "/busy", status: 503, upTo: 2, body: { error: "busy" } },
 		{ match: "/gone", status: 401, body: { error: `no automation for s7-secret-one at ${urls[2]}` } },
 	]);
-	const id = spawn(`Ticket: ${bob}\nsay\nfail 3`, "S7 bob");
+	const id = spawn(`Ticket: ${bob}\nfinish\nfinish ${FINAL.line}\nfail 3`, "S7 bob");
 	assert.equal(wait(id), "failed");
 	await settled(id);
 	const ping = payloads().find((sent) => sent.body.jobId === id)?.body;
 	assert.deepEqual([ping?.event, ping?.plant, Boolean(ping?.reason)], ["job.failed", "repo", true]);
+	assert.ok(ping?.handoff.endsWith(`Final message:\n${FINAL.text}`));
 	assert.match(jobFile(p, id, "finish-webhook"), /^failed: target 3 HTTP 401 .*; not retried/);
 	const receipts = jobFile(p, id, "finish-webhook-targets")
 		.split("\n")

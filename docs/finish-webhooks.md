@@ -28,10 +28,10 @@ error or a new-spawn signal. Failed and stopped jobs retain their status and
 direct inspection of the job record. When the ended job has a final message, the
 `handoff` continues after a blank line with `Final message:` and that whole
 message, never cut: the coordinator a receiver wakes decides the next step from
-it. A manual send adds it only when `LIMEN_FINISH_MESSAGE` holds the text (see
-[the manual send](#inspect-failures-and-deliberately-retry)). A
-final message near Linux's 128 KiB limit for one environment value cannot travel
-this way. All sends include `job`, `status`,
+it. Automatic sends read the saved queue snapshot, so the report does not hit
+argv or environment size limits. A manual send adds it when
+`LIMEN_FINISH_MESSAGE_FILE` names the result file (see
+[the manual send](#inspect-failures-and-deliberately-retry)). All sends include `job`, `status`,
 `branch`, `handoff`, and `event`. Automatic sends also carry `finishEvent`,
 `plant`, `title`, `jobId`, and `reason`.
 
@@ -502,7 +502,7 @@ replacement `done` state for a failed job:
 LIMEN_FINISH_EVENT="$(node --input-type=module -e 'import { finishEvent } from "./src/integrations/finish-receipt.ts"; console.log(finishEvent(process.argv[1]))' "$job")" \
 LIMEN_FINISH_WEBHOOK_ENV="$(tr -d '\n' < "$job/finish-webhook-env")" \
 LIMEN_FINISH_WEBHOOK_AUTHOR="$(sed -n '1p' "$job/finish-webhook-author")" \
-LIMEN_FINISH_MESSAGE="$(cat "$job/result" 2>/dev/null)" \
+LIMEN_FINISH_MESSAGE_FILE="$job/result" \
   bin/tony-finish-ping.sh "$(tr -d '\n' < "$job/label")" \
   "$(tr -d '\n' < "$job/state")" "$(tr -d '\n' < "$job/branch")"
 result=$?
