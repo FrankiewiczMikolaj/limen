@@ -26,8 +26,12 @@ A coordinator receives the agent's complete final report, including trailing Not
 ## Acceptance
 
 - Completion messages preserve a final report beyond both old cut limits, including a trailing Note check, for done, failed/stopped and scout results.
-- Each coordinator delivery route and finish-webhook handoff carries that full report, not a substitute pointer or another excerpt.
-- Wait output and group-lead completion carry their complete final message; commit lists may remain bounded.
+- Each coordinator delivery route and finish-webhook handoff carries that full report, not a substitute pointer or another excerpt; Herdr delivery remains subject to its verified 1 MiB API-request limit.
+- Wait output and group-lead completion carry their complete final message; the same Herdr limit applies, and commit lists may remain bounded.
 - Worker, reviewer, scout and group-team prompts state that the full last message reaches the coordinator, who decides the next step; gaps come before completed work, without duplicate ending lists or obsolete cut-based limits.
 - Existing routing, delivery receipts, state meaning and absent-result cases remain intact; no F953 implementation or proof-rule change enters this slice's diff.
 - Replace the truncation regression, keep `test/` within the 3,500-line cap, retain a full local-check result at the candidate code commit, and obtain the requested independent Sol review before landing.
+
+## Notes
+
+Adam kept Herdr 0.9.5's verified 1 MiB API-request limit for the final review. Reports beyond it remain stored but are not delivered to Herdr; this does not authorize other excerpting or pointer replacement.
