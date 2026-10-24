@@ -1,0 +1,53 @@
+// F953 probe: which named commands count as run. Each case records one shell call and its result (exit 0 or not),
+// then asks the real noteCheckOpen whether a "proven" line naming `named` stays proven.
+// Run: node --no-warnings <this file> <repo>/src/job/task-note.ts
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const { noteCheckOpen } = await import(process.argv[2]);
+const plant = "/tmp/f953-probe/plant";
+const job = join(plant, ".limen/jobs/j");
+const cases = [
+	// [command, exit 0, named, counts as run]
+	["printf '%s\\n' 'npm test'", true, "npm test", false],
+	['echo "npm test"', true, "npm test", false],
+	['echo "a \\" ; npm test"', true, "npm test", false],
+	["cat <<'EOF'\nnpm test\nEOF", true, "npm test", false],
+	["python3 - <<EOF | tail\nnpm test\nEOF\n", true, "npm test", false],
+	["bash -c 'npm test'", true, "npm test", false],
+	["npm testing", true, "npm test", false],
+	["false && npm test", false, "npm test", false],
+	["false && npm test; true", true, "npm test", false],
+	["false || npm test", true, "npm test", false],
+	["if false; then npm test; fi", true, "npm test", false],
+	["if false\nthen\nnpm test\nfi", true, "npm test", false],
+	["for x in a; do npm test; done", true, "npm test", false],
+	["f() { npm test; }", true, "npm test", false],
+	["exit 0; npm test", true, "npm test", false],
+	["sleep 999; npm test", false, "npm test", false],
+	["npm test", false, "npm test", true],
+	["npm test; echo \"exit $?\"", true, "npm test", true],
+	["cd /x && CI=1 npm  test 2>&1 | tail -5", true, "npm test", true],
+	["cd /x && npm test 2>&1 | tail -5", false, "npm test", false],
+	["timeout 600 npm test", true, "npm test", true],
+	["(npm test)", true, "npm test", true],
+	["x=$(npm test)", true, "npm test", true],
+	["npm \\\n  test", true, "npm test", true],
+	["npm test || true", true, "npm test", true],
+	["cd /x && npm run check | tail", true, "cd /x && npm run check", true],
+	["echo hi", true, "npm run check | tail", false],
+];
+let bad = 0;
+for (const [command, ok, named, expected] of cases) {
+	rmSync(plant, { recursive: true, force: true });
+	mkdirSync(join(job, "session"), { recursive: true });
+	const call = { message: { role: "assistant", content: [{ type: "toolCall", id: "c1", arguments: { command } }] } };
+	const result = { message: { role: "toolResult", toolCallId: "c1", isError: !ok } };
+	writeFileSync(join(job, "session/a.jsonl"), `${JSON.stringify(call)}\n${JSON.stringify(result)}\n`);
+	writeFileSync(join(job, "result"), `## Note check\n- X: proven. \`${named}\``);
+	const ran = noteCheckOpen(job).length === 0;
+	bad += ran === expected ? 0 : 1;
+	console.log(`${ran === expected ? "ok " : "BAD"} ran=${ran} exit0=${ok} named=${JSON.stringify(named)} command=${JSON.stringify(command)}`);
+}
+rmSync(plant, { recursive: true, force: true });
+console.log(`${cases.length - bad} of ${cases.length} as expected`);

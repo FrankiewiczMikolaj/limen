@@ -109,7 +109,7 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	assert.doesNotMatch(done, /produced nothing/);
 	// Its open note checks reach the wake, one line each, and it is not a plain done; `npm test` never ran.
 	assert.match(done, /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /);
-	assert.match(done, /\n- Cap: not proven\. Limen: `npm test` did not run in this session and is not a file\n\n/);
+	assert.match(done, /\n- Cap: not proven\. Limen: no proof that `npm test` ran in this session, and no such file\n\n/);
 });
 
 test("stop, timeout, the tool cap and a stalled tool each end a job once and wake its session once; 80% of a timeout steers once; the plant's limits file yields to an env var", async () => {

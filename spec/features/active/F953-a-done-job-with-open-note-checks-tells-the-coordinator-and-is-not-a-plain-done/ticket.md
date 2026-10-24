@@ -15,7 +15,7 @@ Adam (2026-10-24): "even if the note says something is wrong, it still continues
 ## Scope
 
 - Limen reads the final message's "Note check" once, when the job is recorded done; the note and the project reminders share that one path. Start at the before-finish note check in `src/job/task-note.ts`.
-- Open items: a line marked not proven, changed, dropped or broken; a proven line without a command that ran or a file that exists; a sent check with no answer.
+- Open items: a line marked not proven, changed, dropped or broken; a proven line with no proof that its command ran and no such file; a sent check with no answer.
 - The recorded state stays done, so land, continue and the keeper work unchanged. The wake, the toasts, the finish webhook's handoff, `limen jobs` and `limen status` say "done with open checks".
 
 ## Out of scope
@@ -27,7 +27,7 @@ Adam (2026-10-24): "even if the note says something is wrong, it still continues
 ## Acceptance
 
 - A fake finish with one not-proven check gives the coordinator a wake that says "done with open checks" and lists that item in one line.
-- A proven line whose command never ran is listed as not proven, with the reason.
+- A proven line whose command never ran, or was only quoted or skipped, is listed as not proven, with the reason.
 - A done job with no open item gets the wake it got before: no extra line.
 - `test/` stays within its 3,500-line cap.
 - An independent review (Pi `openai-codex/gpt-6.1-sol` at `xhigh`) passes before the work lands on main.

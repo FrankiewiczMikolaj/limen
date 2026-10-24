@@ -53,3 +53,19 @@ mutation: task-note.ts sameCommand is run.includes(want) and the transcript keep
 ✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (204.395167ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^E: not proven\. Limen: it names no .+\|F: not proven\. Limen: `npm test` did not/. Input:
 
+=== mutation-6-u14.txt (after review 2)
+mutation: session-commands.ts counts every command after && or || as run (reached is always true)
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (198.091958ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (198.091958ms)
+
+=== mutation-7-u14.txt (after review 2)
+mutation: session-commands.ts ignores the recorded exit status (every call counts as failed)
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (228.47825ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (228.47825ms)
+

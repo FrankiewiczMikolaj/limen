@@ -25,7 +25,7 @@ test("a job's note shows once, keeps its first version, logs changes, and is che
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const job = join(root, ".limen/jobs/j1");
 	const reminders = join(root, ".agents/limen/reminders.md");
-	await Promise.all([job, join(root, ".agents/limen")].map((dir) => mkdir(dir, { recursive: true })));
+	await Promise.all([join(job, "session"), join(root, ".agents/limen")].map((dir) => mkdir(dir, { recursive: true })));
 	await Promise.all([writeFile(join(job, "log"), ""), writeFile(reminders, " \n")]);
 	Object.assign(process.env, { LIMEN_JOB: "1", LIMEN_CONTEXT_ROOT: root, LIMEN_JOB_ID: "j1", LIMEN_HOSTED: "0" });
 	const hook = load(limenCommunication);
@@ -62,16 +62,16 @@ test("a job's note shows once, keeps its first version, logs changes, and is che
 	assert.equal(await readFile(join(job, "result"), "utf8"), "handoff\n");
 	assert.equal(await hosted.end("final"), "done");
 	assert.equal((await readFile(join(job, "log"), "utf8")).split("] note check sent\n").length, 3);
-	// A check sent and not answered is open; a proven line needs a command the session ran (not echoed) or a file.
+	// A sent check left unanswered is open. A proven command must surely run: not echoed, not after a failed `&&`.
 	assert.deepEqual(noteCheckOpen(job), ["Note check: missing from the final message"]);
-	const command = "cd /x && CI=1 npm  run check | tail\necho 'npm test'";
-	const call = { message: { content: [{ type: "toolCall", arguments: { command } }] } };
-	await mkdir(join(job, "session"));
-	await writeFile(join(job, "session/a.jsonl"), `${JSON.stringify(call)}\n`);
+	const command = "echo 'npm test'; false && npm test; cd /x && CI=1 npm  run check | tail";
+	const call = JSON.stringify({ message: { content: [{ type: "toolCall", id: "c", arguments: { command } }] } });
+	const exited = '{"message":{"role":"toolResult","toolCallId":"c","isError":false}}';
+	await writeFile(join(job, "session/a.jsonl"), `${call}\n${exited}\n`);
 	const proven = "- **A: proven.** `npm run check`\n- B: proven `log:2`\n- C: proven\n  `note.first.md`\n- R: followed";
 	const open = (result: string) => writeFile(join(job, "result"), result).then(() => noteCheckOpen(job));
 	assert.deepEqual(await open(`## Note check\n${proven}\n# Next\n- D: not proven`), []);
 	const unproven = await open("**Note check**\n- E: proven, trust me\n- F: proven. `npm test` passed");
-	assert.match(unproven.join("|"), /^E: not proven\. Limen: it names no .+\|F: not proven\. Limen: `npm test` did not/);
+	assert.match(unproven.join("|"), /^E: not proven\. .+ names no .+\|F: not proven\. .+ no proof that `npm test`/);
 	assert.deepEqual(await open("**Note check**\nAll proven."), ['Note check: no line reads "<check>: <mark>"']);
 });
