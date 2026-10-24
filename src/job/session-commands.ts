@@ -10,8 +10,8 @@ import { readOptional } from "../project/inherit.ts";
 const HEREDOC = /<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?(?:\n[ \t]*\2[ \t]*(?=\n|$)|$)/g;
 // Leading assignments, `!` and wrappers do not change which command runs: `CI=1 timeout 60 npm test` runs `npm test`.
 const PREFIX = /^(?:[A-Za-z_]\w*=\S*\s+|!\s+|(?:time|nohup|env|command)\s+|timeout\s+\S+\s+)+/;
-// A body of these may never run; the condition of `if` or `while` counts as inside too.
-const OPENERS = new Set(["if", "while", "until", "for", "case", "select", "function", "{"]);
+// A body of these may never run; the condition of `if` or `while` counts as inside too. A function body opens with `{`.
+const OPENERS = new Set(["if", "while", "until", "for", "case", "select", "{"]);
 const CLOSERS = new Set(["fi", "done", "esac", "}"]);
 // After one of these, later lists of the call may never start, even when the call exits 0.
 const ENDERS = new Set(["exit", "return", "exec", "logout"]);
@@ -164,11 +164,8 @@ function separator(text: string, index: number): string {
 		return pair;
 	}
 	const char = text.charAt(index);
-	const redirect =
-		/[<>]/.test(text.charAt(index - 1)) ||
-		(char === "&" && text.charAt(index + 1) === ">") ||
-		!";&|()`\n".includes(char);
-	return redirect ? "" : char;
+	const redirect = /[<>]/.test(text.charAt(index - 1)) || (char === "&" && text.charAt(index + 1) === ">");
+	return !redirect && ";&|()`\n".includes(char) ? char : "";
 }
 
 const squash = (text: string): string => text.replace(/\s+/g, " ").trim();

@@ -33,5 +33,7 @@ ok  ran=false exit0=true named="npm test" command="cat <<EOF\nnpm test"
 ok  ran=true exit0=true named="npm test" command="(cd /x; npm test)"
 ok  ran=true exit0=true named="npm test" command="echo $(npm test)"
 ok  ran=true exit0=true named="npm test" command="echo ${#x}; npm test"
+ok  ran=true exit0=true named="npm test" command="function f() { true; }; npm test"
+ok  ran=false exit0=true named="npm test" command="function f { npm test; }"
 ok  ran=false exit0=true named="npm run check | tail" command="echo hi"
-36 of 36 as expected
+38 of 38 as expected

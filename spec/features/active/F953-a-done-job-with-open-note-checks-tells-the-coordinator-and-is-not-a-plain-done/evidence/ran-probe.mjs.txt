@@ -44,6 +44,8 @@ const cases = [
 	["(cd /x; npm test)", true, "npm test", true],
 	["echo $(npm test)", true, "npm test", true],
 	["echo ${#x}; npm test", true, "npm test", true],
+	["function f() { true; }; npm test", true, "npm test", true],
+	["function f { npm test; }", true, "npm test", false],
 	["echo hi", true, "npm run check | tail", false],
 ];
 let bad = 0;
