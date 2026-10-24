@@ -19,7 +19,7 @@ A coordinator receives the agent's complete final report, including trailing Not
 
 ## Out of scope
 
-- The held open-note evidence repair (F953), its parser, proof classification, branches or acceptance. Do not merge or recover it.
+- The separately accepted open-note evidence implementation (F953), its parser, proof classification or acceptance. Integrate current main as needed, but do not change those semantics in this slice.
 - New dependencies, workflow gates, provider changes, unrelated runtime repairs or live external webhook sends.
 - A larger prompt checklist beside the existing one, or replacing role-specific review/scout evidence formats.
 
@@ -29,5 +29,5 @@ A coordinator receives the agent's complete final report, including trailing Not
 - Each coordinator delivery route and finish-webhook handoff carries that full report, not a substitute pointer or another excerpt.
 - Wait output and group-lead completion carry their complete final message; commit lists may remain bounded.
 - Worker, reviewer, scout and group-team prompts state that the full last message reaches the coordinator, who decides the next step; gaps come before completed work, without duplicate ending lists or obsolete cut-based limits.
-- Existing routing, delivery receipts, state meaning and absent-result cases remain intact; no F953 work enters this candidate.
+- Existing routing, delivery receipts, state meaning and absent-result cases remain intact; no F953 implementation or proof-rule change enters this slice's diff.
 - Replace the truncation regression, keep `test/` within the 3,500-line cap, retain a full local-check result at the candidate code commit, and obtain the requested independent Sol review before landing.
