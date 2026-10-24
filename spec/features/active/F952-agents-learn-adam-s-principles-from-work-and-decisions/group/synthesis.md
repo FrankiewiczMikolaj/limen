@@ -1,6 +1,6 @@
 # Learning-system design
 
-The discussion document is `/Users/overment/Downloads/limen-learning-system.html`. It recommends two source-linked files, three retrieval and learning skills, coordinator-led capture, and an opt-in audit timer after a manual pilot. Existing guidance keeps its authority. No system was installed and no product code changed.
+This is the first group's historical synthesis. Adam's review superseded its project-local principle register and three-skill proposal; the current design is [revision-1/design.md](../revision-1/design.md). The discussion page remains `/Users/overment/Downloads/limen-learning-system.html`. No system was installed and no product code changed.
 
 ## Selected ideas
 

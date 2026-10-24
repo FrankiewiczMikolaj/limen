@@ -1,6 +1,6 @@
 ---
 opened: 2026-10-24
-needs-adam: Choose the proposed learning-system options in ~/Downloads/limen-learning-system.html; no implementation is authorized.
+needs-adam: Choose the global principle home, conversation access and refine schedules in ~/Downloads/limen-learning-system.html; no implementation or pilot is authorized.
 needs-adam-on: 2026-10-24
 ---
 
