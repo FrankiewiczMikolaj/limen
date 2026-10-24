@@ -5,7 +5,9 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 import { after, before, test } from "node:test";
 import { FINAL, jobDir, jobFile, LIMEN, limen, type Plant, plant, release, spawnJob, until, waitJob } from "./plant.ts";
 
@@ -69,6 +71,7 @@ switch (noun + " " + verb) {
 		ok({});
 	}
 	case "agent prompt": fail("agent_prompt_stalled"); // Sent, but the busy coordinator pane started no turn.
+	case "status --json": console.log(JSON.stringify({ server: { running: true, socket: path.join(__dirname, "h.sock") } })); process.exit(0);
 	default: ok({});
 }
 `;
@@ -83,6 +86,14 @@ const calls = (): string[][] =>
 		.split("\n")
 		.map((line) => JSON.parse(line) as string[]);
 const named = (noun: string, verb: string) => calls().filter((args) => args[0] === noun && args[1] === verb);
+// Herdr's socket API, served here, takes a prompt too long for one argument; as with `agent prompt`, no turn starts.
+const asked: string[] = [];
+const socket = createServer((conn) =>
+	createInterface({ input: conn }).once("line", (line) => {
+		asked.push(JSON.parse(line).params.text);
+		conn.end('{"id":"","error":{"code":"agent_prompt_stalled","message":"no turn"}}\n');
+	}),
+);
 const engineArgv = (pane: string): string[] => {
 	const start = named("agent", "start").find((args) => args[args.indexOf("--pane") + 1] === pane) ?? [];
 	return start.slice(start.indexOf("--") + 1);
@@ -112,6 +123,7 @@ before(async () => {
 	await writeFile(join(herdr, "state.json"), JSON.stringify({ workspaces: [], tabs: {}, procs: {}, agents: {} }));
 	await writeFile(join(herdr, "herdr"), herdrSource);
 	await chmod(join(herdr, "herdr"), 0o755);
+	await new Promise<void>((resolve) => socket.listen(join(herdr, "h.sock"), resolve));
 	// The caller is a coordinator pane with no Pi session: its wake travels as one Herdr prompt. Sweeps confirm at once.
 	env = {
 		LIMEN_HERDR: join(herdr, "herdr"),
@@ -121,7 +133,7 @@ before(async () => {
 		LIMEN_REAP_CONFIRM_MS: "1",
 	};
 });
-after(() => p.cleanup());
+after(() => p.cleanup().finally(() => socket.close()));
 
 let first = "";
 test("a hosted job's task never travels as argv, and it finishes done with its handoff when the session ends", async () => {
@@ -191,7 +203,7 @@ test("hosted Pi stop records stopped once and closes the job's tab", async () =>
 test("in Herdr a spawn with no mode flag runs detached under its --timeout; queued, it tells its pane once that it started", async () => {
 	const reading = join(p.parent, "start-reading.json");
 	await writeFile(reading, '{"cpuIdle":90,"memoryFree":10}');
-	const run = limen(p, ["spawn", "--timeout", "5m", "--label", "flagless", `say ${FINAL.line}`], { env });
+	const run = limen(p, ["spawn", "--timeout", "5m", "--label", "flagless", `say ${FINAL.line.repeat(12)}`], { env });
 	assert.match(run.stdout, /\nqueued flagless: CPU 90% idle \(gate 25%\), memory 10% free \(gate 20%\), 0 ahead\n/);
 	const id = run.stdout.trim().split("\n").at(-1) ?? "";
 	await writeFile(reading, "{}");
@@ -199,9 +211,9 @@ test("in Herdr a spawn with no mode flag runs detached under its --timeout; queu
 	assert.equal(jobFile(p, id, "herdr/mode"), "watch", "a log-tail tab, not a hosted pane");
 	const receipts = ["herdr-start", "herdr-prompt"].map((name) => () => jobFile(p, id, `notify/${name}`));
 	await until(jobDir(p, id), () => receipts.every((receipt) => receipt().startsWith("attempt 1: delivered to")));
-	const sent = named("agent", "prompt").filter((args) => args[3]?.includes(id));
-	assert.equal(sent.map((args) => args[3]?.includes(") started after ")).join(), "true,false", "each sent once");
-	assert.ok(sent[1]?.[3]?.includes(`Final message:\n${FINAL.text}\n\n`), "the prompt carries the whole message");
+	const sent = [...named("agent", "prompt").map((args) => args[3] ?? ""), ...asked].filter((text) => text.includes(id));
+	assert.equal(sent.map((text) => text.includes(") started after ")).join(), "true,false", "each sent once");
+	assert.ok(asked.at(-1)?.includes(`Final message:\n${FINAL.text.repeat(12)}\n\n`), "whole, by socket");
 });
 
 test("a rule set, change, end and end time ping each live coordinator pane once (F951); a dead timer's rule still ends", async () => {

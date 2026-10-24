@@ -23,8 +23,9 @@ const TRY_MS = 30_000;
 const WAIT_MS = 2 * 60_000;
 const MAX_BACKOFF_MS = 10 * 60_000;
 const GIVE_UP_MS = 24 * 60 * 60_000;
+// The queue snapshot is gone after a final failure, so the job's result file carries the final message.
 const MANUAL =
-	"Manual finish-ping send: only after a final failure. Run bin/tony-finish-ping.sh with this job's finish-webhook-env as LIMEN_FINISH_WEBHOOK_ENV, and its label, state and branch.";
+	"Manual finish-ping send: only after a final failure. Run bin/tony-finish-ping.sh with this job's finish-webhook-env as LIMEN_FINISH_WEBHOOK_ENV, its result file (when it has one) as LIMEN_FINISH_MESSAGE_FILE, and its label, state and branch.";
 
 /** One queued ping. `limen` is the plant's `.limen` folder; `log` is the job folder whose log names each try, or "". */
 type Queued = {

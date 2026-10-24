@@ -8,6 +8,7 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { coordinatorSignals, sweepCoordinators } from "../src/integrations/coordinator-signal.ts";
+import { SENDER } from "../src/integrations/webhook-queue.ts";
 import { FINAL, git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
 
 const p = await plant();
@@ -119,6 +120,13 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 	run(["webhook", "deliver", jobDir(p, id)]);
 	const counts = urls.map((url) => requests(p).filter((request) => request.url === url).length);
 	assert.deepEqual(counts, [1, 3, 1]);
+	// A send by hand, run as the receipt's manual line says, carries the final message too.
+	assert.match(jobFile(p, id, "finish-webhook"), /its result file \(when it has one\) as LIMEN_FINISH_MESSAGE_FILE,/);
+	const config = jobFile(p, id, "finish-webhook-env");
+	const env = { ...p.env, LIMEN_FINISH_WEBHOOK_ENV: config, LIMEN_FINISH_MESSAGE_FILE: "result" };
+	spawnSync(SENDER, ["S7 bob", "failed", "limen/b"], { cwd: jobDir(p, id), env });
+	const last = payloads().slice(-3);
+	assert.ok(last.every((sent) => sent.body.handoff.endsWith(`\n\nFinal message:\n${FINAL.text}`)));
 });
 
 test("a ping whose deliverer was killed mid-send goes out with the next limen command", async () => {
@@ -141,7 +149,7 @@ test("a ping whose deliverer was killed mid-send goes out with the next limen co
 });
 
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {
-	assert.deepEqual([wait(quiet), requests(p).length], ["done", 9]);
+	assert.deepEqual([wait(quiet), requests(p).length], ["done", 12]);
 	const sealed = (request: ReturnType<typeof requests>[number]) =>
 		request.url.startsWith("https://hooks.s7.test/") && SECRETS.includes(request.headers.authorization ?? "");
 	assert.ok(requests(p).every(sealed) && payloads().every((ping) => ping.body.jobId !== quiet));

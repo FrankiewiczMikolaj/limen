@@ -1,7 +1,7 @@
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import { herdrPrompt } from "../integrations/coordinator-wake.ts";
 import { herdrBinary } from "../integrations/herdr.ts";
 import {
 	type GroupMember,
@@ -252,17 +252,12 @@ async function promptLeadPane(run: GroupRun, text: string): Promise<void> {
 	}
 	const lines: string[] = [];
 	for (let attempt = 1; attempt <= 2; attempt += 1) {
-		const args = ["agent", "prompt", run.leadPane, text, "--wait", "--until", "working", "--until", "blocked"];
-		const error = await new Promise<Error | null>((resolve) => {
-			try {
-				execFile(herdr, [...args, "--timeout", String(PROMPT_MS - 2_000)], { timeout: PROMPT_MS }, resolve);
-			} catch (failed) {
-				// The spawn throws when the OS refuses the argv (E2BIG: the result is past one argument's limit).
-				resolve(failed instanceof Error ? failed : new Error(String(failed)));
-			}
-		});
-		lines.push(`attempt ${attempt}: ${error ? `failed on ${run.leadPane}` : `turn observed on ${run.leadPane}`}`);
-		if (!error) {
+		// The same transport as a job's wake: a long result goes whole over Herdr's socket, not as one argument.
+		const outcome = await herdrPrompt(herdr, run.leadPane, text, PROMPT_MS);
+		lines.push(
+			`attempt ${attempt}: ${outcome.ok ? `turn observed on ${run.leadPane}` : `failed on ${run.leadPane} (${outcome.detail})`}`,
+		);
+		if (outcome.ok) {
 			break;
 		}
 	}

@@ -36,7 +36,7 @@ test("an ended turn signals what its todos, goal, stop and owned jobs call for, 
 	assert.match(turnSignal({ ...base, todos: open })?.reason ?? "", /next: Land F781; last message: Report sent$/);
 });
 
-test("only a done job that is not a scout is sent to landing; a fallback or scout wake has the whole message, a Herdr wake past the argument limit is not sent", async (t) => {
+test("only a done job that is not a scout is sent to landing; a fallback or scout wake has the whole message, a Herdr wake past one request is not sent", async (t) => {
 	const dir = await mkdtemp(join(tmpdir(), "u12-"));
 	t.after(() => rm(dir, { recursive: true, force: true }));
 	await writeFile(join(dir, "task.md"), "Scout F001.\n");
@@ -51,5 +51,5 @@ test("only a done job that is not a scout is sent to landing; a fallback or scou
 	assert.doesNotMatch(wake("done"), /before landing|land it/);
 	assert.ok([wake("done"), wake("stopped", true)].every((text) => text.includes(`Final message:\n${FINAL.text}\n\n`)));
 	await promptPane("/usr/bin/true", "w1:p1", wake("done").repeat(130), Date.now() + 60_000, join(dir, "p")); // 1.2 MB
-	assert.match(await readFile(join(dir, "p"), "utf8"), /^attempt 1: not sent to w1:p1: herdr not started: E2BIG /);
+	assert.match(await readFile(join(dir, "p"), "utf8"), /^attempt 1: not sent to w1:p1: prompt_too_large: \d{7} /);
 });
