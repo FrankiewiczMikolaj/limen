@@ -35,6 +35,15 @@ const cases = [
 	["npm \\\n  test", true, "npm test", true],
 	["npm test || true", true, "npm test", true],
 	["cd /x && npm run check | tail", true, "cd /x && npm run check", true],
+	["true # ; npm test", true, "npm test", false],
+	["# npm test\ntrue", true, "npm test", false],
+	["echo $(false && npm test)", true, "npm test", false],
+	["echo `false && npm test`", true, "npm test", false],
+	["false && (true; npm test); true", true, "npm test", false],
+	["cat <<EOF\nnpm test", true, "npm test", false],
+	["(cd /x; npm test)", true, "npm test", true],
+	["echo $(npm test)", true, "npm test", true],
+	["echo ${#x}; npm test", true, "npm test", true],
 	["echo hi", true, "npm run check | tail", false],
 ];
 let bad = 0;

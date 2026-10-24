@@ -5,8 +5,9 @@ import { readOptional } from "../project/inherit.ts";
 // Which shell commands a job's session surely ran, so a "Note check" line marked proven can name one as its evidence.
 // Limen reads the recorded tool calls and their results; it never runs or replays them.
 
-// A heredoc body is data, not commands: `<<'EOF'` up to the line that ends it. The rest of the opening line stays.
-const HEREDOC = /<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/g;
+// A heredoc body is data, not commands: `<<'EOF'` up to the line that ends it, or to the end of an unfinished one.
+// The rest of the opening line stays.
+const HEREDOC = /<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?(?:\n[ \t]*\2[ \t]*(?=\n|$)|$)/g;
 // Leading assignments, `!` and wrappers do not change which command runs: `CI=1 timeout 60 npm test` runs `npm test`.
 const PREFIX = /^(?:[A-Za-z_]\w*=\S*\s+|!\s+|(?:time|nohup|env|command)\s+|timeout\s+\S+\s+)+/;
 // A body of these may never run; the condition of `if` or `while` counts as inside too.
@@ -20,6 +21,7 @@ type Placed = {
 	readonly words: string;
 	readonly list: number;
 	readonly gated: boolean;
+	readonly nested: boolean;
 	readonly or: boolean;
 	readonly inside: boolean;
 	readonly ends: boolean;
@@ -70,10 +72,12 @@ function transcriptLines(jobDir: string): string[] {
 }
 
 /**
- * The simple commands of one shell call that surely ran. Each list (split at `;`, `&` and line ends) starts when the
- * call reaches it. A command after `&&` or `||`, or inside `if`, a loop, `case`, braces or a function, may be skipped.
- * A call that exited 0 (`ok`) also ran every command of its last list when that list has no `||`. A failed or
- * unknown call proves only its first list, and so does a call with `exit`, `return` or `exec` anywhere.
+ * The simple commands of one shell call that surely ran. Each top-level list (split at `;`, `&` and line ends outside
+ * parentheses and backticks) starts when the call reaches it. A command after `&&` or `||`, or inside `if`, a loop,
+ * `case`, braces or a function, may be skipped. A call that exited 0 (`ok`) also ran every top-level command of its
+ * last list when that list has no `||`; inside parentheses or backticks an `&&` does not set the call's exit status.
+ * A failed or unknown call proves only its first list before any `&&` or `||`, and so does a call with `exit`,
+ * `return` or `exec` anywhere.
  */
 function surelyRan(command: string, ok: boolean): string[] {
 	const placed = place(pieces(command));
@@ -81,18 +85,24 @@ function surelyRan(command: string, ok: boolean): string[] {
 	const lastOr = placed.some((each) => each.list === last && each.or);
 	const ended = placed.some((each) => each.ends);
 	const started = (each: Placed) => each.list === 0 || (ok && !ended);
-	const reached = (each: Placed) => !each.gated || (ok && !ended && each.list === last && !lastOr);
+	const reached = (each: Placed) => !each.gated || (ok && !ended && !each.nested && each.list === last && !lastOr);
 	return placed
 		.filter((each) => each.words && !each.inside && started(each) && reached(each))
 		.map((each) => each.words);
 }
 
+/** Each piece with its top-level list, whether an `&&` or `||` gates it, and its nesting. */
 function place(parts: readonly Piece[]): Placed[] {
 	let list = 0;
 	let depth = 0;
+	let nest = 0;
+	let tick = false;
 	let gated = false;
 	return parts.map(({ words, sep }) => {
-		if (sep === ";" || sep === "\n" || sep === "&") {
+		nest = Math.max(0, nest + (sep === "(" ? 1 : 0) - (sep === ")" ? 1 : 0));
+		tick = sep === "`" ? !tick : tick;
+		const nested = nest > 0 || tick;
+		if (!nested && (sep === ";" || sep === "\n" || sep === "&")) {
 			list += 1;
 			gated = false;
 		}
@@ -104,11 +114,11 @@ function place(parts: readonly Piece[]): Placed[] {
 		} else if (CLOSERS.has(first)) {
 			depth = Math.max(0, depth - 1);
 		}
-		return { words: words.replace(PREFIX, ""), list, gated, or: sep === "||", inside, ends: ENDERS.has(first) };
+		return { words: words.replace(PREFIX, ""), list, gated, nested, or: sep === "||", inside, ends: ENDERS.has(first) };
 	});
 }
 
-/** Splits a shell call at its unquoted separators; each piece keeps the separator before it. */
+/** Splits a shell call at its unquoted separators; each piece keeps the separator before it. Comments are dropped. */
 function pieces(command: string): Piece[] {
 	const text = command.replace(HEREDOC, "$3").replaceAll("\\\n", " ");
 	const found: Piece[] = [];
@@ -117,6 +127,12 @@ function pieces(command: string): Piece[] {
 	let quote = "";
 	let escaped = false;
 	for (let index = 0; index < text.length; index += 1) {
+		// An unquoted `#` that starts a word begins a comment, which runs to the line end.
+		if (!(quote || escaped) && text.charAt(index) === "#" && /^$|[\s;&|()]/.test(text.charAt(index - 1))) {
+			const end = text.indexOf("\n", index);
+			index = (end === -1 ? text.length : end) - 1;
+			continue;
+		}
 		const next = quote || escaped ? "" : separator(text, index);
 		if (next) {
 			found.push({ words: squash(current), sep });
