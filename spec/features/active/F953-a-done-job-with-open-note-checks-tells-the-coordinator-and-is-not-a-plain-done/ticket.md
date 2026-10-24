@@ -16,7 +16,7 @@ Adam (2026-10-24): "even if the note says something is wrong, it still continues
 
 - Limen reads the final message's "Note check" once, when the job is recorded done; the note and the project reminders share that one path. Start at the before-finish note check in `src/job/task-note.ts`.
 - Open items: a line marked not proven, changed, dropped or broken; a proven line without a command that ran or a file that exists; a sent check with no answer.
-- The recorded state stays done, so land, continue and the keeper work unchanged. The wake, the toasts, `limen jobs` and `limen status` say "done with open checks".
+- The recorded state stays done, so land, continue and the keeper work unchanged. The wake, the toasts, the finish webhook's handoff, `limen jobs` and `limen status` say "done with open checks".
 
 ## Out of scope
 

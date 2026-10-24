@@ -35,3 +35,12 @@ mutation: task-note.ts sessionCommands sees no toolCall line
   +   'A: not proven. Limen: `npm run check` did not run in this session and is not a file'
   + ]
 
+=== mutation-4-s7.txt
+mutation: finish-webhook.ts sends no open-checks handoff (open.length < 0)
+✖ a done job pings only the target its ticket author maps to, with its unanswered note check (1619.08475ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a done job pings only the target its ticket author maps to, with its unanswered note check (1619.08475ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^Job done with open checks\. .*\n- Note check: missing from the final message$/. Input:
+
