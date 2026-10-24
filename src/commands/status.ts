@@ -220,7 +220,8 @@ async function scanJob(scan: Scan, id: string): Promise<void> {
 		scan.finished.set(`${job.repo}:${job.branch}`, {
 			id,
 			label: job.label || id,
-			state: job.state,
+			// Open note checks need a decision before the branch is a candidate.
+			state: job.state === "done" && existsSync(`${dir}/open-checks`) ? "done with open checks" : job.state,
 			branch: job.branch,
 			repo: job.repo,
 		});

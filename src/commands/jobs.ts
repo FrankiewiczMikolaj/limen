@@ -244,6 +244,8 @@ type JobEvidence = {
 	readonly commits: string;
 	readonly commitsStat: Stats | undefined;
 	readonly result: string;
+	/** The open items of the final "Note check" of a done job, one per line. */
+	readonly openChecks: string;
 	readonly versions: string;
 	readonly cleanup: string;
 	readonly finishWebhook: string;
@@ -359,6 +361,7 @@ async function readJobEvidence(
 	const warning = fields.advisory || (uncertainty ? hostedUncertaintyText(uncertainty) : "");
 	const agent = await text(`${jobDir}/herdr/agent`);
 	const [commits, commitsStat] = await Promise.all([text(`${jobDir}/commits`), optionalStat(`${jobDir}/commits`)]);
+	const openChecks = fields.state === "done" ? await text(`${jobDir}/open-checks`) : "";
 	const [result, versions] = detailed
 		? await Promise.all([text(`${jobDir}/result`), text(`${jobDir}/versions`)])
 		: ["", ""];
@@ -380,6 +383,7 @@ async function readJobEvidence(
 			commits,
 			commitsStat,
 			result,
+			openChecks,
 			versions,
 			cleanup,
 			finishWebhook,
@@ -478,6 +482,7 @@ function jobBlocks(loaded: LoadedJob, facts: JobFacts): string[] {
 	}
 	const sections: ReadonlyArray<readonly [string, string]> = [
 		["stop-reason", fields.stopReason],
+		["open-checks", evidence.openChecks],
 		["versions", evidence.versions],
 		["commits", detailed ? evidence.commits : ""],
 		["result", evidence.result],
@@ -496,6 +501,7 @@ function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 	const { id, detailed, fields, evidence, logStat, log } = loaded;
 	const { job, observedAt, pulse, queue, recordedTools, empty, agentStatus } = facts;
 	const reason = stopSummary(fields.stopReason || log.detail);
+	const open = evidence.openChecks ? evidence.openChecks.split("\n").length : 0;
 	const running = job.phase === "running";
 	return {
 		id,
@@ -506,6 +512,7 @@ function jobRecord(loaded: LoadedJob, facts: JobFacts): JobRecord {
 		...(empty ? { producedNothing: true } : {}),
 		...(fields.lastTool ? { lastTool: displayed(fields.lastTool, detailed) } : {}),
 		...((job.phase === "failed" || job.phase === "stopped") && reason && reason !== "see log" ? { reason } : {}),
+		...(open ? { reason: `${open} open ${open === 1 ? "check" : "checks"}` } : {}),
 		elapsedMs: observedAt - facts.startedAt.getTime(),
 		silentMs: observedAt - logStat.mtimeMs,
 		...(running ? {} : { ageMs: Date.now() - observedAt }),
@@ -527,6 +534,7 @@ function recordedEvidence(loaded: LoadedJob, diffstat: string): Partial<JobRecor
 		...(fields.stopReason ? { stopReason: fields.stopReason } : {}),
 		...(evidence.versions ? { versions: evidence.versions } : {}),
 		...(detailed && evidence.commits ? { commits: evidence.commits } : {}),
+		...(evidence.openChecks ? { openChecks: evidence.openChecks } : {}),
 		...(evidence.result ? { result: evidence.result } : {}),
 		...(evidence.model ? { model: evidence.model } : {}),
 		...(evidence.tokens ? { tokens: evidence.tokens } : {}),

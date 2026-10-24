@@ -43,6 +43,8 @@ Both routes carry the same completion facts: the task, branch and repository, st
 | `done` | The run ended cleanly. The selected engine exited 0, or a hosted session ended, and the last stop reason was not `error` or `aborted`. |
 | `failed` | The run had a provider error, and Limen records the reason. A limit also records `failed` (see [Limits](#limits)). A failed job keeps its worktree and transcript. |
 
+A `done` job whose final "Note check" leaves an item open is `done with open checks`. Limen keeps the `done` state and writes one line for each open item to `open-checks` in the job record: an item marked not proven, changed, dropped or broken, a proven item whose command did not run in the session and whose file does not exist, or a check that was sent and not answered. The wake lists these lines and asks the coordinator to continue the job, start a review, or accept each item with a reason before it lands. `limen jobs` and `limen status` show the same state.
+
 Failed rows use the recorded `stop-reason`, not a later webhook or tab-close log line. Rate-limit rows show the HTTP status and approximate retry minutes; `jobs <id>` retains the full provider reason. Older records without `stop-reason` use the last `failed:` or `stopped:` log entry.
 
 **Neither state is approval.** Neither state means that the ticket is finished or that the branch is safe to merge, because `done` only means that the run exited cleanly. The coordinator reads the record, the diff, and the checks. Then, under the review policy of the project, it merges, or resumes a repair, or asks you.

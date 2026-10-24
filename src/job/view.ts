@@ -27,6 +27,8 @@ export type JobRecord = {
 	readonly versions?: string;
 	readonly commits?: string;
 	readonly result?: string;
+	/** The open items of the final "Note check" of a done job, one per line. */
+	readonly openChecks?: string;
 	readonly model?: string;
 	readonly tokens?: string;
 	readonly cleanup?: string;
@@ -150,6 +152,7 @@ export function humanDetail(record: JobRecord, paint: Paint): string {
 	put("versions", record.versions);
 	put("commits", record.commits);
 	put("stop-reason", record.stopReason);
+	put("open-checks", record.openChecks);
 	put("result", record.result);
 	put("diff", record.diffstat);
 	put("cleanup", record.cleanup);

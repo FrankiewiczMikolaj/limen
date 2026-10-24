@@ -1,13 +1,19 @@
-import { appendFileSync, existsSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { appendFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 import { readOptional } from "../project/inherit.ts";
 
 // The agent writes the note in its job folder; the project may keep reminders beside its other Limen guidance.
 // Limen copies, logs and shows both, and never parses them. Adam approved the wording below as written (F950).
+// Limen reads only the "Note check" of the final message, and records its open items in `open-checks`.
 const NOTE = "note.md";
 const FIRST = "note.first.md";
 const TASK = "task.md";
+const OPEN = "open-checks";
 const REMINDERS = ".agents/limen/reminders.md";
+// One "Note check" line: `<check>: <mark>`, then the evidence or the gap. Proven and followed close an item.
+const MARKED = /^(.+?):\s*(not proven|proven|changed|dropped|followed|broken)\b[\s.,;:]*(.*)$/i;
+const SHOWN = 10;
 const FORMAT = [
 	"Write a plan, not a task copy or a result log. Use plain technical English. Aim for six lines in three parts:",
 	'- Done means: two to four end checks. Each line states what must be true, then "Shown by:" and the command or ' +
@@ -74,11 +80,15 @@ export function noteCheck(jobDir: string, finishTool: boolean): string {
 		...(now && first && first !== now ? ["Your note at the start:", first] : []),
 		...(reminders ? ["Project reminders:", reminders.text] : []),
 		"Compare the note with the task and later instructions. " +
-			'Under "Note check" in your final message, give one line per end check. ' +
-			"Mark it proven, not proven, changed, or dropped. Proven needs evidence and its location. " +
+			'Under the heading "Note check" in your final message, give one line per end check: ' +
+			'"- <check>: <mark>. <evidence or gap>". The mark is proven, not proven, changed, or dropped. ' +
+			"Proven names its evidence in backticks: a command that ran in this session, or a file. " +
 			"Not proven needs what is missing. Changed or dropped needs the instruction that changed its scope. " +
 			"Give one line per item in a referenced acceptance list. " +
-			"Account for any obligation missing from the current note.",
+			"Account for any obligation missing from the current note. " +
+			"Limen sends each line marked not proven, changed, dropped, or broken to the coordinator, " +
+			"and the job ends as done with open checks. " +
+			"A proven line whose command did not run and whose file does not exist counts as not proven.",
 		"Give the easy-to-miss rule its own line: followed, broken, or not proven, with evidence or the gap. " +
 			"Passing the end checks does not prove that the rule was followed. " +
 			"Read Not proven yet; none of its entries can be marked proven without evidence.",
@@ -103,6 +113,131 @@ export function recordNote(jobDir: string, seen: string | undefined): string | u
 	appendFileSync(join(jobDir, "log"), `[limen ${new Date().toISOString()}] note changed\n`);
 	return now;
 }
+
+/**
+ * The open items of the final "Note check", for `open-checks`: each line marked not proven, changed, dropped, or
+ * broken, and each proven line whose evidence Limen cannot find. The note and the reminders share these lines.
+ * A check that was sent and not answered is one item.
+ */
+export function noteCheckOpen(jobDir: string): string[] {
+	const lines = noteCheckSection(readOptional(join(jobDir, "result")) ?? "");
+	if (!lines) {
+		const sent = (readOptional(join(jobDir, "log")) ?? "").includes("] note check sent\n");
+		return sent ? ["Note check: missing from the final message"] : [];
+	}
+	const items = markedItems(lines);
+	if (!items.length) {
+		return ['Note check: no line reads "<check>: <mark>"'];
+	}
+	return items.flatMap((item) => openItem(item, jobDir)).map((line) => clip(line, 160));
+}
+
+/** The open items a done job recorded, as wake lines: at most ten, then a count of the rest. */
+export function openChecks(jobDir: string): string[] {
+	const open = (readOptional(join(jobDir, OPEN)) ?? "").split("\n").filter(Boolean);
+	const more = open.length > SHOWN ? [`… ${open.length - SHOWN} more in ${join(jobDir, OPEN)}`] : [];
+	return [...open.slice(0, SHOWN).map((line) => `- ${line}`), ...more];
+}
+
+type Marked = { readonly name: string; readonly mark: string; readonly said: string; evidence: string };
+
+/** The lines under the first "Note check" heading, up to the next Markdown heading; undefined without one. */
+function noteCheckSection(result: string): string[] | undefined {
+	const lines = result.split("\n");
+	const start = lines.findIndex((line) => /^\s*(?:#{1,6}\s+)?[*_]*note check\b.{0,40}$/i.test(line));
+	if (start === -1) {
+		return;
+	}
+	const rest = lines.slice(start + 1);
+	const end = rest.findIndex((line) => /^#{1,6}\s/.test(line));
+	return end === -1 ? rest : rest.slice(0, end);
+}
+
+/** Each `<check>: <mark>` line, with the indented lines right under it as more evidence. */
+function markedItems(lines: readonly string[]): Marked[] {
+	const items: Marked[] = [];
+	let current: Marked | undefined;
+	for (const line of lines) {
+		const bare = line
+			.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "")
+			.replace(/\*\*|__/g, "")
+			.trim();
+		const match = MARKED.exec(bare);
+		if (match) {
+			const said = (match[3] ?? "").trim();
+			current = { name: (match[1] ?? "").trim(), mark: (match[2] ?? "").toLowerCase(), said, evidence: said };
+			items.push(current);
+		} else if (current && /^\s+\S/.test(line)) {
+			current.evidence += `\n${line}`;
+		} else {
+			current = undefined;
+		}
+	}
+	return items;
+}
+
+function openItem(item: Marked, jobDir: string): string[] {
+	if (item.mark === "followed") {
+		return [];
+	}
+	if (item.mark !== "proven") {
+		return [`${item.name}: ${item.mark}${item.said ? `. ${item.said}` : ""}`];
+	}
+	const why = missingEvidence(item.evidence, jobDir);
+	return why ? [`${item.name}: not proven. Limen: ${why}`] : [];
+}
+
+/** Empty when one backticked name is a command the session ran or a file that exists; otherwise why not. */
+function missingEvidence(evidence: string, jobDir: string): string {
+	const named = [...evidence.matchAll(/`([^`\n]+)`/g)]
+		.map((match) => (match[1] ?? "").trim())
+		.filter((name) => /[a-z0-9]/i.test(name));
+	if (!named.length) {
+		return "it names no command or file in backticks";
+	}
+	const ran = sessionCommands(jobDir);
+	const worktree = readOptional(join(jobDir, "worktree"))?.trim();
+	const roots = [...(worktree ? [worktree] : []), jobDir, resolve(jobDir, "..", "..", "..")];
+	const found = (name: string) => ran.some((command) => command.includes(squash(name))) || fileExists(name, roots);
+	return named.some(found) ? "" : `\`${clip(named[0] ?? "", 60)}\` did not run in this session and is not a file`;
+}
+
+/** A path as written, or relative to one of `roots`; a `:line` or `#anchor` suffix is ignored. */
+function fileExists(name: string, roots: readonly string[]): boolean {
+	const path = name.replace(/^~(?=\/)/, homedir()).replace(/(?::\d+)+(?:-\d+)?$|#.*$/, "");
+	return (isAbsolute(path) ? [path] : roots.map((root) => resolve(root, path))).some((each) => existsSync(each));
+}
+
+/** Every shell command in the job's session transcripts, with its whitespace squashed. Pi and OMP write the same. */
+function sessionCommands(jobDir: string): string[] {
+	const dir = join(jobDir, "session");
+	let files: string[] = [];
+	try {
+		files = readdirSync(dir).filter((name) => name.endsWith(".jsonl"));
+	} catch {
+		// A job without a transcript ran no command Limen can see.
+	}
+	const commands: string[] = [];
+	for (const line of files.flatMap((file) => (readOptional(join(dir, file)) ?? "").split("\n"))) {
+		if (!line.includes('"toolCall"')) {
+			continue;
+		}
+		try {
+			const content: unknown = JSON.parse(line)?.message?.content;
+			for (const part of Array.isArray(content) ? content : []) {
+				if (part?.type === "toolCall" && typeof part.arguments?.command === "string") {
+					commands.push(squash(part.arguments.command));
+				}
+			}
+		} catch {
+			// A torn last line is not a command.
+		}
+	}
+	return commands;
+}
+
+const squash = (text: string): string => text.replace(/\s+/g, " ").trim();
+const clip = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 /** A job folder is `<root>/.limen/jobs/<id>`; the reminders belong to that root. Absent or empty means none. */
 function projectReminders(jobDir: string): { readonly path: string; readonly text: string } | undefined {

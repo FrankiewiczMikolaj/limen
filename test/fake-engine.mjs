@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The one fake pi/omp. It loads the real hook extensions Limen passes, runs the task text as a script, and records
 // what it saw in the record dir (the parent of --session-dir, so a job's own dir). Script lines:
-//   commit · fail <code> · error (assistant stop reason "error") · say <text> · tool <command> · block · orphan · finish <handoff>
+//   commit · fail <code> · error (assistant stop reason "error") · say <text> · tool <command> · block · orphan · finish <handoff, \n ends a line>
 //   · idle (a bash tool whose one child waits without CPU) · /<command> <args> (runs a command a hook registered, as a user typing it)
 // `block` writes fake-blocked-<n> and waits for one write to the FIFO fake-gate. Records: fake-argv.json, fake-env.json
 // (variable names), fake-task.txt, fake-system.txt (system prompt after before_agent_start), fake-context.txt (the hidden
@@ -160,7 +160,8 @@ for (const line of task.split("\n")) {
 		child.unref();
 		writeFileSync(join(dir, "fake-orphan"), String(child.pid));
 	} else if (word === "finish") {
-		await tools.get("finish")?.execute("fake", { handoff: value }, undefined, undefined, context);
+		const handoff = value.replaceAll("\\n", "\n");
+		await tools.get("finish")?.execute("fake", { handoff }, undefined, undefined, context);
 	} else if (word.startsWith("/")) {
 		await commands.get(word.slice(1))?.handler(value, context);
 	}

@@ -7,6 +7,7 @@ import { processAlive, processInfo } from "../runtime/contain.ts";
 import { jobMembership, saveJson, startGroupAdvance } from "./group-cabinet.ts";
 import { syncLifecycle } from "./group-events.ts";
 import { isTerminal, type TerminalState } from "./job.ts";
+import { noteCheckOpen } from "./task-note.ts";
 
 // The job record is a directory of plain files. `state` is the commit point observers key on;
 // everything a reader needs must be durable before it flips to a terminal value.
@@ -42,6 +43,11 @@ export async function finalizeJob(
 		return;
 	}
 	await recordCommits(jobDir).catch(() => {});
+	// A done the coordinator asked for (`done: <reason>`) already accepts what is open.
+	const open = state === "done" && !detail.startsWith("done:") ? noteCheckOpen(jobDir) : [];
+	if (open.length) {
+		await atomicWrite(`${jobDir}/open-checks`, `${open.join("\n")}\n`);
+	}
 	await atomicWrite(`${jobDir}/finished-at`, `${new Date().toISOString()}\n`);
 	// The terminal log line lands before the state flip; state is the commit point observers key on, and the story must already be durable when they see it.
 	const inbox = await readdir(`${jobDir}/steer/inbox`).catch(() => []);

@@ -26,13 +26,10 @@ const end = (message: object) => JSON.stringify({ type: "message_end", message }
 test("a line split across chunks yields one event when its end arrives, and flush emits a trailing partial line", () => {
 	const parser = createStreamParser();
 	const line = end({ role: "assistant", content: ["do", "ne"].map((text) => ({ type: "text", text })) });
-	assert.deepEqual(parser.push(`{"type":"agent_start"}\r\n${line.slice(0, 20)}`), [
-		{ kind: "activity", name: "think" },
-	]);
-	assert.deepEqual(
-		parser.push(`${line.slice(20)}\n{"type":"tool_execution_start","toolName":"bash","args":{"command":"npm  test"}}`),
-		[{ kind: "assistant", text: "done" }],
-	);
+	const started = parser.push(`{"type":"agent_start"}\r\n${line.slice(0, 20)}`);
+	assert.deepEqual(started, [{ kind: "activity", name: "think" }]);
+	const tool = '{"type":"tool_execution_start","toolName":"bash","args":{"command":"npm  test"}}';
+	assert.deepEqual(parser.push(`${line.slice(20)}\n${tool}`), [{ kind: "assistant", text: "done" }]);
 	assert.deepEqual(parser.flush(), [{ kind: "tool", name: "bash", detail: "npm test" }]);
 });
 

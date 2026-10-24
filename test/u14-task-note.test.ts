@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import limenCommunication from "../hook/communication.ts";
 import limenFinish from "../hook/finish.ts";
-import { noteSteer } from "../src/job/task-note.ts";
+import { noteCheckOpen, noteSteer } from "../src/job/task-note.ts";
 
 type Result = { message?: { content: string }; entries?: { content: string }[]; content: { text: string }[] };
 type Hook = (...args: unknown[]) => Result | undefined;
@@ -62,4 +62,14 @@ test("a job's note shows once, keeps its first version, logs changes, and is che
 	assert.equal(await readFile(join(job, "result"), "utf8"), "handoff\n");
 	assert.equal(await hosted.end("final"), "done");
 	assert.equal((await readFile(join(job, "log"), "utf8")).split("] note check sent\n").length, 3);
+	// A check sent and not answered is open; a proven line needs a command the session ran or a file that exists.
+	assert.deepEqual(noteCheckOpen(job), ["Note check: missing from the final message"]);
+	const call = { message: { content: [{ type: "toolCall", arguments: { command: "npm  run check" } }] } };
+	await mkdir(join(job, "session"));
+	await writeFile(join(job, "session/a.jsonl"), `${JSON.stringify(call)}\n`);
+	const proven = "- **A: proven.** `npm run check`\n- B: proven `log:2`\n- C: proven\n  `note.first.md`\n- R: followed";
+	const open = (result: string) => writeFile(join(job, "result"), result).then(() => noteCheckOpen(job));
+	assert.deepEqual(await open(`## Note check\n${proven}\n# Next\n- D: not proven`), []);
+	assert.match((await open("**Note check**\n- E: proven, trust me")).join(), /^E: not proven\. Limen: it names no /);
+	assert.deepEqual(await open("**Note check**\nAll proven."), ['Note check: no line reads "<check>: <mark>"']);
 });

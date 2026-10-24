@@ -14,6 +14,7 @@ import { coordinatorSignals } from "../src/integrations/coordinator-signal.ts";
 import { herdrBinary } from "../src/integrations/herdr.ts";
 import { resendQueuedPings } from "../src/integrations/webhook-queue.ts";
 import { closedFeatures, closedJobFeatures, derivePulse, isTerminal, type Pulse, SESSION_ID } from "../src/job/job.ts";
+import { openChecks } from "../src/job/task-note.ts";
 import {
 	CLAIM_STALE_MS,
 	claimDelivery,
@@ -88,6 +89,18 @@ const METADATA_REFRESH_MS = 60_000;
 const TAB_TAIL = /(?:\s*·\s*\d+\s+(?:running|finished))+$/;
 type FinishedJob = { readonly id: string; readonly label: string; readonly state: string; readonly finishedAt: number };
 type HerdrPane = { readonly binary: string; readonly pane: string };
+
+// Toast words for a done job; one whose final "Note check" left items open asks for a decision before landing.
+const PLAIN_DONE = {
+	title: "done; next step: land it",
+	next: "land it, or name the check that blocks landing",
+	toast: "done; next step: land it, or name the check that blocks landing",
+};
+const OPEN_DONE = {
+	title: "done with open checks; decide before landing",
+	next: "continue the job, start a review, or accept each open check with a reason",
+	toast: "done with open checks; decide each before landing",
+};
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: split pending: hook factory, handlers share its state
 export default function limenWake(pi: PiApi): void {
@@ -332,14 +345,13 @@ export default function limenWake(pi: PiApi): void {
 		if (!claimMarker(job, "herdr", slot)) {
 			return;
 		}
+		const done = state === "done" && openChecks(job).length > 0 ? OPEN_DONE : PLAIN_DONE;
 		herdrCall([
 			"notification",
 			"show",
-			state === "done" ? `limen: ${label} done; next step: land it` : `limen: ${label} is ${state}`,
+			state === "done" ? `limen: ${label} ${done.title}` : `limen: ${label} is ${state}`,
 			"--body",
-			state === "done"
-				? `job ${id} · branch ${branch} · land it, or name the check that blocks landing`
-				: `job ${id} · branch ${branch}`,
+			state === "done" ? `job ${id} · branch ${branch} · ${done.next}` : `job ${id} · branch ${branch}`,
 			"--sound",
 			state === "done" ? "done" : "request",
 		]);
@@ -443,7 +455,7 @@ export default function limenWake(pi: PiApi): void {
 				try {
 					session?.ui.notify(
 						state === "done"
-							? `limen: ${label} done; next step: land it, or name the check that blocks landing (${id})`
+							? `limen: ${label} ${openChecks(job).length ? OPEN_DONE.toast : PLAIN_DONE.toast} (${id})`
 							: `limen: ${label} is ${state}; inspect failure (${id})`,
 						"info",
 					);

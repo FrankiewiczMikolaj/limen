@@ -40,11 +40,8 @@ test("shipped template history starts at the current template", async () => {
 		const hash = createHash("sha256")
 			.update(await readFile(join(root, "templates", name)))
 			.digest("hex");
-		assert.equal(
-			(await readFile(path, "utf8")).split(" ")[0],
-			hash,
-			`regenerate ${path}: LIMEN_WRITE_HISTORY=1 node --test test/structure.test.ts`,
-		);
+		const head = (await readFile(path, "utf8")).split(" ")[0];
+		assert.equal(head, hash, `regenerate ${path}: LIMEN_WRITE_HISTORY=1 node --test test/structure.test.ts`);
 	}
 });
 
