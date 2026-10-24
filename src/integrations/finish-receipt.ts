@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { basename } from "node:path";
 import { textFile } from "../job/record.ts";
@@ -101,6 +102,10 @@ export function finalReceipts(text: string): Map<number, FinishReceipt> {
 	}
 	return targets;
 }
+/** The finish webhook's handoff for a done job whose final "Note check" left items open; the items follow it. */
+export const OPEN_HANDOFF =
+	"Job done with open checks. Next step: decide each before you land: continue the job, start a review, " +
+	"or accept it with a reason.";
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: split pending: finish webhook receipt check
 export async function inspectFinishWebhook(jobDir: string): Promise<string> {
 	const configured = Boolean(await textFile(`${jobDir}/finish-webhook-env`));
@@ -109,7 +114,9 @@ export async function inspectFinishWebhook(jobDir: string): Promise<string> {
 		`event: ${finishEvent(jobDir)} (the ID the receiver uses to match this finish)`,
 	];
 	const state = await textFile(`${jobDir}/state`);
-	if (state === "done") {
+	if (state === "done" && existsSync(`${jobDir}/open-checks`)) {
+		lines.push(`handoff: ${OPEN_HANDOFF} (open-checks lists them)`);
+	} else if (state === "done") {
 		lines.push("handoff: Job done. Next step: land it, or name the check that still blocks landing.");
 	} else if (state === "failed" || state === "stopped") {
 		lines.push(`handoff: ${state}; inspect failure before proceeding`);

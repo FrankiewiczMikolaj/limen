@@ -158,7 +158,7 @@ function send(target, index) {
         job: args[0], status: args[1] === 'done' ? 'waiting' : args[1], branch: args[2],
         ...(args[1] === 'done' ? { jobState: 'done' } : {}),
         ...(event ? { finishEvent: event } : {}),
-        // A lead step or a non-terminal event names its own next step; a terminal job never sets this override.
+        // A lead step, a non-terminal event, or a done job with open note checks names its own next step.
         handoff: process.env.LIMEN_FINISH_HANDOFF?.trim() || (args[1] === 'done'
           ? 'Job done. Next step: land it, or name the check that still blocks landing.'
           : ['failed', 'stopped'].includes(args[1])

@@ -61,13 +61,14 @@ await writeFile(
 	`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(URLS.map((url, index) => ({ url, auth: SECRETS[index] })))}'\nLIMEN_FINISH_WEBHOOK_AUTHOR_TARGETS='{"@alice":[1],"@bob":[2]}'\n`,
 );
 
-test("a done job pings only the target its ticket author maps to", async () => {
-	const id = spawn(`Ticket: ${alice}\ncommit`, "S7 alice");
+test("a done job pings only the target its ticket author maps to, with its unanswered note check", async () => {
+	const id = spawn(`Ticket: ${alice}\ncommit\nfinish\nfinish no note check`, "S7 alice");
 	assert.equal(wait(id), "done");
 	await settled(id);
 	const [ping, ...rest] = payloads();
 	assert.deepEqual(rest, []);
 	assert.deepEqual([ping?.url, ping?.body.event, ping?.body.jobId], [URLS[0], "job.done", id]);
+	assert.match(ping?.body.handoff, /^Job done with open checks\. .*\n- Note check: missing from the final message$/);
 	assert.equal(requests(p)[0]?.headers.authorization, SECRETS[0]);
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
