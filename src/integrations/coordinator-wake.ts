@@ -7,8 +7,9 @@ import { herdrBinary } from "./herdr.ts";
 
 const PROMPT_MS = 15_000;
 const ATTEMPTS = 2;
-// Herdr refuses these before it sends any input; every other failure may follow a submission.
-const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found)\b/;
+// Herdr refuses these before it sends any input, and a Herdr the OS did not start sent nothing; every other failure
+// may follow a submission.
+const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found|herdr not started)\b/;
 
 /**
  * Start a turn on the Herdr pane that spawned this job. Only jobs whose coordinator had no Pi session record
@@ -137,13 +138,18 @@ function run(
 	timeout: number,
 ): Promise<{ readonly ok: boolean; readonly detail: string }> {
 	const { promise, resolve } = Promise.withResolvers<{ readonly ok: boolean; readonly detail: string }>();
-	execFile(binary, args, { encoding: "utf8", timeout }, (error, stdout, stderr) => {
-		// error.message repeats the full argv, wake text included; the receipt keeps Herdr's own first line instead.
-		const said = `${stderr || ""}${stdout || ""}`.trim().split("\n")[0] ?? "";
-		const detail = error?.killed
-			? `herdr exceeded ${timeout}ms`
-			: said || (error ? `herdr exited ${error.code ?? "abnormally"}` : "");
-		resolve({ ok: !error, detail });
-	});
+	try {
+		execFile(binary, args, { encoding: "utf8", timeout }, (error, stdout, stderr) => {
+			// error.message repeats the full argv, wake text included; the receipt keeps Herdr's own first line instead.
+			const said = `${stderr || ""}${stdout || ""}`.trim().split("\n")[0] ?? "";
+			const detail = error?.killed
+				? `herdr exceeded ${timeout}ms`
+				: said || (error ? `herdr exited ${error.code ?? "abnormally"}` : "");
+			resolve({ ok: !error, detail });
+		});
+	} catch (error) {
+		// The spawn throws when the OS refuses the argv: E2BIG for a text past one argument's limit (128 KiB on Linux).
+		resolve({ ok: false, detail: `herdr not started: ${(error as NodeJS.ErrnoException).code ?? "spawn failed"}` });
+	}
 	return promise;
 }

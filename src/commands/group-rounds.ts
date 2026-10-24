@@ -254,7 +254,12 @@ async function promptLeadPane(run: GroupRun, text: string): Promise<void> {
 	for (let attempt = 1; attempt <= 2; attempt += 1) {
 		const args = ["agent", "prompt", run.leadPane, text, "--wait", "--until", "working", "--until", "blocked"];
 		const error = await new Promise<Error | null>((resolve) => {
-			execFile(herdr, [...args, "--timeout", String(PROMPT_MS - 2_000)], { timeout: PROMPT_MS }, resolve);
+			try {
+				execFile(herdr, [...args, "--timeout", String(PROMPT_MS - 2_000)], { timeout: PROMPT_MS }, resolve);
+			} catch (failed) {
+				// The spawn throws when the OS refuses the argv (E2BIG: the result is past one argument's limit).
+				resolve(failed instanceof Error ? failed : new Error(String(failed)));
+			}
 		});
 		lines.push(`attempt ${attempt}: ${error ? `failed on ${run.leadPane}` : `turn observed on ${run.leadPane}`}`);
 		if (!error) {

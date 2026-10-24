@@ -80,9 +80,7 @@ test("after two unsuccessful attempts the claim stays blocked for a human and no
 				recordUnconfirmed(claim);
 			}
 		}
-		assert.equal(listen("c"), false);
-		assert.equal(recoverClaims(dir), false, "a blocked claim is not recovered again");
-		assert.equal(sends(), 2, failure);
+		assert.deepEqual([listen("c"), recoverClaims(dir), sends()], [false, false, 2], `${failure}: stays blocked`);
 		assert.ok(existsSync(join(claim, "blocked")), failure);
 		assert.deepEqual(readdirSync(join(dir, "notify", "delivered")), []);
 		if (failure === "rejected injection") {

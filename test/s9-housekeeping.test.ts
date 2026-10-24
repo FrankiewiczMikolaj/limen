@@ -108,8 +108,7 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	git(p.root, "merge", "-q", "--no-edit", landedBranch);
 	assert.equal(limen(p, ["prune", "--retire"]).status, 0);
 	assert.deepEqual([existsSync(jobDir(p, landed)), git(p.root, "branch", "--list", landedBranch)], [false, ""]);
-	assert.ok(existsSync(jobDir(p, unmerged)), "an unmerged job stays");
-	assert.ok(existsSync(jobDir(p, live)), "a running job stays");
+	assert.deepEqual([existsSync(jobDir(p, unmerged)), existsSync(jobDir(p, live))], [true, true]); // both stay
 	await release(jobDir(p, live));
 	assert.equal(waitJob(p, live), "done");
 });
