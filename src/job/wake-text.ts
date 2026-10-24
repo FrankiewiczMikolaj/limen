@@ -11,8 +11,12 @@ function text(path: string): string {
 		return "";
 	}
 }
-/** Bounded commits and final-message excerpts; either is omitted when its file is absent — that absence is information. */
-function handoffExcerpt(job: string): string {
+/**
+ * How the job ended: stop reason, bounded commits, the whole final message, and undelivered steers. The coordinator
+ * decides the next step from this, so the final message is never cut. A part whose file is absent is omitted; that
+ * absence is information.
+ */
+export function jobEnding(job: string): string {
 	const sections: string[] = [];
 	const stop = text(join(job, "stop-reason"));
 	if (stop) {
@@ -29,8 +33,7 @@ function handoffExcerpt(job: string): string {
 	}
 	const result = text(join(job, "result"));
 	if (result) {
-		const head = result.split("\n").slice(0, 15).join("\n").slice(0, 1200);
-		sections.push(`Final message:\n${head}${head.length < result.length ? "\n… (full text in the job record)" : ""}`);
+		sections.push(`Final message:\n${result}`);
 	}
 	try {
 		const unseen = readdirSync(join(job, "steer", "inbox")).length;
@@ -40,7 +43,7 @@ function handoffExcerpt(job: string): string {
 	} catch {
 		// Inbox may be absent; that is not an undelivered steer.
 	}
-	return sections.length ? `\n\n${sections.join("\n\n")}` : "";
+	return sections.join("\n\n");
 }
 /**
  * How a completion wake travels. `fallback`: a busy coordinator's wake reaches another session. `instruction`: a route's
@@ -94,7 +97,7 @@ export function completionWake(
 		instruction =
 			"The subscribed coordinator is busy. Do not spawn, stop, steer, or land on behalf of another coordinator unless the human asks.";
 	}
-	return joinWake(lead, handoffExcerpt(job), [facts, handoff].filter(Boolean).join("\n\n"), instruction);
+	return joinWake(lead, jobEnding(job), [facts, handoff].filter(Boolean).join("\n\n"), instruction);
 }
 /**
  * The first line of the job's start notice, when the job waited in the start queue and `session` never got that
@@ -134,12 +137,12 @@ export function advisoryWake(
 	const instruction = fallback
 		? "The subscribed coordinator is busy. Do not spawn, stop, or steer on this wake unless the human asks."
 		: "Inspect the job record and continue the loop; steer; or open the tab and exit if you mean the session to end.";
-	return joinWake(lead, handoffExcerpt(job), "", instruction);
+	return joinWake(lead, jobEnding(job), "", instruction);
 }
-function joinWake(lead: string, excerpt: string, facts: string, instruction: string): string {
+function joinWake(lead: string, ending: string, facts: string, instruction: string): string {
 	const parts = [lead];
-	if (excerpt) {
-		parts.push(excerpt.trim());
+	if (ending) {
+		parts.push(ending);
 	}
 	if (facts) {
 		parts.push(facts);

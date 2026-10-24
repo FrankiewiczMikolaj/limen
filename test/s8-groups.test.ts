@@ -10,6 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import {
 	engineEvents,
+	FINAL,
 	git,
 	jobDir,
 	jobFile,
@@ -43,6 +44,7 @@ before(async () => {
 		await mkdir(dirname(join(p.root, FEATURE, "group", `${name}.md`)), { recursive: true });
 		await writeFile(join(p.root, FEATURE, "group", `${name}.md`), `# ${name}\n`);
 	}
+	await writeFile(join(p.root, FEATURE, "group/teams/team-1.md"), `say ${FINAL.line}\n`); // team 1's draft result
 	await mkdir(join(p.root, ROUNDS));
 	await writeFile(join(p.root, ROUNDS, "ticket.md"), "# F002 · rounds\n");
 	git(p.root, "add", "-A");
@@ -98,7 +100,7 @@ const as = (id: string, team: string) => ({
 const delivered = () => engineEvents(lead).filter((entry) => entry.text?.startsWith("[limen-group-delivery:"));
 const pings = (step: string) => requests(p).filter((request) => JSON.parse(request.body).job === `F001 lead ${step}`);
 
-test("a stale lead registration starts nothing; two concurrent activations by the lead start one roster in one cabinet", async () => {
+test("a stale lead registration starts nothing; two concurrent activations by the lead start one roster in one cabinet; the lead hears every last-round result whole", async () => {
 	// A registration no running hook refreshes is not a lead: no update would reach it.
 	await writeFile(join(p.root, ".limen/group-leads/stale-pane"), `${process.pid}\n`);
 	await utimes(join(p.root, ".limen/group-leads/stale-pane"), new Date(0), new Date(0));
@@ -112,13 +114,13 @@ test("a stale lead registration starts nothing; two concurrent activations by th
 		assert.equal(result.status, 0, result.output);
 	}
 	group = started[0]?.id ?? "";
-	assert.equal(started[1]?.id, group);
-	assert.deepEqual(readdirSync(join(p.root, ".limen/groups")), [group]);
+	assert.deepEqual([started[1]?.id, ...readdirSync(join(p.root, ".limen/groups"))], [group, group]);
 	assert.deepEqual(roles(), ["team-1 coordinator", "team-2 coordinator"]);
 	[roster.coordinator1 = "", roster.coordinator2 = ""] = members().map((member) => member.id);
 	for (const id of [roster.coordinator1, roster.coordinator2]) {
 		assert.equal(waitJob(p, id), "done");
 	}
+	await until(lead, () => delivered().some((entry) => entry.text?.includes(`/team-1.md\n${FINAL.text}\n`)));
 });
 
 test("launches queued behind a slow sibling wait past the old 10-second lock deadline, and one slot makes one member", async () => {
@@ -186,8 +188,7 @@ test("a member's finish completes while another process holds the cabinet; its l
 	while (seen === 0) {
 		seen = doneEvents();
 	}
-	assert.equal(seen, 1);
-	assert.equal(doneEvents(), 1);
+	assert.deepEqual([seen, doneEvents()], [1, 1]);
 });
 
 test("each recipient reads a finding once, the lead hears it as a followUp, and a synthesis write sends a lead-step ping", async () => {

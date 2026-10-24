@@ -48,13 +48,10 @@ async function job(t: TestContext) {
 
 test("a second listener never takes a live claim, even one aged past 30 seconds while its owner's heartbeat is fresh", async (t) => {
 	const { claim, events, listen, age, sends } = await job(t);
-	assert.equal(listen("a"), true);
-	assert.equal(listen("b"), false);
+	assert.deepEqual([listen("a"), listen("b")], [true, false]);
 	refreshClaim(claim);
 	age(false);
-	assert.equal(listen("b"), false);
-	assert.equal(sends(), 1);
-	assert.deepEqual(events, ["a accepted"]);
+	assert.deepEqual([listen("b"), sends(), events], [false, 1, ["a accepted"]]);
 });
 
 test("a dead owner's claim is recovered: an unaccepted one is released, an accepted one spends one attempt and is delivered again", async (t) => {
@@ -64,8 +61,7 @@ test("a dead owner's claim is recovered: an unaccepted one is released, an accep
 	assert.equal(listen("b"), true);
 	refreshClaim(claim);
 	age(true);
-	assert.equal(listen("c"), true);
-	assert.equal(sends(), 3);
+	assert.deepEqual([listen("c"), sends()], [true, 3]);
 	assert.deepEqual(events, ["b released", "b accepted", "c released", "c accepted"]);
 	assert.equal(readFileSync(join(dir, "notify", "unconfirmed", "_completion"), "utf8"), "1\n");
 });

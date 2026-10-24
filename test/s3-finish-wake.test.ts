@@ -12,6 +12,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
 	engineEvents,
+	FINAL,
 	git,
 	jobDir,
 	jobFile,
@@ -84,9 +85,9 @@ after(async () => {
 test("a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session", async () => {
 	const second = coordinator("second", "coord", "block\n");
 	const ids = {
-		done: job("commit\nfinish\nfinish a done handoff", "a done"),
+		done: job(`commit\nfinish\nfinish ${FINAL.line}`, "a done"),
 		failed: job("fail 7", "a failed"),
-		provider: job("commit\nerror", "a provider error"),
+		provider: job(`say ${FINAL.line}\ncommit\nerror`, "a provider error"),
 	};
 	const states = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, waitJob(p, id)]));
 	await delivered(Object.values(ids));
@@ -95,17 +96,17 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	await until(second, () => engineEvents(second).some((event) => event.event === "exit"));
 	assert.deepEqual(states, { done: "done", failed: "failed", provider: "failed" });
 	// A detached job resumed from a hosted session calls finish too: once for the note check, then with the result.
-	assert.equal(jobFile(p, ids.done, "result"), "a done handoff");
 	assert.equal(jobFile(p, ids.done, "log").split("note check sent").length, 2);
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
 	assert.equal(git(p.root, "rev-list", "--count", `main..${jobFile(p, ids.provider, "branch")}`), "1");
 	wokeOnce(ids, [coord, second]);
-	// A job with no tool calls and no commits says so; a job that committed does not.
-	const [failed = "", done = ""] = [ids.failed, ids.done].map(
+	// A job with no tool calls and no commits says so; a job that committed does not. Its final message comes whole.
+	const [failed = "", done = "", provider = ""] = [ids.failed, ids.done, ids.provider].map(
 		(id) => [coord, second].flatMap((dir) => wakes(dir, id))[0]?.text,
 	);
 	assert.match(failed, /produced nothing/);
 	assert.doesNotMatch(done, /produced nothing/);
+	assert.ok([done, provider].every((wake) => wake.includes(`Final message:\n${FINAL.text}\n\n`)));
 });
 
 test("stop, timeout, the tool cap and a stalled tool each end a job once and wake its session once; 80% of a timeout steers once; the plant's limits file yields to an env var", async () => {

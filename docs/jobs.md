@@ -34,7 +34,7 @@ For a Herdr wake, `limen jobs <id>` shows the result as `herdr-wake`: `turn obse
 
 `limen continue` from a shell with no wake route (no Pi session and no Herdr pane), for example a remote executor, keeps the parent's route: the parent's coordinator gets the continuation's wake.
 
-Both routes carry the same completion facts: the task, branch and repository, stop reason, bounded commit and final-message excerpts, and undelivered steers when present. A job with zero recorded tool calls and no commits says that it produced nothing. Missing evidence files remain absent from the wake; the route-specific next-step instruction may differ.
+Both routes carry the same completion facts: the task, branch and repository, stop reason, at most ten commits, the whole final message, and undelivered steers when present. The final message is never cut: the coordinator decides the next step from it. `limen wait`, the finish webhook's `handoff` and the group lead's result carry it whole too. A job with zero recorded tool calls and no commits says that it produced nothing. Missing evidence files remain absent from the wake; the route-specific next-step instruction may differ.
 
 ### Job states
 

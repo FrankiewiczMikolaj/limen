@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { jobDir, jobFile, LIMEN, limen, type Plant, plant, release, spawnJob, until, waitJob } from "./plant.ts";
+import { FINAL, jobDir, jobFile, LIMEN, limen, type Plant, plant, release, spawnJob, until, waitJob } from "./plant.ts";
 
 const herdrSource = `#!/usr/bin/env node
 const fs = require("node:fs"), path = require("node:path"), { spawn } = require("node:child_process");
@@ -180,8 +180,7 @@ test("hosted Pi stop records stopped once and closes the job's tab", async () =>
 	const dir = jobDir(p, third);
 	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
 	const stopped = limen(p, ["stop", third, "enough"], { env });
-	assert.equal(stopped.status, 0, stopped.stderr);
-	assert.equal(jobFile(p, third, "state"), "stopped");
+	assert.deepEqual([stopped.status, jobFile(p, third, "state")], [0, "stopped"], stopped.stderr);
 	const tab = jobFile(p, third, "herdr/tab");
 	await until(herdr, () => named("tab", "close").some((args) => args[2] === tab));
 	assert.equal(jobFile(p, third, "log").match(/\] stopped: enough/g)?.length, 1);
@@ -192,7 +191,7 @@ test("hosted Pi stop records stopped once and closes the job's tab", async () =>
 test("in Herdr a spawn with no mode flag runs detached under its --timeout; queued, it tells its pane once that it started", async () => {
 	const reading = join(p.parent, "start-reading.json");
 	await writeFile(reading, '{"cpuIdle":90,"memoryFree":10}');
-	const run = limen(p, ["spawn", "--timeout", "5m", "--label", "flagless", "say hi\nfinish flagless handoff"], { env });
+	const run = limen(p, ["spawn", "--timeout", "5m", "--label", "flagless", `say ${FINAL.line}`], { env });
 	assert.match(run.stdout, /\nqueued flagless: CPU 90% idle \(gate 25%\), memory 10% free \(gate 20%\), 0 ahead\n/);
 	const id = run.stdout.trim().split("\n").at(-1) ?? "";
 	await writeFile(reading, "{}");
@@ -202,6 +201,7 @@ test("in Herdr a spawn with no mode flag runs detached under its --timeout; queu
 	await until(jobDir(p, id), () => receipts.every((receipt) => receipt().startsWith("attempt 1: delivered to")));
 	const sent = named("agent", "prompt").filter((args) => args[3]?.includes(id));
 	assert.equal(sent.map((args) => args[3]?.includes(") started after ")).join(), "true,false", "each sent once");
+	assert.ok(sent[1]?.[3]?.includes(`Final message:\n${FINAL.text}\n\n`), "the prompt carries the whole message");
 });
 
 test("a rule set, change, end and end time ping each live coordinator pane once (F951); a dead timer's rule still ends", async () => {

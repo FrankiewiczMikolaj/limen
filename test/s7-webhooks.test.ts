@@ -8,7 +8,7 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { coordinatorSignals, sweepCoordinators } from "../src/integrations/coordinator-signal.ts";
-import { git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
+import { FINAL, git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
 
 const p = await plant();
 after(p.cleanup);
@@ -61,13 +61,14 @@ await writeFile(
 	`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(URLS.map((url, index) => ({ url, auth: SECRETS[index] })))}'\nLIMEN_FINISH_WEBHOOK_AUTHOR_TARGETS='{"@alice":[1],"@bob":[2]}'\n`,
 );
 
-test("a done job pings only the target its ticket author maps to", async () => {
-	const id = spawn(`Ticket: ${alice}\ncommit`, "S7 alice");
+test("a done job pings only the target its ticket author maps to, its whole final message in the handoff and wait", async () => {
+	const id = spawn(`Ticket: ${alice}\ncommit\nsay ${FINAL.line}`, "S7 alice");
 	assert.equal(wait(id), "done");
+	assert.ok(runs.at(-1)?.stdout.endsWith(`Final message:\n${FINAL.text}\n`), "wait prints the whole message");
 	await settled(id);
 	const [ping, ...rest] = payloads();
-	assert.deepEqual(rest, []);
-	assert.deepEqual([ping?.url, ping?.body.event, ping?.body.jobId], [URLS[0], "job.done", id]);
+	assert.deepEqual([rest, ping?.url, ping?.body.event, ping?.body.jobId], [[], URLS[0], "job.done", id]);
+	assert.ok(ping?.body.handoff.endsWith(`landing.\n\nFinal message:\n${FINAL.text}`), "the handoff carries it whole");
 	assert.equal(requests(p)[0]?.headers.authorization, SECRETS[0]);
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
@@ -135,12 +136,10 @@ test("a ping whose deliverer was killed mid-send goes out with the next limen co
 });
 
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {
-	assert.equal(wait(quiet), "done");
-	assert.equal(requests(p).length, 9);
+	assert.deepEqual([wait(quiet), requests(p).length], ["done", 9]);
 	const sealed = (request: ReturnType<typeof requests>[number]) =>
 		request.url.startsWith("https://hooks.s7.test/") && SECRETS.includes(request.headers.authorization ?? "");
-	assert.ok(requests(p).every(sealed));
-	assert.ok(payloads().every((ping) => ping.body.jobId !== quiet));
+	assert.ok(requests(p).every(sealed) && payloads().every((ping) => ping.body.jobId !== quiet));
 	const leaks = (text: string) =>
 		[...SECRETS.map((secret) => secret.slice(7)), "hooks.s7.test"].filter((value) => text.includes(value));
 	const rest = requests(p).map((request) => ({

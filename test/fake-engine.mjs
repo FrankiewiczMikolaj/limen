@@ -134,7 +134,7 @@ let stopReason;
 let code = 0;
 for (const line of task.split("\n")) {
 	const [word = "", ...rest] = line.trim().split(" ");
-	const value = rest.join(" ");
+	const value = rest.join(" ").replaceAll("\\n", "\n"); // a `\n` in say or finish text is a line break
 	if (word === "commit") {
 		writeFileSync(`fake-${process.pid}-${blocks}-${Date.now()}.txt`, `${task}\n`);
 		execFileSync("git", ["add", "."]);
@@ -169,4 +169,4 @@ turns = turns.then(() => turn([{ role: "user", content: [{ type: "text", text: t
 await turns;
 await fire("session_shutdown", {});
 record({ event: "exit", code });
-process.exit(code);
+process.stdout.write("", () => process.exit(code)); // a stdio pipe takes 8 KiB at once; exit after the rest

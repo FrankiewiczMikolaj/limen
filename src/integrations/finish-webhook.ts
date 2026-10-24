@@ -11,7 +11,10 @@ import { ticketPointers } from "../project/planning.ts";
 import { finishEvent, GITHUB_AUTHOR, GITHUB_NOREPLY } from "./finish-receipt.ts";
 import { queuePing, SENDER, senderEnvironment } from "./webhook-queue.ts";
 
-/** One plant webhook: what happened (`kind`), to what (`title`, `id`), where (`plant`), and why (`reason`). `status` is the sender's state argument. */
+/**
+ * One plant webhook: what happened (`kind`), to what (`title`, `id`), where (`plant`), and why (`reason`). `status` is
+ * the sender's state argument. `message` is an ended job's whole final message; the sender puts it after the handoff.
+ */
 export type PlantEvent = {
 	readonly kind: string;
 	readonly status: string;
@@ -22,6 +25,7 @@ export type PlantEvent = {
 	readonly plant: string;
 	readonly author?: string;
 	readonly handoff?: string;
+	readonly message?: string;
 };
 export function finishWebhookEnv(root: string, cwd: string, explicit = process.env.LIMEN_FINISH_WEBHOOK_ENV): string {
 	if (explicit !== undefined) {
@@ -79,9 +83,10 @@ export async function deliverFinishWebhook(jobDir: string, detail = ""): Promise
 		throw error;
 	}
 	// A done job's reason is its handoff's first text line, without Markdown markers; every other end names the finish detail, which is the failed gate.
+	const message = await textFile(`${jobDir}/result`);
 	const summary =
 		state === "done"
-			? ((await textFile(`${jobDir}/result`))
+			? (message
 					.split("\n")
 					.map((line) => line.replace(/^[\s#>*-]+/, "").trim())
 					.find(Boolean) ?? "")
@@ -91,6 +96,7 @@ export async function deliverFinishWebhook(jobDir: string, detail = ""): Promise
 		kind: terminalKind(state, detail),
 		status: state,
 		reason: summary || detail || state,
+		...(message ? { message } : {}),
 	};
 	await queuePing(resolve(jobDir, "../.."), jobDir, config, event, finishEvent(jobDir), jobDir);
 }

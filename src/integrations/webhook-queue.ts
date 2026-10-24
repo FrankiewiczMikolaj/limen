@@ -242,6 +242,7 @@ export function senderEnvironment(config: string, event: PlantEvent): NodeJS.Pro
 		LIMEN_FINISH_WEBHOOK_AUTHOR: event.author ?? "",
 		// Undefined drops any inherited override, so a terminal job always sends the job handoff.
 		LIMEN_FINISH_HANDOFF: event.handoff,
+		LIMEN_FINISH_MESSAGE: event.message,
 		LIMEN_FINISH_KIND: event.kind,
 		LIMEN_FINISH_PLANT: event.plant,
 		LIMEN_FINISH_ID: event.id,

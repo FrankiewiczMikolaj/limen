@@ -63,8 +63,7 @@ test("spawn returns before --prepare; prune keeps live, nested and starting work
 	const halfTree = readFileSync(prepared, "utf8").trim();
 	const landed = spawnJob(p, "commit");
 	const unmerged = spawnJob(p, "commit");
-	assert.equal(waitJob(p, landed), "done");
-	assert.equal(waitJob(p, unmerged), "done");
+	assert.deepEqual([waitJob(p, landed), waitJob(p, unmerged)], ["done", "done"]);
 	const lost = spawnJob(p, "say lost", ["--prepare", 'rm -rf "$PWD"']);
 	assert.equal(waitJob(p, lost), "failed");
 	assert.ok(jobFile(p, lost, "log").includes(`failed: worktree ${jobFile(p, lost, "worktree")} `));
@@ -124,8 +123,7 @@ test("a killed wrapper is reaped at once and a stopped job leaves no escaped chi
 	process.kill(pid, "SIGKILL");
 	// A young job: only the product's dead-pid confirmation window applies, never the startup grace.
 	const listed = limen(p, ["jobs", killed], { env: { LIMEN_REAP_CONFIRM_MS: "1" } });
-	assert.equal(listed.status, 0, listed.stderr);
-	assert.equal(jobFile(p, killed, "state"), "failed");
+	assert.deepEqual([listed.status, jobFile(p, killed, "state")], [0, "failed"], listed.stderr);
 	await release(jobDir(p, killed));
 
 	const stopped = spawnJob(p, "orphan\nblock", [], { env });
@@ -133,8 +131,7 @@ test("a killed wrapper is reaped at once and a stopped job leaves no escaped chi
 	const orphan = Number(jobFile(p, stopped, "fake-orphan"));
 	assert.ok(alive(orphan), "the orphan escaped into its own process group and runs");
 	const stop = limen(p, ["stop", stopped, "s9"]);
-	assert.equal(stop.status, 0, stop.stderr);
-	assert.equal(jobFile(p, stopped, "state"), "stopped");
+	assert.deepEqual([stop.status, jobFile(p, stopped, "state")], [0, "stopped"], stop.stderr);
 	assert.ok(
 		!alive(orphan) || jobFile(p, stopped, "cleanup").includes(`${orphan} `),
 		`orphan ${orphan} survived stop unnamed`,
