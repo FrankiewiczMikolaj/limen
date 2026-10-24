@@ -129,7 +129,17 @@ export function noteCheckOpen(jobDir: string): string[] {
 	if (!items.length) {
 		return ['Note check: no line reads "<check>: <mark>"'];
 	}
-	return items.flatMap((item) => openItem(item, jobDir)).map((line) => clip(line, 160));
+	// The transcripts are read once, and only when a proven line needs them.
+	let ran: string[] | undefined;
+	const worktree = readOptional(join(jobDir, "worktree"))?.trim();
+	const seen: Seen = {
+		ran: (name) => {
+			ran ??= sessionCommands(jobDir);
+			return ran.some((command) => command.includes(squash(name)));
+		},
+		roots: [...(worktree ? [worktree] : []), jobDir, resolve(jobDir, "..", "..", "..")],
+	};
+	return items.flatMap((item) => openItem(item, seen)).map((line) => clip(line, 160));
 }
 
 /** The open items a done job recorded, as wake lines: at most ten, then a count of the rest. */
@@ -140,6 +150,7 @@ export function openChecks(jobDir: string): string[] {
 }
 
 type Marked = { readonly name: string; readonly mark: string; readonly said: string; evidence: string };
+type Seen = { readonly ran: (name: string) => boolean; readonly roots: readonly string[] };
 
 /** The lines under the first "Note check" heading, up to the next Markdown heading; undefined without one. */
 function noteCheckSection(result: string): string[] | undefined {
@@ -176,29 +187,26 @@ function markedItems(lines: readonly string[]): Marked[] {
 	return items;
 }
 
-function openItem(item: Marked, jobDir: string): string[] {
+function openItem(item: Marked, seen: Seen): string[] {
 	if (item.mark === "followed") {
 		return [];
 	}
 	if (item.mark !== "proven") {
 		return [`${item.name}: ${item.mark}${item.said ? `. ${item.said}` : ""}`];
 	}
-	const why = missingEvidence(item.evidence, jobDir);
+	const why = missingEvidence(item.evidence, seen);
 	return why ? [`${item.name}: not proven. Limen: ${why}`] : [];
 }
 
 /** Empty when one backticked name is a command the session ran or a file that exists; otherwise why not. */
-function missingEvidence(evidence: string, jobDir: string): string {
+function missingEvidence(evidence: string, seen: Seen): string {
 	const named = [...evidence.matchAll(/`([^`\n]+)`/g)]
 		.map((match) => (match[1] ?? "").trim())
 		.filter((name) => /[a-z0-9]/i.test(name));
 	if (!named.length) {
 		return "it names no command or file in backticks";
 	}
-	const ran = sessionCommands(jobDir);
-	const worktree = readOptional(join(jobDir, "worktree"))?.trim();
-	const roots = [...(worktree ? [worktree] : []), jobDir, resolve(jobDir, "..", "..", "..")];
-	const found = (name: string) => ran.some((command) => command.includes(squash(name))) || fileExists(name, roots);
+	const found = (name: string) => seen.ran(name) || fileExists(name, seen.roots);
 	return named.some(found) ? "" : `\`${clip(named[0] ?? "", 60)}\` did not run in this session and is not a file`;
 }
 

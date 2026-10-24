@@ -1,8 +1,9 @@
 // F953 demo. Fake jobs finish through the real `finalizeJob`; the script prints the recorded state, `open-checks`
 // and the coordinator wake as Limen builds it. Then it replays two observed final messages from read-only copies.
 // Run from the repository root: node --no-warnings spec/features/<lane>/F953-*/evidence/f953-demo.ts
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+
 import { existsSync } from "node:fs";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
