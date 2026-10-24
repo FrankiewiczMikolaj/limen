@@ -4,6 +4,7 @@ touches:
   - limen.sessions.wake
   - limen.cabinet.records
 opened: 2026-10-24
+landed: 2026-10-24
 ---
 
 # F953 · A done job with open note checks tells the coordinator and is not a plain done
