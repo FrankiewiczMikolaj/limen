@@ -1,0 +1,13 @@
+# Native group restart after the draft timeout
+
+Adam authorized restarting the Pi draft through the group driver with a longer deadline and the original routes. The new run has a 200-minute group deadline and the same draft, critique, revise and final sequence. Read your per-team note first. This recovery instruction takes precedence over any first-discovery instructions that would repeat completed work.
+
+The original group `be92abac-de4e-4f92-a507-0daa6c25fe43` ended after draft only. Its Sol member timed out with no result; its scratch inventory, episode ledger, provisional counts and audit remain under `/tmp/mega-assessment-f954/`. Opus finished its OMP draft and retained its ledger there. Ordinary `limen continue` was refused for a team's own job; no such continuation started. This is a native group restart, not a changed route or a claim that the original group completed its later rounds.
+
+Reuse the inventories, exclusions, source locators and completed judgments. Do not start a second full-store discovery parse or erase earlier partial artifacts. New output files use a `recovery-1-` prefix, while preserved source files remain available. Read only the missing source evidence needed to settle a claim. Validate all reused evidence against the fixed snapshot and applicability; a pointer alone is not proof.
+
+The agreed recent activity window is 2026-10-21T00:00:00Z through 2026-10-24T13:30:00Z. Opus also has a broader OMP ledger. Retain dated episode evidence so the final writer can choose a consistent cut. Keep full discovery, final exclusions, deduplicated eligible sessions and actually judged/scanned sessions distinct. Do not pretend a structural parse is a semantic read or that a sample covers the whole store.
+
+Draft remains independent except for the already-authorized metadata deduplication and window exchange. Team 2 reuses its own completed OMP draft; it does not recount the whole store merely because the group restarted. Critique cross-checks both ledgers and source evidence; revise resolves proven problems; Sol writes one merged record and full coverage/audit handoff in final.
+
+All original read-only, privacy, inert-history, consent and output restrictions remain. No product files, history, commits, helpers, upload or POST by members. The coordinator alone owns presentation and transmission. Both authorized POST attempts remain unused. No model substitution on limits.
