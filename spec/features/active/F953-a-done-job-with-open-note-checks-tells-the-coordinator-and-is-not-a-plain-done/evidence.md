@@ -21,4 +21,4 @@ Observed facts, with their source. Guesses are labeled.
 
 - Demo: `node --no-warnings spec/features/active/F953-*/evidence/f953-demo.ts` from the repository root; output in `evidence/demo-output.txt`.
 - Mutations, each run once and reverted: no `open-checks` write in `finalizeJob` fails s3 "a job that ends done…"; every backticked proven line accepted fails the same s3 test; a transcript reader that sees no command fails u14; no open-checks handoff in the finish webhook fails s7 "a done job pings only…". Output: `evidence/mutations.txt`.
-- Full check: `evidence/npm-run-check.txt`.
+- Full check: `evidence/npm-run-check.txt`, `npm run check` at affc693, exit 0, 81 of 81. The run before it, on the same tree, cancelled the s3 start-queue test at its 180 s limit while the Mac load average was 149 to 290 (an F952 group ran beside it). That test then passed three times alone and in this full run. Observed, not explained.

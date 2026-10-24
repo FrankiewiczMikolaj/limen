@@ -85,7 +85,7 @@ See the [Picture guide](docs/picture.md) for navigation and updates.
 
 The experiment started on 2026-10-22 at 12:17 CEST (UTC+2), when this change landed on `main`. Jobs that started before that time have no note. On 2026-10-23 the note became the plan below (F950). Notes from before that change use the earlier 🔴 / 🟡 / ⚪ marker lines.
 
-**What changed.** Every Limen job keeps a task note in `.limen/jobs/<id>/note.md`. Team coordinators of a group get one too; the top-level coordinator session does not. The agent writes the note. Limen copies and shows it, and never parses it. Limen reads only the "Note check" of the final message.
+**What changed.** Every Limen job keeps a task note in `.limen/jobs/<id>/note.md`. Team coordinators of a group get one too; the top-level coordinator session does not. The agent writes the note. Limen copies and shows the note, and never parses it. At the finish, Limen reads the "Note check" of the final message (see **After the finish**).
 
 - **The format.** A plan in plain technical English, about six lines in three parts, with no colored markers. It is not a task copy or a result log.
   - `Done means:` two to four end checks. Each states what must be true, then `Shown by:` and the command or observation that would prove it.
