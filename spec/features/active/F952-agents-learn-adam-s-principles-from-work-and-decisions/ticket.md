@@ -1,5 +1,7 @@
 ---
 opened: 2026-10-24
+needs-adam: Choose the proposed learning-system options in ~/Downloads/limen-learning-system.html; no implementation is authorized.
+needs-adam-on: 2026-10-24
 ---
 
 # F952 · Agents learn Adam’s principles from work and decisions
