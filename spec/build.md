@@ -2,6 +2,7 @@
 
 ## TRACK
 
+- **Idle coordinator lag (F944):** Johnny owns the existing Opus investigation of lag and wake-hook polling; findings only, Adam reviews; no second investigator.
 - **Assessment handoff (F954, Adam 2026-10-24 20:44 Warsaw):** Johnny owns the one POST of the merged proposed record under the prior YES; this coordinator must not POST, review the assessment further or start more F954 rounds, and stays on F955.
 - **Full final messages (F955, failed exact-tip proof):** priority 1; Pi `pi-claude/claude-opus-5-5` xhigh repairs UTF-8 report decoding and separates rule-fixture phases, without a production rule change, 200m; keep the 1 MiB Herdr limit; require Pi `openai-codex/gpt-6.1-sol` xhigh PASS and full native/live Herdr/wait-and-every-job-end proof at the same exact tip before landing and pushing main with a `[skip ci]` tip.
 - **Open-note evidence repair (F953, Adam decision 115, 2026-10-24):** repair 4 landed as it is with review 4's quoted-source edge case accepted in the done ticket Notes; no further strict-command-proof reviews or follow-up ticket; full-message work remains separate.
