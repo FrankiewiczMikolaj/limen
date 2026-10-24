@@ -49,6 +49,8 @@ worktree /Users/overment/mega/.mega-challenge-limen-worktrees/2026-10-23-s01e02-
 open items Limen now records:
 - Resume sentence: not proven. Limen: no proof that `cd00ed1` ran in this session, and no such file
 - C4 path: not proven. Limen: no proof that `cd00ed1` ran in this session, and no such file
+- Typecheck and specs: not proven. Limen: no proof that `pnpm build:assets` ran in this session, and no such file
+- PR merged, no deploy: not proven. Limen: no proof that `gh pr view 137` ran in this session, and no such file
 - Debrief in the chat with the link last (change 4, added by the steer): not proven. Limen: no proof that `cd00ed1` ran in this session, and no such file
 - Plain technical English per the clarity doc (change 3): not proven. This obligation was missing from the note. I wrote the copy to `docs/clarity.md` and to the…
 - Report back (PR link, exact sentences, detected or folded): not proven. Limen: it names no command or file in backticks
@@ -59,6 +61,7 @@ open items Limen now records:
 - Queue hold: not proven. Limen: no proof that `test/s3-finish-wake.test.ts` ran in this session, and no such file
 - Prose: not proven. Limen: no proof that `templates/agents.md` ran in this session, and no such file
 - seatDir: not proven. Limen: no proof that `src/project/seat-rules.ts` ran in this session, and no such file
+- Check and test cap: not proven. Limen: no proof that `evidence/npm-run-check.txt` ran in this session, and no such file
 - Priority 1 starts before an earlier priority 2, and a start priority 1 rule keeps priority 2 queued until it ends: not proven. Limen: no proof that `started(ur…
 - The shop manual says spawn when ready and never poll the load, and names `limen rule` and the priority budget: not proven. Limen: no proof that `templates/agen…
 - `npm run check` passes and `test/` stays within its 3,500-line cap: not proven. Limen: no proof that `evidence/npm-run-check.txt` ran in this session, and no s…

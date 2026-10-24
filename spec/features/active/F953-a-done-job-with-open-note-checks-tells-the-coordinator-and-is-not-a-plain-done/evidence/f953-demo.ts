@@ -12,8 +12,14 @@ const { completionWake } = await import(join(process.cwd(), "src/job/wake-text.t
 const { noteCheckOpen } = await import(join(process.cwd(), "src/job/task-note.ts"));
 
 const plant = await mkdtemp(join(tmpdir(), "f953-demo-"));
+// One shell call and its result, as Pi records them; the call exited 0.
 const ran = (command: string) =>
-	JSON.stringify({ message: { role: "assistant", content: [{ type: "toolCall", arguments: { command } }] } });
+	[
+		{ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: { command } }] },
+		{ role: "toolResult", toolCallId: "c1", toolName: "bash", isError: false },
+	]
+		.map((message) => JSON.stringify({ message }))
+		.join("\n");
 
 async function fakeJob(id: string, result: string): Promise<string> {
 	const job = join(plant, ".limen", "jobs", id);

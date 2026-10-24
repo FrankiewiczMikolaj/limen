@@ -69,3 +69,11 @@ mutation: session-commands.ts ignores the recorded exit status (every call count
 ✖ failing tests:
 ✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (228.47825ms)
 
+=== mutation-8-u14.txt (after review 3, chain rule)
+mutation: session-commands.ts accepts any call that exited 0 (no chain or stopper check)
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (194.641291ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (194.641291ms)
+

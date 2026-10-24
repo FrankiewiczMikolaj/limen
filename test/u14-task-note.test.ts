@@ -59,15 +59,15 @@ test("a job's note shows once, keeps its first version, logs changes, and is che
 	const rebuild = (await hosted.end("early")) ?? "";
 	assert.ok(rebuild.startsWith(`[limen] No note exists in ${job}/note.md. Read ${job}/task.md and reconstruct`));
 	assert.match(rebuild, /^\[limen\] No note .*\nCompare .*\nGive .*\nDo not repeat .*\nThen call finish again\. .*$/);
-	assert.equal(await readFile(join(job, "result"), "utf8"), "handoff\n");
-	assert.equal(await hosted.end("final"), "done");
+	assert.deepEqual([await readFile(join(job, "result"), "utf8"), await hosted.end("final")], ["handoff\n", "done"]);
 	assert.equal((await readFile(join(job, "log"), "utf8")).split("] note check sent\n").length, 3);
-	// A sent check left unanswered is open. A proven command must surely run: not echoed, not after a failed `&&`.
+	// A sent check left unanswered is open. A proven command must come from a call that exited 0 and is one `&&` chain.
 	assert.deepEqual(noteCheckOpen(job), ["Note check: missing from the final message"]);
-	const command = "echo 'npm test'; false && npm test; cd /x && CI=1 npm  run check | tail";
-	const call = JSON.stringify({ message: { content: [{ type: "toolCall", id: "c", arguments: { command } }] } });
-	const exited = '{"message":{"role":"toolResult","toolCallId":"c","isError":false}}';
-	await writeFile(join(job, "session/a.jsonl"), `${call}\n${exited}\n`);
+	const jsonl = (command: string, id: number) =>
+		`{"message":{"content":[{"type":"toolCall","id":"${id}","arguments":{"command":${JSON.stringify(command)}}}]}}\n` +
+		`{"message":{"role":"toolResult","toolCallId":"${id}","isError":false}}\n`;
+	const commands = ["echo 'npm test' && cd /x && CI=1 npm  run check | tail", "if true; then exit 0; fi; npm test"];
+	await writeFile(join(job, "session/a.jsonl"), commands.map(jsonl).join(""));
 	const proven = "- **A: proven.** `npm run check`\n- B: proven `log:2`\n- C: proven\n  `note.first.md`\n- R: followed";
 	const open = (result: string) => writeFile(join(job, "result"), result).then(() => noteCheckOpen(job));
 	assert.deepEqual(await open(`## Note check\n${proven}\n# Next\n- D: not proven`), []);

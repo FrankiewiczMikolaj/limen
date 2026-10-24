@@ -10,22 +10,16 @@ import { readOptional } from "../project/inherit.ts";
 const HEREDOC = /<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?(?:\n[ \t]*\2[ \t]*(?=\n|$)|$)/g;
 // Leading assignments, `!` and wrappers do not change which command runs: `CI=1 timeout 60 npm test` runs `npm test`.
 const PREFIX = /^(?:[A-Za-z_]\w*=\S*\s+|!\s+|(?:time|nohup|env|command)\s+|timeout\s+\S+\s+)+/;
-// A body of these may never run; the condition of `if` or `while` counts as inside too. A function body opens with `{`.
-const OPENERS = new Set(["if", "while", "until", "for", "case", "select", "{"]);
-const CLOSERS = new Set(["fi", "done", "esac", "}"]);
-// After one of these, later lists of the call may never start, even when the call exits 0.
-const ENDERS = new Set(["exit", "return", "exec", "logout"]);
+// A chain that holds one of these may skip a later command and still exit 0: `if`, a loop or a function body may not
+// run; `exit`, `exec`, or text run by `eval`, `source` or `.` can end the shell; `trap` and `set -n` change what runs.
+const STOPPERS = new Set([
+	...["if", "then", "else", "elif", "fi", "while", "until", "for", "do", "done", "case", "esac", "select"],
+	...["function", "{", "}", "exit", "return", "exec", "logout", "eval", "source", ".", "builtin", "trap", "set"],
+]);
+// One chain: simple commands joined by `&&` or a pipe. Any other separator starts a list, a subshell or a substitution.
+const CHAINED = new Set(["", "&&", "|", "|&"]);
 
 type Piece = { readonly words: string; readonly sep: string };
-type Placed = {
-	readonly words: string;
-	readonly list: number;
-	readonly gated: boolean;
-	readonly nested: boolean;
-	readonly or: boolean;
-	readonly inside: boolean;
-	readonly ends: boolean;
-};
 
 /** Every simple command that surely ran in the job's session transcripts (`surelyRan`). Pi and OMP write the same. */
 export function sessionCommands(jobDir: string): string[] {
@@ -72,55 +66,26 @@ function transcriptLines(jobDir: string): string[] {
 }
 
 /**
- * The simple commands of one shell call that surely ran. Each top-level list (split at `;`, `&` and line ends outside
- * parentheses and backticks) starts when the call reaches it. A command after `&&` or `||`, or inside `if`, a loop,
- * `case`, braces or a function, may be skipped. A call that exited 0 (`ok`) also ran every top-level command of its
- * last list when that list has no `||`; inside parentheses or backticks an `&&` does not set the call's exit status.
- * A failed or unknown call proves only its first list before any `&&` or `||`, and so does a call with `exit`,
- * `return` or `exec` anywhere.
+ * The simple commands of one shell call that surely ran: all of them, when the call exited 0 (`ok`) and is one chain
+ * of simple commands joined by `&&` or a pipe. Exit 0 of such a chain means each command in it ran. Any other call
+ * proves nothing: a `;`, a line end, `||`, `&`, parentheses or backticks may skip a command, and so may a stopper.
  */
 function surelyRan(command: string, ok: boolean): string[] {
-	const placed = place(pieces(command));
-	const last = placed.at(-1)?.list ?? 0;
-	const lastOr = placed.some((each) => each.list === last && each.or);
-	const ended = placed.some((each) => each.ends);
-	const started = (each: Placed) => each.list === 0 || (ok && !ended);
-	const reached = (each: Placed) => !each.gated || (ok && !ended && !each.nested && each.list === last && !lastOr);
-	return placed
-		.filter((each) => each.words && !each.inside && started(each) && reached(each))
-		.map((each) => each.words);
+	const parts = ok ? pieces(command) : [];
+	const chain = parts.every(({ words, sep }) => CHAINED.has(sep) && !STOPPERS.has(firstWord(words)));
+	return chain ? parts.map(({ words }) => words.replace(PREFIX, "")).filter(Boolean) : [];
 }
 
-/** Each piece with its top-level list, whether an `&&` or `||` gates it, and its nesting. */
-function place(parts: readonly Piece[]): Placed[] {
-	let list = 0;
-	let depth = 0;
-	let nest = 0;
-	let tick = false;
-	let gated = false;
-	return parts.map(({ words, sep }) => {
-		nest = Math.max(0, nest + (sep === "(" ? 1 : 0) - (sep === ")" ? 1 : 0));
-		tick = sep === "`" ? !tick : tick;
-		const nested = nest > 0 || tick;
-		if (!nested && (sep === ";" || sep === "\n" || sep === "&")) {
-			list += 1;
-			gated = false;
-		}
-		gated ||= sep === "&&" || sep === "||";
-		const first = words.split(" ")[0] ?? "";
-		const inside = depth > 0 || OPENERS.has(first);
-		if (OPENERS.has(first)) {
-			depth += 1;
-		} else if (CLOSERS.has(first)) {
-			depth = Math.max(0, depth - 1);
-		}
-		return { words: words.replace(PREFIX, ""), list, gated, nested, or: sep === "||", inside, ends: ENDERS.has(first) };
-	});
-}
+const firstWord = (words: string): string => words.replace(PREFIX, "").split(" ")[0] ?? "";
 
 /** Splits a shell call at its unquoted separators; each piece keeps the separator before it. Comments are dropped. */
 function pieces(command: string): Piece[] {
-	const text = command.replace(HEREDOC, "$3").replaceAll("\\\n", " ");
+	// A line end right after `&&` or a pipe continues the chain.
+	const text = command
+		.replace(HEREDOC, "$3")
+		.replaceAll("\\\n", " ")
+		.replace(/(&&|\|)[ \t]*\n/g, "$1 ")
+		.trim();
 	const found: Piece[] = [];
 	let current = "";
 	let sep = "";

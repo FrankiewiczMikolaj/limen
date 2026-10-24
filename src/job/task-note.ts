@@ -83,7 +83,8 @@ export function noteCheck(jobDir: string, finishTool: boolean): string {
 		"Compare the note with the task and later instructions. " +
 			'Under the heading "Note check" in your final message, give one line per end check: ' +
 			'"- <check>: <mark>. <evidence or gap>". The mark is proven, not proven, changed, or dropped. ' +
-			"Proven names its evidence in backticks: a command that ran in this session, or a file. " +
+			"Proven names its evidence in backticks: a file, or a command from one shell call in this session " +
+			"that exited 0 and joined its commands only with && or |. " +
 			"Not proven needs what is missing. Changed or dropped needs the instruction that changed its scope. " +
 			"Give one line per item in a referenced acceptance list. " +
 			"Account for any obligation missing from the current note. " +
