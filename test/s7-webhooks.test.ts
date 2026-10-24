@@ -61,14 +61,16 @@ await writeFile(
 	`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(URLS.map((url, index) => ({ url, auth: SECRETS[index] })))}'\nLIMEN_FINISH_WEBHOOK_AUTHOR_TARGETS='{"@alice":[1],"@bob":[2]}'\n`,
 );
 
-test("a done job pings only the target its ticket author maps to, its whole final message in the handoff and wait", async () => {
-	const id = spawn(`Ticket: ${alice}\ncommit\nsay ${FINAL.line}`, "S7 alice");
+test("a done job pings only its author's target, with open checks and its whole final message in the handoff and wait", async () => {
+	const message = FINAL.text.replace("Note check:", "Report:"); // keep the landed missing-Note-check case
+	const id = spawn(`Ticket: ${alice}\ncommit\nfinish\nfinish ${message.replaceAll("\n", "\\n")}`, "S7 alice");
 	assert.equal(wait(id), "done");
-	assert.ok(runs.at(-1)?.stdout.endsWith(`Final message:\n${FINAL.text}\n`), "wait prints the whole message");
+	assert.ok(runs.at(-1)?.stdout.endsWith(`Final message:\n${message}\n`), "wait prints the whole message");
 	await settled(id);
 	const [ping, ...rest] = payloads();
 	assert.deepEqual([rest, ping?.url, ping?.body.event, ping?.body.jobId], [[], URLS[0], "job.done", id]);
-	assert.ok(ping?.body.handoff.endsWith(`landing.\n\nFinal message:\n${FINAL.text}`), "the handoff carries it whole");
+	assert.ok(ping?.body.handoff.endsWith(`\n\nFinal message:\n${message}`), "the handoff carries it whole");
+	assert.match(ping?.body.handoff, /^Job done with open checks\. .*\n- Note check: missing from the final message\n\n/);
 	assert.equal(requests(p)[0]?.headers.authorization, SECRETS[0]);
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });

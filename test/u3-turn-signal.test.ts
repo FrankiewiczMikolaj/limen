@@ -44,7 +44,7 @@ test("only a done job that is not a scout is sent to landing; a fallback or scou
 	const wake = (state: string, fallback = false) =>
 		completionWake(dir, "F001", state, "id", "limen/id", "", { instruction: "Inspect it before landing.", fallback });
 	assert.doesNotMatch(wake("failed"), /landing/);
-	assert.match(wake("done"), /before landing/);
+	assert.match(wake("done"), /is done \(id\).*before landing/s);
 	await writeFile(join(dir, "role"), "scout\n");
 	assert.match(wake("done"), /Nothing to land/);
 	assert.doesNotMatch(wake("done"), /before landing|land it/);

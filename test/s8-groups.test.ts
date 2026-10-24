@@ -223,10 +223,8 @@ test("a second group runs two routes through draft, critique and final, and the 
 	const runFile = readFileSync(join(p.root, ".limen/groups", started.id, "run.json"), "utf8");
 	const jobs: Array<{ id: string; team: string; round: number; parent?: string }> = JSON.parse(runFile).members;
 	// Every team continues in its own session into the critique; the final round is the first team's alone.
-	assert.deepEqual(
-		jobs.map((job) => `${job.team} ${job.round} ${jobs.findIndex((other) => other.id === job.parent)}`),
-		["team-1 0 -1", "team-2 0 -1", "team-1 1 0", "team-2 1 1", "team-1 2 2"],
-	);
+	const chain = jobs.map((job) => `${job.team} ${job.round} ${jobs.findIndex((other) => other.id === job.parent)}`);
+	assert.deepEqual(chain, ["team-1 0 -1", "team-2 0 -1", "team-1 1 0", "team-2 1 1", "team-1 2 2"]);
 	const argv: string[] = JSON.parse(jobFile(p, jobs[3]?.id ?? "", "fake-argv.json"));
 	assert.deepEqual([argv[argv.indexOf("--model") + 1], argv[argv.indexOf("--thinking") + 1]], ["fake-2", "low"]);
 	const finalTask = readFileSync(join(jobDir(p, jobs[4]?.id ?? ""), "task.md"), "utf8");

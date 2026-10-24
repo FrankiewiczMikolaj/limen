@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The one fake pi/omp. It loads the real hook extensions Limen passes, runs the task text as a script, and records
 // what it saw in the record dir (the parent of --session-dir, so a job's own dir). Script lines:
-//   commit · fail <code> · error (assistant stop reason "error") · say <text> · tool <command> · block · orphan · finish <handoff>
+//   commit · fail <code> · error (assistant stop reason "error") · say <text> · tool <command> · block · orphan · finish <handoff, \n ends a line>
 //   · idle (a bash tool whose one child waits without CPU) · /<command> <args> (runs a command a hook registered, as a user typing it)
 // `block` writes fake-blocked-<n> and waits for one write to the FIFO fake-gate. Records: fake-argv.json, fake-env.json
 // (variable names), fake-task.txt, fake-system.txt (system prompt after before_agent_start), fake-context.txt (the hidden
@@ -24,14 +24,8 @@ const task = prompt ? readFileSync(prompt.slice(1), "utf8") : (flag("--continue"
 const preamble = flag("--append-system-prompt") ?? "";
 mkdirSync(dir, { recursive: true });
 writeFileSync(join(dir, "fake-argv.json"), JSON.stringify(args));
-writeFileSync(
-	join(dir, "fake-env.json"),
-	JSON.stringify(
-		Object.keys(process.env)
-			.filter((name) => /^(LIMEN|HERDR|PI)_/.test(name))
-			.sort(),
-	),
-);
+const names = Object.keys(process.env).filter((name) => /^(LIMEN|HERDR|PI)_/.test(name));
+writeFileSync(join(dir, "fake-env.json"), JSON.stringify(names.sort()));
 writeFileSync(join(dir, "fake-task.txt"), task);
 if (flag("--session-dir")) {
 	mkdirSync(flag("--session-dir"), { recursive: true });
@@ -53,13 +47,8 @@ const fire = async (event, payload) => {
 	}
 	return results;
 };
-const ui = new Proxy(
-	{},
-	{
-		get: (_, method) =>
-			method === "then" ? undefined : (text) => method === "notify" && record({ event: "notify", text }),
-	},
-);
+const toast = (method) => (text) => method === "notify" && record({ event: "notify", text });
+const ui = new Proxy({}, { get: (_, method) => (method === "then" ? undefined : toast(method)) });
 const context = {
 	cwd: process.cwd(),
 	ui,

@@ -27,6 +27,8 @@ export type JobRecord = {
 	readonly versions?: string;
 	readonly commits?: string;
 	readonly result?: string;
+	/** The open items of the final "Note check" of a done job, one per line. */
+	readonly openChecks?: string;
 	readonly model?: string;
 	readonly tokens?: string;
 	readonly cleanup?: string;
@@ -122,7 +124,11 @@ export function humanDetail(record: JobRecord, paint: Paint): string {
 		return `${paint("red", "!")} ${record.id}  ${paint("red", record.invalid ?? "unreadable")}${tail}`;
 	}
 	const lines = [
-		[`${glyph(record, paint)} ${paint("bold", job.label)}`, job.phase, ...flags(record)].join(paint("dim", " · ")),
+		[
+			`${glyph(record, paint)} ${paint("bold", job.label)}`,
+			record.openChecks ? "done with open checks" : job.phase,
+			...flags(record),
+		].join(paint("dim", " · ")),
 	];
 	const put = (key: string, value: string | undefined) => {
 		if (value) {
@@ -145,11 +151,13 @@ export function humanDetail(record: JobRecord, paint: Paint): string {
 		put("advisory", record.advisory);
 	} else {
 		put("ran", terminalRanLine(record, paint));
-		put("reason", record.reason);
+		// The header already says "done with open checks", and `open-checks` lists them.
+		put("reason", record.openChecks ? undefined : record.reason);
 	}
 	put("versions", record.versions);
 	put("commits", record.commits);
 	put("stop-reason", record.stopReason);
+	put("open-checks", record.openChecks);
 	put("result", record.result);
 	put("diff", record.diffstat);
 	put("cleanup", record.cleanup);
@@ -182,7 +190,7 @@ function glyph(record: JobRecord, paint: Paint): string {
 		return paint(record.pulse === "dead" ? "red" : "green", "●");
 	}
 	if (record.job.phase === "done") {
-		return paint("green", "✓");
+		return paint(record.openChecks ? "yellow" : "green", "✓");
 	}
 	if (record.job.phase === "failed") {
 		return paint("red", "✗");

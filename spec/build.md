@@ -3,7 +3,7 @@
 ## TRACK
 
 - **Full final messages (F955, Adam decision 114, 2026-10-24):** priority 1; Pi `pi-claude/claude-opus-5-5` xhigh implements complete coordinator delivery and the concise report-first role-prompt addition; full local check, then one Pi `openai-codex/gpt-6.1-sol` xhigh review; land and push main with a `[skip ci]` tip only when it passes.
-- **Open-note evidence repair (F953, Adam 2026-10-24):** held after the final review failure; preserve its branch and do not repair, review, merge or land until Adam decides; keep it separate from the full-message change.
+- **Open-note evidence repair (F953, Adam decision 115, 2026-10-24):** repair 4 landed as it is with review 4's quoted-source edge case accepted in the done ticket Notes; no further strict-command-proof reviews or follow-up ticket; full-message work remains separate.
 - **Task-note implementation (F950, Adam 2026-10-23 16:03):** implement the approved `group/prompt.txt` as written with one Pi `pi-claude/claude-opus-5-5` worker at `xhigh`, then an independent Pi `openai-codex/gpt-6.1-sol` review at `xhigh`, then land on main and push using local evidence only; no GitHub Actions, no repair or masking of the old wake and structure-scan failures.
 - **Pi/OMP engines (Adam 2026-09-22):** one flag, one profile table, one wrapper, one unchanged parser; separate auth stores and same-engine continuation. This VPS plant coordinator owns the board and authorized main landings/pushes; Adam retains review ownership, with no independent reviewer. Live hosted OMP proof, doorbell, unusable-route, and restoring Claude were outside the engine slice.
 - **Standing engine (Adam 2026-10-23):** new jobs default to Pi at runtime; `--engine` overrides `LIMEN_ENGINE`. Use `--engine omp` or `LIMEN_ENGINE=omp` when OMP is required; continuation keeps the recorded engine, and old records without one remain Pi. This replaces the 2026-09-23 OMP default.
@@ -61,6 +61,7 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F953-a-done-job-with-open-note-checks-tells-the-coordinator-and-is-not-a-plain-done` (🟢 PROVEN): A done job with open note checks tells the coordinator and is not a plain done; landed 2026-10-24
 - `F951-limen-starts-queued-jobs-by-priority-and-tells-every-coordinator-each-rule` (🟢 PROVEN): Limen starts queued jobs by priority and tells every coordinator each rule; landed 2026-10-23
 - `F950-task-notes-state-the-end-checks-and-the-rule-most-likely-to-be-missed` (🟢 PROVEN): Task notes state the end checks and the rule most likely to be missed; landed 2026-10-23
 - `F949-a-limen-job-can-run-as-a-devin-cloud-session-and-return-its-commits` (🟢 PROVEN): A limen job can run as a Devin cloud session and return its commits; landed 2026-10-20
@@ -70,7 +71,6 @@
 - `F945-short-pi-claude-model-form-starts-the-job-instead-of-killing-it` (🟢 PROVEN): Short pi-claude model form starts the job instead of killing it; landed 2026-10-13
 - `F943-the-coordinator-sweep-does-not-start-a-process-for-each-running-job-every-half-second` (🟢 PROVEN): The coordinator sweep does not start a process for each running job every half second; landed 2026-10-13
 - `F935-a-real-group-shows-as-one-tree-on-the-live-picture` (🟢 PROVEN): A real group shows as one tree on the live picture; landed 2026-10-09
-- `F934-live-records-panel` (🟢 PROVEN): A live job on the picture opens in the side panel and shows its workers and its group; landed 2026-10-09
-- 2026-10: 55 landed. spec/features/done/2026-10/
+- 2026-10: 56 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/

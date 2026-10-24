@@ -132,10 +132,8 @@ test("a killed wrapper is reaped at once and a stopped job leaves no escaped chi
 	assert.ok(alive(orphan), "the orphan escaped into its own process group and runs");
 	const stop = limen(p, ["stop", stopped, "s9"]);
 	assert.deepEqual([stop.status, jobFile(p, stopped, "state")], [0, "stopped"], stop.stderr);
-	assert.ok(
-		!alive(orphan) || jobFile(p, stopped, "cleanup").includes(`${orphan} `),
-		`orphan ${orphan} survived stop unnamed`,
-	);
+	const named = !alive(orphan) || jobFile(p, stopped, "cleanup").includes(`${orphan} `);
+	assert.ok(named, `orphan ${orphan} survived stop unnamed`);
 
 	const coordinator = join(p.parent, "coordinator");
 	await mkdir(coordinator);
@@ -205,9 +203,7 @@ syncBuiltinESMExports();
 	writeSync(hold, "x".repeat(children.length));
 	const results = await Promise.all(children.map((child) => child.done));
 	closeSync(hold);
-	assert.deepEqual(
-		results.filter((result) => result.status !== 0 || /ENOTEMPTY/.test(result.output)),
-		[],
-	);
+	const broken = results.filter((result) => result.status !== 0 || /ENOTEMPTY/.test(result.output));
+	assert.deepEqual(broken, []);
 	assert.deepEqual(new Set(readFileSync(registry, "utf8").trim().split("\n")), new Set([p.root, ...projects]));
 });

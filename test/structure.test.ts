@@ -40,11 +40,8 @@ test("shipped template history starts at the current template", async () => {
 		const hash = createHash("sha256")
 			.update(await readFile(join(root, "templates", name)))
 			.digest("hex");
-		assert.equal(
-			(await readFile(path, "utf8")).split(" ")[0],
-			hash,
-			`regenerate ${path}: LIMEN_WRITE_HISTORY=1 node --test test/structure.test.ts`,
-		);
+		const head = (await readFile(path, "utf8")).split(" ")[0];
+		assert.equal(head, hash, `regenerate ${path}: LIMEN_WRITE_HISTORY=1 node --test test/structure.test.ts`);
 	}
 });
 
@@ -55,8 +52,6 @@ test("test/ stays within the line cap that spec/vision.md sets", async () => {
 	for (const path of await filesBelow(join(root, "test"))) {
 		lines += (await readFile(path, "utf8")).split("\n").length - 1;
 	}
-	assert.ok(
-		lines <= cap,
-		`test/ has ${lines} lines; spec/vision.md caps it at ${cap}. Remove ${lines - cap} test lines, or ask Adam to raise the cap.`,
-	);
+	const fix = `Remove ${lines - cap} test lines, or ask Adam to raise the cap.`;
+	assert.ok(lines <= cap, `test/ has ${lines} lines; spec/vision.md caps it at ${cap}. ${fix}`);
 });

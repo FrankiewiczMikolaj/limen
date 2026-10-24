@@ -6,9 +6,10 @@ import { hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { isTerminal, type TerminalState } from "../job/job.ts";
 import { textFile } from "../job/record.ts";
+import { openChecks } from "../job/task-note.ts";
 import { currentBranch, listWorktrees, ticketAuthor, workspaceRoot } from "../project/git.ts";
 import { ticketPointers } from "../project/planning.ts";
-import { finishEvent, GITHUB_AUTHOR, GITHUB_NOREPLY } from "./finish-receipt.ts";
+import { finishEvent, GITHUB_AUTHOR, GITHUB_NOREPLY, OPEN_HANDOFF } from "./finish-receipt.ts";
 import { queuePing, SENDER, senderEnvironment } from "./webhook-queue.ts";
 
 /**
@@ -91,12 +92,15 @@ export async function deliverFinishWebhook(jobDir: string, detail = ""): Promise
 					.map((line) => line.replace(/^[\s#>*-]+/, "").trim())
 					.find(Boolean) ?? "")
 			: "";
+	// A done job with open note checks names them, so the receiver does not read the default "land it".
+	const open = state === "done" ? openChecks(jobDir) : [];
 	const event: PlantEvent = {
 		...(await jobFields(jobDir)),
 		kind: terminalKind(state, detail),
 		status: state,
 		reason: summary || detail || state,
 		...(message ? { message } : {}),
+		...(open.length ? { handoff: [OPEN_HANDOFF, ...open].join("\n") } : {}),
 	};
 	await queuePing(resolve(jobDir, "../.."), jobDir, config, event, finishEvent(jobDir), jobDir);
 }

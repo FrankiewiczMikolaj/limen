@@ -136,7 +136,7 @@ const fields = Object.entries({
   event: kind, plant: oneLine(process.env.LIMEN_FINISH_PLANT, 120), title: oneLine(args[0], 200),
   jobId: oneLine(process.env.LIMEN_FINISH_ID, 160), reason: oneLine(process.env.LIMEN_FINISH_REASON, 300),
 }).filter(([, value]) => value !== undefined);
-// A lead step or a non-terminal event names its own next step; a terminal job never sets this override.
+// A lead step, a non-terminal event, or a done job with open note checks names its own next step.
 const next = process.env.LIMEN_FINISH_HANDOFF?.trim() || (args[1] === 'done'
   ? 'Job done. Next step: land it, or name the check that still blocks landing.'
   : ['failed', 'stopped'].includes(args[1])

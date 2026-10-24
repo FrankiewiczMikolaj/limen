@@ -36,6 +36,8 @@ export type JobView = {
 	readonly pulse?: Pulse;
 	/** For a job in the start queue: its wait and the reason. */
 	readonly queue?: string;
+	/** A done job whose final "Note check" left items open (`open-checks`). */
+	readonly openChecks?: boolean;
 	readonly processAlive?: boolean;
 	readonly diffstat: string;
 	readonly logTail: string;
@@ -206,7 +208,7 @@ export function jobFeatures(label: string, id: string, task: string, subjects: r
 }
 export function renderJob(job: Job, view: JobView): string {
 	const facts = [
-		`${PHASE_LABELS[job.phase]} ${job.label}`,
+		`${view.openChecks ? "DONE WITH OPEN CHECKS" : PHASE_LABELS[job.phase]} ${job.label}`,
 		`id ${job.id}`,
 		`branch ${job.branch}`,
 		`elapsed ${formatDuration(view.elapsedMs)}`,

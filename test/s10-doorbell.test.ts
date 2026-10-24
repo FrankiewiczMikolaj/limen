@@ -58,6 +58,7 @@ else if (verb === "agent get") {
 
 // GitHub as the poller sees it. Rows match by substring, first match wins, so the specific rows come first.
 function github(receipts: unknown[] = []) {
+	const base = { sha: SHA.base, ref: "main", repo: { full_name: REPO } };
 	return [
 		{
 			match: "/issues/comments?",
@@ -86,17 +87,7 @@ function github(receipts: unknown[] = []) {
 		{ match: "/collaborators/mallory/", body: { permission: "read" } },
 		{ match: "/collaborators/trent/", body: { permission: "triage" } },
 		{ match: "/collaborators/", status: 404, body: {} },
-		{
-			match: "/pulls/4",
-			body: {
-				number: 4,
-				state: "open",
-				title: "Fix",
-				body: "",
-				base: { sha: SHA.base, ref: "main", repo: { full_name: REPO } },
-				head: { sha: SHA.head },
-			},
-		},
+		{ match: "/pulls/4", body: { number: 4, state: "open", title: "Fix", body: "", base, head: { sha: SHA.head } } },
 		{ match: "/pulls/", status: 404, body: {} },
 		{ match: "/issues/6", body: issue(6, "alice", { state: "closed" }) },
 		{ match: "/access_tokens", body: { token: "installation-token" } },

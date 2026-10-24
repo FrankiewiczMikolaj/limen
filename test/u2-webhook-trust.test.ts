@@ -84,18 +84,14 @@ test("the sender sends nothing for a bad credential, destination, target list or
 		const failed = await send(single(`https://finish.example.test/private-${route}`, AUTH));
 		assert.deepEqual([failed.status, failed.sent.length], [1, 1], route);
 	}
-	const fanOut = await send(multi([{ ...two[0], url: "https://finish.example.test/private-reject" }, two[1]]));
-	assert.deepEqual(
-		[fanOut.status, fanOut.sent.map((request) => request.url)],
-		[1, ["https://finish.example.test/private-reject", two[1]?.url]],
-	);
+	const reject = "https://finish.example.test/private-reject";
+	const fanOut = await send(multi([{ ...two[0], url: reject }, two[1]]));
+	assert.deepEqual([fanOut.status, fanOut.sent.map((request) => request.url)], [1, [reject, two[1]?.url]]);
 
 	const accepted = await send(single(URL_ONE, AUTH));
 	assert.equal(accepted.status, 0);
-	assert.deepEqual(
-		accepted.sent.map((request) => [request.method, request.url, request.headers.authorization]),
-		[["POST", URL_ONE, AUTH]],
-	);
+	const sent = accepted.sent.map((request) => [request.method, request.url, request.headers.authorization]);
+	assert.deepEqual(sent, [["POST", URL_ONE, AUTH]]);
 	const body = JSON.parse(accepted.sent[0]?.body ?? "{}");
 	assert.deepEqual([body.job, body.branch, body.jobState], ["F001 demo", "limen/demo", "done"]);
 	assert.doesNotMatch(accepted.sent[0]?.body ?? "", SECRET);

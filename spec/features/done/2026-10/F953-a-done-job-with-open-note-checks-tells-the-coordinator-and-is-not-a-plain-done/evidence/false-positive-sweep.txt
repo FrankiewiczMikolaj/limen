@@ -1,0 +1,97 @@
+False-proof sweep at candidate d1db363: node --no-warnings spec/features/active/F953-a-done-job-with-open-note-checks-tells-the-coordinator-and-is-not-a-plain-done/evidence/false-positive-sweep.ts
+
+rejected-ran   exit=0 ran=y "npm test & wait" :: no proof that `npm test` ran (its shell call holds `&`), and no such file
+open           exit=2 ran=n "npm test |& cat" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "true && npm test > /dev/null"
+rejected-ran   exit=0 ran=y "exec 3>&1 && npm test" :: no proof that `npm test` ran (its shell call holds `exec`), and no such file
+open           exit=1 ran=n "[ -f nope ] && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "cd \"$(mktemp -d)\" && npm test"
+proven         exit=0 ran=y "npm test # && exit"
+rejected-ran   exit=0 ran=y "true && trap '' EXIT && npm test" :: no proof that `npm test` ran (its shell call holds `trap`), and no such file
+open           exit=null ran=n "true && kill $$ && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+rejected-ran   exit=0 ran=y "true && (exit 0) && npm test" :: no proof that `npm test` ran (its shell call holds `(`), and no such file
+open           exit=0 ran=n "true && { exit 0; } && npm test" :: no proof that `npm test` ran (its shell call holds `{`), and no such file
+open           exit=0 ran=n "true && ex\\it 0 && npm test" :: no proof that `npm test` ran (its shell call holds `ex\it`), and no such file
+open           exit=0 ran=n "true && $'exit' 0 && npm test" :: no proof that `npm test` ran (its shell call holds `$'`), and no such file
+open           exit=0 ran=n "true && \"ex\"it 0 && npm test" :: no proof that `npm test` ran (its shell call holds `"ex"it`), and no such file
+open           exit=0 ran=n "true && ${E:-exit} 0 && npm test" :: no proof that `npm test` ran (its shell call holds `${E:-exit}`), and no such file
+open           exit=0 ran=n "true && exit$IFS0 && npm test" :: no proof that `npm test` ran (its shell call holds `exit$IFS0`), and no such file
+open           exit=0 ran=n "true && e''xit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `e''xit`), and no such file
+open           exit=0 ran=n "true && {exit,0} && npm test" :: no proof that `npm test` ran (its shell call holds `{exit,0}`), and no such file
+open           exit=0 ran=n "PATH=/none npm test | cat" :: no proof that `npm test` ran (a `|` follows it and hides its exit status), and no such file
+open           exit=0 ran=n "! PATH=/none npm test" :: no proof that `npm test` ran (its shell call holds `!`), and no such file
+open           exit=0 ran=n "time ! PATH=/none npm test" :: no proof that `npm test` ran (its shell call holds `!`), and no such file
+open           exit=0 ran=n "true && command exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+open           exit=0 ran=n "true && builtin exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `builtin`), and no such file
+open           exit=0 ran=n "true && . /dev/stdin <<< 'exit 0' && npm test" :: no proof that `npm test` ran (its shell call holds `.`), and no such file
+open           exit=0 ran=n "true && source /dev/null && exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `source`), and no such file
+proven         exit=0 ran=y "cat <<<EOF && npm test\nexit 0"
+proven         exit=0 ran=y "cat <<EOF && npm test\nEOF"
+open           exit=0 ran=n "cat <<EOF\nnpm test\nEOF" :: no proof that `npm test` ran (no shell call names it as a command), and no such file
+open           exit=0 ran=n "echo $'\\'' ; exit 0 ; echo \"'\" && npm test" :: no proof that `npm test` ran (no shell call names it as a command), and no such file
+rejected-ran   exit=0 ran=y "printf 'x' | xargs npm test" :: no proof that `npm test` ran (no shell call names it as a command), and no such file
+open           exit=127 ran=n "env -i npm test" :: no proof that `npm test` ran (no shell call names it as a command), and no such file
+open           exit=0 ran=n "true && set -n && npm test" :: no proof that `npm test` ran (its shell call holds `set`), and no such file
+open           exit=0 ran=n "true && shopt -s extdebug && trap false DEBUG && npm test" :: no proof that `npm test` ran (its shell call holds `shopt`), and no such file
+open           exit=0 ran=n "true && hash -p /usr/bin/true npm && npm test" :: no proof that `npm test` ran (its shell call holds `hash`), and no such file
+rejected-ran   exit=0 ran=y "true && enable -n test && npm test" :: no proof that `npm test` ran (its shell call holds `enable`), and no such file
+rejected-ran   exit=0 ran=y "true && alias npm=true && npm test" :: no proof that `npm test` ran (its shell call holds `alias`), and no such file
+proven         exit=0 ran=y "true && break && npm test"
+open           exit=1 ran=n "true && return 0 && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=1 ran=n "true && logout && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=0 ran=n "true && exec true && npm test" :: no proof that `npm test` ran (its shell call holds `exec`), and no such file
+open           exit=0 ran=n "true && eval exit && npm test" :: no proof that `npm test` ran (its shell call holds `eval`), and no such file
+open           exit=1 ran=n "true && fc -s && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "true && wait && npm test"
+open           exit=1 ran=n "true && %1 && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "npm test --help"
+rejected-ran   exit=0 ran=y "true && :; npm test" :: no proof that `npm test` ran (its shell call holds `;`), and no such file
+open           exit=0 ran=n "true && >log exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `>log`), and no such file
+open           exit=0 ran=n "true && 2>/dev/null exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `2>/dev/null`), and no such file
+open           exit=0 ran=n "true && X=1 exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+proven         exit=0 ran=y "true && [[ 1 ]] && npm test"
+open           exit=0 ran=n "true && \\\nexit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+open           exit=0 ran=n "true &&\n exit 0 &&\n npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+open           exit=0 ran=n "true && exit\\\n 0 && npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+proven         exit=0 ran=y "true && npm test 2>&1 >/dev/null"
+proven         exit=0 ran=y "npm  test"
+proven         exit=0 ran=y "npm\ttest"
+open           exit=127 ran=n "true && ' exit' 0 && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "true && /usr/bin/true && npm test"
+open           exit=127 ran=n "unset PATH && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=1 ran=n "true && local x && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=2 ran=n "true && function && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=2 ran=n "true && select && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=1 ran=y "npm test && false" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+rejected-ran   exit=0 ran=y "npm test 1>&2 | cat" :: no proof that `npm test` ran (a `|` follows it and hides its exit status), and no such file
+rejected-ran   exit=0 ran=y "true && exit 0 | cat && npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+rejected-ran   exit=0 ran=y "true && (true) | npm test" :: no proof that `npm test` ran (its shell call holds `(`), and no such file
+proven         exit=0 ran=y "true | npm test"
+proven         exit=0 ran=y "false | npm test"
+rejected-ran   exit=0 ran=y "npm test | true" :: no proof that `npm test` ran (a `|` follows it and hides its exit status), and no such file
+open           exit=1 ran=n "! true && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+rejected-ran   exit=0 ran=y "true && ! true || npm test" :: no proof that `npm test` ran (its shell call holds `!`), and no such file
+rejected-ran   exit=0 ran=y "true && npm test || true" :: no proof that `npm test` ran (its shell call holds `||`), and no such file
+proven         exit=0 ran=y "npm test\n"
+proven         exit=0 ran=y "  npm test  "
+open           exit=1 ran=n "true && caller && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "true && times && npm test"
+open           exit=null ran=n "true && ulimit -t 0 && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "true && umask 777 && npm test"
+open           exit=0 ran=n "true && exit 0 2>&1 && npm test" :: no proof that `npm test` ran (its shell call holds `exit`), and no such file
+open           exit=1 ran=n "true && suspend && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=1 ran=n "true && disown && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+proven         exit=0 ran=y "true && declare -f && npm test"
+proven         exit=0 ran=y "true && readonly PATH && npm test"
+proven         exit=0 ran=y "true && export -n PATH && npm test"
+open           exit=127 ran=n "true && unset -v PATH && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=1 ran=n "true && let x=0 && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=1 ran=n "true && shift 9 && npm test" :: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+open           exit=0 ran=n "true && command -p exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `-p`), and no such file
+open           exit=0 ran=n "true && time -p exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `-p`), and no such file
+open           exit=0 ran=n "true && command -- exit 0 && npm test" :: no proof that `npm test` ran (its shell call holds `--`), and no such file
+rejected-ran   exit=0 ran=y "command -v npm && npm test" :: no proof that `npm test` ran (its shell call holds `-v`), and no such file
+rejected-ran   exit=0 ran=y "true && env -- npm test" :: no proof that `npm test` ran (no shell call names it as a command), and no such file
+proven         exit=0 ran=y "true && nohup npm test"
+proven         exit=0 ran=y "true && command npm test"
+0 false positives of 94
