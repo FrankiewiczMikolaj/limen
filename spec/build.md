@@ -2,7 +2,7 @@
 
 ## TRACK
 
-- **Assessment recovery (F954, Adam 2026-10-24):** restart through the native group driver for 200m on the original Pi Sol xhigh and Pi Opus xhigh routes; reuse both partitions' private artifacts, finish the Pi draft, then cross-check and merge; no duplicate standalone continuation or model substitution.
+- **Assessment recovery (F954, Adam 2026-10-24):** native 200m group on the original Pi Sol xhigh and Pi Opus xhigh routes reuses both partitions, cross-checks and merges all individually verified eligible episodes in one outer 2026-09-23–2026-10-24 window; disclose unscanned material and source-range bias; no duplicate continuation or model substitution.
 - **Full final messages (F955, Adam decision 114, 2026-10-24):** priority 1; Pi `pi-claude/claude-opus-5-5` xhigh implements complete coordinator delivery and the concise report-first role-prompt addition; full local check, then one Pi `openai-codex/gpt-6.1-sol` xhigh review; land and push main with a `[skip ci]` tip only when it passes.
 - **Open-note evidence repair (F953, Adam decision 115, 2026-10-24):** repair 4 landed as it is with review 4's quoted-source edge case accepted in the done ticket Notes; no further strict-command-proof reviews or follow-up ticket; full-message work remains separate.
 - **Task-note implementation (F950, Adam 2026-10-23 16:03):** implement the approved `group/prompt.txt` as written with one Pi `pi-claude/claude-opus-5-5` worker at `xhigh`, then an independent Pi `openai-codex/gpt-6.1-sol` review at `xhigh`, then land on main and push using local evidence only; no GitHub Actions, no repair or masking of the old wake and structure-scan failures.
