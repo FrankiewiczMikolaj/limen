@@ -1,79 +1,60 @@
-=== mutation-1.txt
-mutation: record.ts writes no open-checks (if (open.length && open.length < 0))
-✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4754.206417ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4754.206417ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /. Input:
+Mutations at candidate d1db363. Each makes one small change, runs the named check once, and is reverted; 'applied' is git diff --stat of that file while mutated.
 
-=== mutation-2-s3.txt
-mutation: task-note.ts missingEvidence accepts any backticked name (named.length || named.some(found))
-✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4899.150917ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4899.150917ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /. Input:
+=== The evidence rules, against test/u14-task-note.test.ts
+FAILS u14 · pipe rule off: a command before | counts
+    mutation: 'why: why || (PIPES.has(parts[index + 1]?.sep ?? "") ? "a `|` follows it and hides its exit status" : ""),' -> 'why,'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    -   'C7: not proven. Limen: no proof that `npm test 7` ran (a `|` follows it and hides its exit status), and no such file',
+FAILS u14 · name rule off: a quoted command name reads as plain
+    mutation: 'if (STOPPERS.has(word) || (word && !NAME.test(word))) {' -> 'if (STOPPERS.has(word)) {'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    -   "C5: not proven. Limen: no proof that `npm test 5` ran (its shell call holds `'exit'`), and no such file",
+FAILS u14 · negation rule off: `!` is an ordinary prefix
+    mutation: 'if (/(?:^|\\s)!\\s/.test(words.match(PREFIX)?.[0] ?? "")) {' -> 'if (false) {'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    -   'C6: not proven. Limen: no proof that `npm test 6` ran (its shell call holds `!`), and no such file',
+FAILS u14 · tool name off: any tool with a command argument is a shell call
+    mutation: 'part?.type === "toolCall" && part.name === "bash" &&' -> 'part?.type === "toolCall" &&'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    +   'C8: not proven. Limen: no proof that `npm test 8` ran (its shell call did not end with exit 0), and no such file',
+    -   'C8: not proven. Limen: no proof that `npm test 8` ran (no shell call names it as a command), and no such file',
+FAILS u14 · result tie off: every call counts as exit 0
+    mutation: 'answered.ok = message.isError === false;' -> 'answered.ok = true;'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    -   'C2: not proven. Limen: no proof that `npm test 2` ran (its shell call did not end with exit 0), and no such file',
+FAILS u14 · result tie off: an unanswered call counts as exit 0
+    mutation: 'const call = { command: part.arguments.command, ok: false };' -> 'const call = { command: part.arguments.command, ok: true };'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    -   'C9: not proven. Limen: no proof that `npm test 9` ran (its shell call did not end with exit 0), and no such file',
+FAILS u14 · stoppers off: `if` and `exit` read as commands
+    mutation: 'if (STOPPERS.has(word) || (word && !NAME.test(word))) {' -> 'if (word && !NAME.test(word)) {'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    +   'C4: not proven. Limen: no proof that `npm test 4` ran (its shell call holds `;`), and no such file',
+    -   'C4: not proven. Limen: no proof that `npm test 4` ran (its shell call holds `if`), and no such file',
+FAILS u14 · chain rule off: any separator joins a chain
+    mutation: 'if (!CHAINED.has(sep)) {' -> 'if (false) {'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    -   'C3: not proven. Limen: no proof that `npm test 3` ran (its shell call holds `;`), and no such file',
 
-=== mutation-2-u14.txt
-mutation: task-note.ts missingEvidence accepts any backticked name (named.length || named.some(found))
-✔ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (207.364125ms)
-ℹ pass 1
-ℹ fail 0
+=== The flow, against the native tests named
+FAILS s3-finish-wake.test.ts · finalizeJob writes no open-checks
+    mutation in src/job/record.ts: 'if (open.length) {\n\t\tawait atomicWrite(`${jobDir}/open-checks`' -> 'if (false) {\n\t\tawait atomicWrite(`${jobDir}/open-checks`'
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    ✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4972.891708ms)
+    ✖ failing tests:
+FAILS u14-task-note.test.ts s3-finish-wake.test.ts · every proven line is accepted
+    mutation in src/job/task-note.ts: '\tconst gaps: Gap[] = [];\n' -> '\tif (named.length) {\n\t\treturn "";\n\t}\n\tconst gaps: Gap[] = [];\n'
+    applied:  1 file changed, 3 insertions(+)
+    ✖ a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session (4809.373ms)
+    ✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (674.536459ms)
+FAILS s7-webhooks.test.ts · the finish webhook drops the open-checks handoff
+    mutation in src/integrations/finish-webhook.ts: '...(open.length ? { handoff: [OPEN_HANDOFF, ...open].join("\\n") } : {}),' -> ''
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    ✖ a done job pings only the target its ticket author maps to, with its unanswered note check (1753.155125ms)
+    ✖ failing tests:
 
-=== mutation-3-u14.txt
-mutation: task-note.ts sessionCommands sees no toolCall line
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (210.943875ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (210.943875ms)
-  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
-  + actual - expected
-  + [
-  +   'A: not proven. Limen: `npm run check` did not run in this session and is not a file'
-  + ]
-
-=== mutation-4-s7.txt
-mutation: finish-webhook.ts sends no open-checks handoff (open.length < 0)
-✖ a done job pings only the target its ticket author maps to, with its unanswered note check (1619.08475ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a done job pings only the target its ticket author maps to, with its unanswered note check (1619.08475ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^Job done with open checks\. .*\n- Note check: missing from the final message$/. Input:
-
-=== mutation-5-u14.txt (after review 1)
-mutation: task-note.ts sameCommand is run.includes(want) and the transcript keeps whole commands (substring matching)
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (204.395167ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (204.395167ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^E: not proven\. Limen: it names no .+\|F: not proven\. Limen: `npm test` did not/. Input:
-
-=== mutation-6-u14.txt (after review 2)
-mutation: session-commands.ts counts every command after && or || as run (reached is always true)
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (198.091958ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (198.091958ms)
-
-=== mutation-7-u14.txt (after review 2)
-mutation: session-commands.ts ignores the recorded exit status (every call counts as failed)
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (228.47825ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (228.47825ms)
-
-=== mutation-8-u14.txt (after review 3, chain rule)
-mutation: session-commands.ts accepts any call that exited 0 (no chain or stopper check)
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (194.641291ms)
-ℹ pass 0
-ℹ fail 1
-✖ failing tests:
-✖ a job's note shows once, keeps its first version, logs changes, and is checked once before the finish (194.641291ms)
-
+=== OMP persistent-shell rule off ('kept ||= omp ? keptWord(command, parts) : "";' -> 'kept ||= "";'), against real-shell-probe.ts
+    applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+    probe exit: 1
+    BAD OMP keeps a function: ["npm() { :; }","npm test"] names `npm test`
+    19 of 20 as expected (source: mutated d1db363)

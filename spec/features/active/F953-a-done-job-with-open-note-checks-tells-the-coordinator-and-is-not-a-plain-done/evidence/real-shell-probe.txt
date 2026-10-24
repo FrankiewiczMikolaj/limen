@@ -1,0 +1,185 @@
+Real-shell probe at candidate d1db363: node --no-warnings spec/features/active/F953-a-done-job-with-open-note-checks-tells-the-coordinator-and-is-not-a-plain-done/evidence/real-shell-probe.ts
+
+ok  review 1: quoted: ["printf '%s\\n' 'npm test'"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (no shell call names it as a command), and no such file
+ok  review 2: skipped: ["false && npm test"] names `npm test`
+    exit 1 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+ok  review 3: early exit: ["if true; then exit 0; fi; npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `if`), and no such file
+ok  pipe hides a missing command: ["npm test 2>&1 | tail -1"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (a `|` follows it and hides its exit status), and no such file
+ok  pipe masks a failed && prefix: ["cd missing 2>&1 | tail -1 && npm test"] names `cd missing && npm test`
+    exit 0 · npm ran: yes · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `cd missing` ran (a `|` follows it and hides its exit status), and no such file
+ok  ! hides a missing command: ["! npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `!`), and no such file
+ok  quoted exit: ["true && 'exit' 0 && npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `'exit'`), and no such file
+ok  escaped exit: ["true && \\exit 0 && npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `\exit`), and no such file
+ok  hash -p stands in: ["hash -p /usr/bin/true npm && npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `hash`), and no such file
+ok  command -p runs a builtin: ["true && command -p exit 0 && npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `-p`), and no such file
+ok  command -v declines: ["command -v npm test"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (no shell call names it as a command), and no such file
+ok  xargs declines: ["xargs npm test < /dev/null"] names `npm test`
+    exit 0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (no shell call names it as a command), and no such file
+ok  not a shell tool: ["npm test"] names `npm test`
+    exit - · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (no shell call names it as a command), and no such file
+ok  no shell result: ["npm test"] names `npm test`
+    exit - · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (its shell call did not end with exit 0), and no such file
+ok  OMP keeps a function: ["npm() { :; }","npm test"] names `npm test`
+    exit 0,0 · npm ran: no · wake: done with open checks
+    open-checks: Suite: not proven. Limen: no proof that `npm test` ran (an earlier call in OMP's persistent shell holds `()`), and no such file
+ok  control: ran: ["npm test"] names `npm test`
+    exit 0 · npm ran: yes · wake: done
+    open-checks: (no file)
+ok  control: chain: ["cd sub && CI=1 npm test -- --grep x"] names `npm test`
+    exit 0 · npm ran: yes · wake: done
+    open-checks: (no file)
+ok  control: last in pipe: ["printf x | npm test"] names `npm test`
+    exit 0 · npm ran: yes · wake: done
+    open-checks: (no file)
+ok  control: Pi shell per call: ["npm() { :; }","npm test"] names `npm test`
+    exit 0,0 · npm ran: yes · wake: done
+    open-checks: (no file)
+ok  control: saved file: [] names `check.log`
+    exit - · npm ran: no · wake: done
+    open-checks: (no file)
+20 of 20 as expected (source: candidate d1db363)
+
+=== Wake for "review 3: early exit"
+Limen job "probe": Show which proven lines Limen accepts.
+is done with open checks (case-2) on branch limen/case-2.
+
+Open checks:
+- Suite: not proven. Limen: no proof that `npm test` ran (its shell call holds `if`), and no such file
+
+Final message:
+Done.
+
+## Note check
+- Suite: proven. `npm test`
+
+The worker left the checks above open. Decide for each before you land: continue the job, start a review, or accept it and tell the user why.
+
+Inspect the job record, branch diff and commits, log/session, and relevant checks. Then decide each open check, and land the work at the verified commit only after that. If a check blocks landing, name that check and resume a focused fix. If it added, moved or changed a ticket, start limen keeper <ticket> --job case-2 --engine <engine> --provider <provider> --model <model> --thinking <level> and land the keeper job instead. After it lands, continue with the next item on the board. Keep the user informed; ask only when genuine product ambiguity, a scope or risk tradeoff, or an irreversible action needs a human decision.
+
+=== Wake for "control: ran"
+Limen job "probe": Show which proven lines Limen accepts.
+is done (case-15) on branch limen/case-15.
+
+Final message:
+Done.
+
+## Note check
+- Suite: proven. `npm test`
+
+Job done. Next step: land it, or name the check that still blocks landing. Done does not mean that review passed.
+
+Inspect the job record, branch diff and commits, log/session, and relevant checks. Then land the work at the verified commit. If a check blocks landing, name that check and resume a focused fix. If it added, moved or changed a ticket, start limen keeper <ticket> --job case-15 --engine <engine> --provider <provider> --model <model> --thinking <level> and land the keeper job instead. After it lands, continue with the next item on the board. Keep the user informed; ask only when genuine product ambiguity, a scope or risk tradeoff, or an irreversible action needs a human decision.
+exit: 0
+
+=== The same probe against the code of each reviewed commit (git archive <commit> src hook), case lines and summary
+--- c975f2e
+BAD review 1: quoted: ["printf '%s\\n' 'npm test'"] names `npm test`
+BAD review 2: skipped: ["false && npm test"] names `npm test`
+BAD review 3: early exit: ["if true; then exit 0; fi; npm test"] names `npm test`
+BAD pipe hides a missing command: ["npm test 2>&1 | tail -1"] names `npm test`
+ok  pipe masks a failed && prefix: ["cd missing 2>&1 | tail -1 && npm test"] names `cd missing && npm test`
+BAD ! hides a missing command: ["! npm test"] names `npm test`
+BAD quoted exit: ["true && 'exit' 0 && npm test"] names `npm test`
+BAD escaped exit: ["true && \\exit 0 && npm test"] names `npm test`
+BAD hash -p stands in: ["hash -p /usr/bin/true npm && npm test"] names `npm test`
+BAD command -p runs a builtin: ["true && command -p exit 0 && npm test"] names `npm test`
+BAD command -v declines: ["command -v npm test"] names `npm test`
+BAD xargs declines: ["xargs npm test < /dev/null"] names `npm test`
+BAD not a shell tool: ["npm test"] names `npm test`
+BAD no shell result: ["npm test"] names `npm test`
+BAD OMP keeps a function: ["npm() { :; }","npm test"] names `npm test`
+ok  control: ran: ["npm test"] names `npm test`
+ok  control: chain: ["cd sub && CI=1 npm test -- --grep x"] names `npm test`
+ok  control: last in pipe: ["printf x | npm test"] names `npm test`
+ok  control: Pi shell per call: ["npm() { :; }","npm test"] names `npm test`
+ok  control: saved file: [] names `check.log`
+6 of 20 as expected (source: c975f2e)
+--- 3dc40e9
+ok  review 1: quoted: ["printf '%s\\n' 'npm test'"] names `npm test`
+BAD review 2: skipped: ["false && npm test"] names `npm test`
+BAD review 3: early exit: ["if true; then exit 0; fi; npm test"] names `npm test`
+BAD pipe hides a missing command: ["npm test 2>&1 | tail -1"] names `npm test`
+BAD pipe masks a failed && prefix: ["cd missing 2>&1 | tail -1 && npm test"] names `cd missing && npm test`
+ok  ! hides a missing command: ["! npm test"] names `npm test`
+BAD quoted exit: ["true && 'exit' 0 && npm test"] names `npm test`
+BAD escaped exit: ["true && \\exit 0 && npm test"] names `npm test`
+BAD hash -p stands in: ["hash -p /usr/bin/true npm && npm test"] names `npm test`
+BAD command -p runs a builtin: ["true && command -p exit 0 && npm test"] names `npm test`
+ok  command -v declines: ["command -v npm test"] names `npm test`
+ok  xargs declines: ["xargs npm test < /dev/null"] names `npm test`
+BAD not a shell tool: ["npm test"] names `npm test`
+BAD no shell result: ["npm test"] names `npm test`
+BAD OMP keeps a function: ["npm() { :; }","npm test"] names `npm test`
+ok  control: ran: ["npm test"] names `npm test`
+ok  control: chain: ["cd sub && CI=1 npm test -- --grep x"] names `npm test`
+ok  control: last in pipe: ["printf x | npm test"] names `npm test`
+ok  control: Pi shell per call: ["npm() { :; }","npm test"] names `npm test`
+ok  control: saved file: [] names `check.log`
+9 of 20 as expected (source: 3dc40e9)
+--- 9609f61
+ok  review 1: quoted: ["printf '%s\\n' 'npm test'"] names `npm test`
+ok  review 2: skipped: ["false && npm test"] names `npm test`
+BAD review 3: early exit: ["if true; then exit 0; fi; npm test"] names `npm test`
+BAD pipe hides a missing command: ["npm test 2>&1 | tail -1"] names `npm test`
+BAD pipe masks a failed && prefix: ["cd missing 2>&1 | tail -1 && npm test"] names `cd missing && npm test`
+BAD ! hides a missing command: ["! npm test"] names `npm test`
+BAD quoted exit: ["true && 'exit' 0 && npm test"] names `npm test`
+BAD escaped exit: ["true && \\exit 0 && npm test"] names `npm test`
+BAD hash -p stands in: ["hash -p /usr/bin/true npm && npm test"] names `npm test`
+BAD command -p runs a builtin: ["true && command -p exit 0 && npm test"] names `npm test`
+ok  command -v declines: ["command -v npm test"] names `npm test`
+ok  xargs declines: ["xargs npm test < /dev/null"] names `npm test`
+BAD not a shell tool: ["npm test"] names `npm test`
+BAD no shell result: ["npm test"] names `npm test`
+BAD OMP keeps a function: ["npm() { :; }","npm test"] names `npm test`
+ok  control: ran: ["npm test"] names `npm test`
+ok  control: chain: ["cd sub && CI=1 npm test -- --grep x"] names `npm test`
+ok  control: last in pipe: ["printf x | npm test"] names `npm test`
+ok  control: Pi shell per call: ["npm() { :; }","npm test"] names `npm test`
+ok  control: saved file: [] names `check.log`
+9 of 20 as expected (source: 9609f61)
+--- 331ed84
+ok  review 1: quoted: ["printf '%s\\n' 'npm test'"] names `npm test`
+ok  review 2: skipped: ["false && npm test"] names `npm test`
+ok  review 3: early exit: ["if true; then exit 0; fi; npm test"] names `npm test`
+BAD pipe hides a missing command: ["npm test 2>&1 | tail -1"] names `npm test`
+BAD pipe masks a failed && prefix: ["cd missing 2>&1 | tail -1 && npm test"] names `cd missing && npm test`
+BAD ! hides a missing command: ["! npm test"] names `npm test`
+BAD quoted exit: ["true && 'exit' 0 && npm test"] names `npm test`
+BAD escaped exit: ["true && \\exit 0 && npm test"] names `npm test`
+BAD hash -p stands in: ["hash -p /usr/bin/true npm && npm test"] names `npm test`
+BAD command -p runs a builtin: ["true && command -p exit 0 && npm test"] names `npm test`
+ok  command -v declines: ["command -v npm test"] names `npm test`
+ok  xargs declines: ["xargs npm test < /dev/null"] names `npm test`
+BAD not a shell tool: ["npm test"] names `npm test`
+ok  no shell result: ["npm test"] names `npm test`
+BAD OMP keeps a function: ["npm() { :; }","npm test"] names `npm test`
+ok  control: ran: ["npm test"] names `npm test`
+ok  control: chain: ["cd sub && CI=1 npm test -- --grep x"] names `npm test`
+ok  control: last in pipe: ["printf x | npm test"] names `npm test`
+ok  control: Pi shell per call: ["npm() { :; }","npm test"] names `npm test`
+ok  control: saved file: [] names `check.log`
+11 of 20 as expected (source: 331ed84)
