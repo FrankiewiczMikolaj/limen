@@ -2,6 +2,7 @@
 
 ## TRACK
 
+- **Limen marks in Herdr and on the map (F956, Adam via Tony 2026-10-25 03:56 Warsaw):** one Pi `pi-claude/claude-opus-5-5` xhigh worker; land and push on local checks only, no GitHub Actions; never write Adam's Herdr config or touch Alice; a color highlight beyond the sidebar is a Herdr gap to report to Tony, not to build.
 - **Idle coordinator lag (F944, Adam 2026-10-25):** slice 1 landed in `74c8596` after the Pi `openai-codex/gpt-6.1-sol` review PASS at `5246ca5`: a finished job that owes a coordinator nothing stays settled, a rolling 30 s refresh replaces the full reopen, and a busy job's watch events start at most one wake sweep a second. All five acceptance lines are proven; the gone-pid check already held since `645ab02`. The ticket stays open because the `finishedJobs` job-line pass still reads every record every 30 s with a synchronous `git` call, and the session-start sweep still reads every record once.
 - **Assessment handoff (F954, Adam 2026-10-24 20:44 Warsaw):** Johnny owns the one POST of the merged proposed record under the prior YES; this coordinator must not POST, review the assessment further or start more F954 rounds, and stays on F955.
 - **Full final messages (F955, failed exact-tip proof):** priority 1; Pi `pi-claude/claude-opus-5-5` xhigh repairs UTF-8 report decoding and separates rule-fixture phases, without a production rule change, 200m; keep the 1 MiB Herdr limit; require Pi `openai-codex/gpt-6.1-sol` xhigh PASS and full native/live Herdr/wait-and-every-job-end proof at the same exact tip before landing and pushing main with a `[skip ci]` tip.
@@ -33,8 +34,9 @@
 
 <!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F956-one-switch-marks-what-limen-added-in-herdr-and-on-the-map` (🟠 ACTIVE): One switch marks what Limen added in Herdr and on the map
 - `F954-a-private-assessment-combines-verified-collaboration-counts-from-both-session-stores` (🟠 ACTIVE): A private assessment combines verified collaboration counts from both session stores
-- `F952-agents-learn-adam-s-principles-from-work-and-decisions` (🟠 ACTIVE): Agents learn Adam’s principles from work and decisions; needs Adam since 2026-10-24: Choose the global principle home, conversation access and refine schedules in ~/Downloads/limen-learning-system.html; no implementation or pilot is authorized.
+- `F952-agents-learn-adam-s-principles-from-work-and-decisions` (🟠 ACTIVE): Agents learn Adam’s principles from work and decisions; needs Adam since 2026-10-25: Answer choices 1 to 4 at the end of ~/Downloads/limen-learning-system.html (revision 3) before a pilot; no implementation or pilot is authorized.
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
 - `F778-coordinator-and-lead-finish-signal` (🟠 ACTIVE): The shepherd learns when coordinators and group leads finish, block or stall
 - `F777-hosted-pane-shows-true-agent-state` (🟠 ACTIVE): A hosted job's Herdr tab shows the agent's true state; wrong since 2026-10-05: Hosted panes show green while the agent is visibly working.
