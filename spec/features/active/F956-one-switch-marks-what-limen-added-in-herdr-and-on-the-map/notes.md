@@ -44,14 +44,22 @@ Confirmed in the Herdr 0.9.5 docs (`cli-reference.mdx`, `configuration.mdx`, `pl
 
 Classification rule: an element is Limen when its data comes from Limen work state (`.limen/jobs/`, `spec/features/` tickets, `spec/build.md`) or it exists only to show or filter that state. It is native map when it comes from the dataset (`nodes/`, `edges/`, `features/`, `journeys/`).
 
-| Item | Class |
-|---|---|
-| Mast pins: Changed, Wrong, Needs Adam | Limen |
-| Work count on a place (`k-n`) | Limen |
-| Live strip and its states (`live.js`, served page only) | Limen |
-| Live job mark on a place ("a job works here now") | Limen |
-| Reading column Work tab, Needs Adam group and badges, board state lines | Limen |
-| Days tab (dated ticket decisions) | Limen |
-| Modules, places, connections, count badges between modules, journeys, partly described dots | native map |
-| Places tab, Journeys tab, layers, trail, selection and lit states | native map |
-| "Show all module connections" button | native map |
+The F956 job marks each Limen element where the viewer builds it (`data-limen` plus a hidden `◆`), and the page switch shows the marks (`data-marks` on the root, kept in `localStorage` under `limen.picture.marks`).
+
+| Item | Class | Written by |
+|---|---|---|
+| Mast pins: Changed, Wrong, Needs Adam (also an empty pin) | Limen | `viewer.js` `renderMastHtml` |
+| Work count on a place (`.ct`, when not zero) and its legend entry | Limen | `viewer.js` `chip`, `template.html` |
+| Live strip and its states (served page only) | Limen | `live.js` strip |
+| Live job mark on a place: the accent ring on the dot, `◆` beside it | Limen | `live.js` `markAtlas`, `live.css` |
+| Live legend entries ("a job works here now", the quiet rule) | Limen | `live.js` |
+| A job entry for a job that names no feature | Limen | `live.js` `entryHtml` |
+| Work and Days tabs, and each Work or Days list section (Needs Adam group, tags, board state lines inside) | Limen | `viewer.js` `readHtml`, `sections` |
+| Work tab "Map features" group (dataset features without a ticket) | native map | `viewer.js` `sections` |
+| "Work that touches this place / module", "Work on these places" blocks | Limen | `viewer.js` `placeBody`, `moduleMid`, `journeyMid` |
+| Ticket and day layers (whole layer) | Limen | `layers.js` `layerElement` |
+| Work sections inside place, module and map feature layers ("Work that touches …", "Tickets") | Limen | `layers.js` `limenSection` |
+| Modules, places, connections, count badges between modules, journeys, partly described dots | native map | |
+| Places tab, Journeys tab, layers, trail, selection and lit states | native map | |
+| "Show all module connections" button | native map | |
+| Mixed text left unmarked: the light line ("touched by 29 work items"), a place row's "N work items", the build notes (map and ticket diagnostics) | unmarked | |

@@ -38,6 +38,12 @@
 			(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
 		);
 	const plural = (n, one, many) => `${n} ${n === 1 ? one : many || `${one}s`}`;
+	/* Limen marks: a part drawn from Limen work state (tickets, the board, job folders) carries `data-limen` and this ◆,
+	   which the page switch shows (`data-marks` on the root). The map dataset stays unmarked. */
+	const LM = '<i class="lm" aria-hidden="true">◆</i>';
+	const limenMark = (on) => (on ? { attr: " data-limen", glyph: LM } : { attr: "", glyph: "" });
+	const LIMEN_TABS = new Set(["work", "days"]);
+	const MARKS_KEY = "limen.picture.marks";
 
 	function ymd(iso) {
 		const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
@@ -536,8 +542,8 @@
 			D.pins
 				.map((p) =>
 					p.empty
-						? `<a class="pin ${p.kind} empty" href="#plant/work"><span class="lab">${esc(p.label)}</span><span class="txt">${esc(p.text)}</span></a>`
-						: `<a class="pin ${p.kind}" href="#work/${esc(p.work)}" data-layer="work/${esc(p.work)}" aria-current="${cur === p.work}" title="${esc(p.text)}"><span class="lab">${esc(p.label)} <small>· ${esc(p.date)}${p.more ? ` · ${p.more} more` : ""}${p.scope ? ` · ${esc(p.scope)}` : ""}</small></span><span class="txt">${esc(p.text)}</span></a>`,
+						? `<a class="pin ${p.kind} empty" href="#plant/work" data-limen><span class="lab">${LM}${esc(p.label)}</span><span class="txt">${esc(p.text)}</span></a>`
+						: `<a class="pin ${p.kind}" href="#work/${esc(p.work)}" data-layer="work/${esc(p.work)}" data-limen aria-current="${cur === p.work}" title="${esc(p.text)}"><span class="lab">${LM}${esc(p.label)} <small>· ${esc(p.date)}${p.more ? ` · ${p.more} more` : ""}${p.scope ? ` · ${esc(p.scope)}` : ""}</small></span><span class="txt">${esc(p.text)}</span></a>`,
 				)
 				.join("")
 		);
@@ -552,7 +558,7 @@
 		const inner = band
 			? `<span class="nm"><b>${esc(p.title)}</b><span>${esc(M[id].gloss)}</span></span>`
 			: `<span class="nm">${esc(p.title)}</span>`;
-		return `<a class="place" data-place="${esc(id)}" href="#place/${esc(id)}" title="${esc(label)}">${p.status === "partial" ? '<i class="pd" aria-label="only partly described"></i>' : ""}${inner}<span class="ct" aria-label="${plural(n, "work item")}">${n || ""}</span></a>`;
+		return `<a class="place" data-place="${esc(id)}" href="#place/${esc(id)}" title="${esc(label)}">${p.status === "partial" ? '<i class="pd" aria-label="only partly described"></i>' : ""}${inner}<span class="ct"${n ? " data-limen" : ""} aria-label="${plural(n, "work item")}">${n ? `${LM}${n}` : ""}</span></a>`;
 	}
 	function modCard(m, cls) {
 		return `<div class="mod ${cls}" data-mod="${esc(m.id)}"><div class="fhead"><div class="mod-head"><a href="#module/${esc(m.id)}" title="Open module">${esc(m.title)}</a></div><p>${esc(m.gloss)}</p></div><div class="places">${m.places.map((id) => chip(id)).join("")}</div></div>`;
@@ -1030,7 +1036,7 @@
     ${p.bodyHtml ? `<div class="blk md"><h4>How it works</h4>${p.bodyHtml}</div>` : ""}
     <div class="blk"><h4>In module</h4><div class="inl"><a href="#module/${esc(p.module)}">${esc(M[p.module].title)}</a></div></div>
     <div class="blk"><h4>Connections<small>${out.length} outgoing · ${inn.length} incoming</small></h4>${out.length + inn.length ? edgeRows([...out, ...inn], r) : '<p class="note">No connection in the map.</p>'}</div>
-    <div class="blk"><h4>Work that touches this place<small>${ws.length}</small></h4>${ws.length ? `<div class="inl">${ws.map((w) => `<a href="#work/${esc(w)}" data-key="go:${esc(w)}">${esc(W[w].code)} · ${esc(W[w].title)}</a>`).join("")}</div>` : '<p class="note">No work item names this place.</p>'}</div>
+    <div class="blk" data-limen><h4>${LM}Work that touches this place<small>${ws.length}</small></h4>${ws.length ? `<div class="inl">${ws.map((w) => `<a href="#work/${esc(w)}" data-key="go:${esc(w)}">${esc(W[w].code)} · ${esc(W[w].title)}</a>`).join("")}</div>` : '<p class="note">No work item names this place.</p>'}</div>
     <div class="blk"><h4>Journeys through this place<small>${js.length}</small></h4>${js.length ? `<div class="inl">${js.map((x) => `<a href="#journey/${esc(x.j)}/step/${x.i + 1}">${esc(J[x.j].title)} · step ${x.i + 1}</a>`).join("")}</div>` : '<p class="note">No journey passes here.</p>'}</div>
     <div class="blk"><h4>Cited files</h4><p class="note path">${p.sources.map(esc).join(" · ") || "None cited."}</p><p class="note">Map record: <span class="path">${esc(p.path)}</span></p></div>`;
 	}
@@ -1104,7 +1110,7 @@
 			.join("")}</ol>
     ${r.step ? stepDeep(j, r) : ""}</div>
     ${j.notes.length && !j.partial ? `<div class="blk"><h4>Limits</h4>${j.notes.map((n) => `<p>${esc(n)}</p>`).join("")}</div>` : ""}
-    <div class="blk"><h4>Work on these places<small>${ws.length}</small></h4>${ws.length ? `<div class="inl">${ws.map((w) => `<a href="#work/${esc(w)}" data-key="go:${esc(w)}">${esc(W[w].code)}</a>`).join("")}</div>` : '<p class="note">No work item names these places.</p>'}</div>
+    <div class="blk" data-limen><h4>${LM}Work on these places<small>${ws.length}</small></h4>${ws.length ? `<div class="inl">${ws.map((w) => `<a href="#work/${esc(w)}" data-key="go:${esc(w)}">${esc(W[w].code)}</a>`).join("")}</div>` : '<p class="note">No work item names these places.</p>'}</div>
     <div class="blk"><h4>Sources</h4><p class="note">Map record: <span class="path">${esc(j.path)}</span></p><p class="note path">${j.sources.map(esc).join(" · ")}</p></div></div>`;
 	}
 	function dayMid(d) {
@@ -1139,7 +1145,7 @@
 				)
 				.join("") || '<p class="note">No connection crosses this module.</p>'
 		}</div>
-    <div class="blk"><h4>Work that touches this module<small>${ws.length}</small></h4>${ws.length ? `<div class="inl">${ws.map((w) => `<a href="#work/${esc(w)}" data-key="go:${esc(w)}">${esc(W[w].code)} · ${esc(W[w].title)}</a>`).join("")}</div>` : '<p class="note">No work item names this module.</p>'}</div></div>`;
+    <div class="blk" data-limen><h4>${LM}Work that touches this module<small>${ws.length}</small></h4>${ws.length ? `<div class="inl">${ws.map((w) => `<a href="#work/${esc(w)}" data-key="go:${esc(w)}">${esc(W[w].code)} · ${esc(W[w].title)}</a>`).join("")}</div>` : '<p class="note">No work item names this module.</p>'}</div></div>`;
 	}
 	let query = "";
 	const match = (...s) => !query || s.join(" ").toLowerCase().includes(query);
@@ -1167,7 +1173,9 @@
 				if (!ws.length && (g !== "needs" || query)) {
 					return "";
 				}
-				return `<section class="sec"><div class="sec-h"><h2>${label}<small>${ws.length}</small></h2><span>${ws.length ? note : "Nothing waits for you."}</span></div>${ws
+				/* Map features come from the map dataset, not from a ticket. */
+				const mark = limenMark(g !== "map");
+				return `<section class="sec"${mark.attr}><div class="sec-h"><h2>${mark.glyph}${label}<small>${ws.length}</small></h2><span>${ws.length ? note : "Nothing waits for you."}</span></div>${ws
 					.map((w) => {
 						const open = workOf(r) === w.id;
 						const meta = [
@@ -1198,7 +1206,7 @@
 			const ds = D.days.filter(
 				(d) => match(d.title, d.purpose, ...d.items.map((i) => W[i.work].code)) || r.id === d.id,
 			);
-			return `<section class="sec"><div class="sec-h"><h2>Days<small>${ds.length}</small></h2><span>What changed, by date</span></div>${ds
+			return `<section class="sec" data-limen><div class="sec-h"><h2>${LM}Days<small>${ds.length}</small></h2><span>What changed, by date</span></div>${ds
 				.map((d) => {
 					const open = r.view === "day" && r.id === d.id;
 					const ps = [...new Set(d.items.flatMap((i) => W[i.work].lit))];
@@ -1334,7 +1342,7 @@
 						: "Open work for its reason. The plant lights the places it touches. Esc goes back one step.";
 		return (
 			crumbs(r) +
-			`<div class="tools"><nav class="tabs" aria-label="Lists">${TABS.map(([k, n, c]) => `<a href="#plant/${k}" aria-current="${k === t ? "page" : "false"}">${n}<small>${c}</small></a>`).join("")}</nav><input class="filter" id="filter" type="search" placeholder="Filter (press /)" value="${esc(query)}" aria-label="Filter this list"></div>` +
+			`<div class="tools"><nav class="tabs" aria-label="Lists">${TABS.map(([k, n, c]) => `<a href="#plant/${k}" aria-current="${k === t ? "page" : "false"}"${limenMark(LIMEN_TABS.has(k)).attr}>${limenMark(LIMEN_TABS.has(k)).glyph}${n}<small>${c}</small></a>`).join("")}</nav><input class="filter" id="filter" type="search" placeholder="Filter (press /)" value="${esc(query)}" aria-label="Filter this list"></div>` +
 			(r.view === "plant" ? `<p class="hint">${hint}</p>` : "") +
 			(sections(r) || '<p class="empty">Nothing matches this filter.</p>') +
 			`<p class="foot">Built by limen picture build from the plant map of ${esc(D.plant.date)}. Work, pins, and days come from the tickets and the board.</p>` +
@@ -1428,6 +1436,28 @@
 			drawWires();
 		});
 	}
+	/* The switch is one attribute on the root, remembered in localStorage; a page without storage still switches. */
+	function initMarks() {
+		const button = document.getElementById("limenMarks");
+		const set = (on) => {
+			document.documentElement.toggleAttribute("data-marks", on);
+			button.setAttribute("aria-pressed", String(on));
+		};
+		try {
+			set(localStorage.getItem(MARKS_KEY) === "on");
+		} catch {
+			set(false);
+		}
+		button.addEventListener("click", () => {
+			const on = button.getAttribute("aria-pressed") !== "true";
+			set(on);
+			try {
+				localStorage.setItem(MARKS_KEY, on ? "on" : "off");
+			} catch {
+				// The choice then lasts until the page closes.
+			}
+		});
+	}
 	function focusWire(target) {
 		for (const x of document.querySelectorAll("#over .wire.hot")) {
 			x.classList.remove("hot");
@@ -1447,6 +1477,7 @@
 		stage = document.getElementById("stage");
 		buildAtlas();
 		initWireOverview();
+		initMarks();
 		document.addEventListener("focusin", (e) => focusWire(e.target));
 		document.addEventListener("focusout", (e) => focusWire(e.relatedTarget));
 		document.addEventListener(

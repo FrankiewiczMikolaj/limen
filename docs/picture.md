@@ -46,6 +46,14 @@ The strict check exits 1 for ticket errors. It warns, but does not guess a link,
 
 Remove a Needs Adam request and its date after Adam answers. Remove a Wrong problem and its date after the fix. The pin then leaves the page.
 
+## See what Limen added
+
+**◆ Limen marks**, under the map facts, marks each part of the page that comes from Limen work state: tickets, the board (`spec/build.md`) and job folders (`.limen/jobs/`). Each such part gets a fuchsia outline and `◆`. Parts without a mark are the native map: modules, places, connections, journeys, and the features of the map dataset (`nodes/`, `edges/`, `features/`, `journeys/`). A legend line names both. The page remembers the switch in the browser (`localStorage`), for the built file and for `limen picture serve`, so a reload keeps it. It is off at first.
+
+Marked parts: the Changed, Wrong and Needs Adam pins, the work count on each place, the Work and Days tabs and their lists (the Map features group stays unmarked), the work blocks in a place, module or journey, ticket and day layers, the work sections in other layers, and on the served page the live strip, the job marks on places, and their legend entries.
+
+The same `◆` and the same accent mark Limen's text in Herdr: see [See what Limen added](herdr-status.md#see-what-limen-added). The two switches are separate: `limen highlight` changes Herdr, and this button changes the page.
+
 ## Live job activity
 
 `limen picture serve` serves the same page on `http://127.0.0.1:4747/` (`--port` picks another port; `--dir` another dataset). It reads the job folders in `.limen/jobs/` of the repository that holds the map once a second, whatever folder it runs from, and pushes changes to the open page over Server-Sent Events. It never changes a job, and it listens only on 127.0.0.1. Ctrl-C stops it. A reload rebuilds the page from the current tickets and board.

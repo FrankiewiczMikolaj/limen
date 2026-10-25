@@ -25,6 +25,8 @@
 			(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
 		);
 	const enc = (id) => encodeURIComponent(id).replace(/~/g, "%7E");
+	/* The Limen mark (viewer.js): a ticket or a day layer is Limen's whole; elsewhere only the work it lists. */
+	const LM = '<i class="lm" aria-hidden="true">◆</i>';
 	const same = (a, b) => a.kind === b.kind && a.id === b.id;
 	const keyOf = (layer) => `${layer.kind}/${layer.id}`;
 	const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
@@ -171,6 +173,8 @@
 		return w ? link("work", id, workName(w)) : `<span>${esc(id)}</span>`;
 	};
 	const section = (title, body) => (body ? `<section class="layer-part"><h3>${esc(title)}</h3>${body}</section>` : "");
+	const limenSection = (title, body) =>
+		body ? `<section class="layer-part" data-limen><h3>${LM}${esc(title)}</h3>${body}</section>` : "";
 	const list = (items) =>
 		items.length ? `<ul class="layer-list">${items.map((item) => `<li>${item}</li>`).join("")}</ul>` : "";
 	const meta = (text) => (text ? ` <small>${esc(text)}</small>` : "");
@@ -250,7 +254,7 @@
 			html:
 				(f.summary ? `<p class="layer-lead">${esc(f.summary)}</p>` : "") +
 				section("Places it touches", list((f.touches ?? []).map((id) => nodeLink(id)))) +
-				section("Tickets", list(work)),
+				limenSection("Tickets", list(work)),
 		};
 	}
 	function renderPlace(n) {
@@ -272,7 +276,7 @@
 			html:
 				(n.summary ? `<p class="layer-lead">${esc(n.summary)}</p>` : "") +
 				(n.parent ? facts([["Module", nodeLink(n.parent)]]) : "") +
-				section("Work that touches this place", list(touching([n.id]).map((w) => workLink(w.id)))) +
+				limenSection("Work that touches this place", list(touching([n.id]).map((w) => workLink(w.id)))) +
 				section("Map features", list(featuresTouching([n.id]).map((f) => workLink(f.id)))) +
 				section("Connections", list(lines)) +
 				section("Journeys", list(journeys)),
@@ -289,7 +293,7 @@
 					"Places",
 					list((n.children ?? []).map((id) => `${nodeLink(id)}${meta(index.nodes.get(id)?.summary ?? "")}`)),
 				) +
-				section("Work that touches this module", list(touching(ids).map((w) => workLink(w.id)))),
+				limenSection("Work that touches this module", list(touching(ids).map((w) => workLink(w.id)))),
 		};
 	}
 	function renderDay(d) {
@@ -371,11 +375,15 @@
 				: "";
 		const el = document.createElement("section");
 		el.className = "layer";
+		const limen = layer.kind === "day" || (layer.kind === "work" && index.work.has(layer.id));
+		if (limen) {
+			el.dataset.limen = "";
+		}
 		el.dataset.key = keyOf(layer);
 		el.setAttribute("role", "dialog");
 		el.setAttribute("aria-modal", "true");
 		el.setAttribute("aria-labelledby", `layer-title-${depth}`);
-		el.innerHTML = `<header class="layer-head"><div class="layer-titles"><p class="layer-eyebrow">${esc(view.eyebrow)}</p><h2 id="layer-title-${depth}" tabindex="-1">${esc(view.title)}</h2></div><div class="layer-tools">${steps}<button type="button" class="layer-close" data-layer-close title="Close this layer (Esc)">Close</button></div></header><div class="layer-body">${view.html}</div>`;
+		el.innerHTML = `<header class="layer-head"><div class="layer-titles"><p class="layer-eyebrow">${limen ? LM : ""}${esc(view.eyebrow)}</p><h2 id="layer-title-${depth}" tabindex="-1">${esc(view.title)}</h2></div><div class="layer-tools">${steps}<button type="button" class="layer-close" data-layer-close title="Close this layer (Esc)">Close</button></div></header><div class="layer-body">${view.html}</div>`;
 		return el;
 	}
 	function paint(why) {

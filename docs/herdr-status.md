@@ -142,8 +142,8 @@ sidebar, you can add a style rule like this to `~/.config/herdr/config.toml`:
 rows = [
   ["state_icon", "machine", "workspace", "tab"],
   [
-    { token = "agent", rules = [{ starts_with = "◆", fg = "#f5a524" }] },
-    { token = "state_text", rules = [{ contains = "◆", fg = "#f5a524" }] },
+    { token = "agent", rules = [{ starts_with = "◆", fg = "#c026d3" }] },
+    { token = "state_text", rules = [{ contains = "◆", fg = "#c026d3" }] },
   ],
 ]
 ```
@@ -151,6 +151,8 @@ rows = [
 These rows replace Herdr's default Agent rows (the first row is Herdr 0.9.5's
 default), so start from your own rows if you changed them. `state_text` shows a
 reported state label. A rule cannot color the tab strip or the pane border.
+The picture page has its own switch with the same mark and accent; see
+[Picture](picture.md#see-what-limen-added).
 
 ## Activity is evidence, not a human blocker
 

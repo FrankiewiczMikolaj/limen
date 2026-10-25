@@ -252,6 +252,16 @@ a.live-what:hover {
 	top: var(--sp-2);
 	right: var(--sp-2);
 }
+/* A dot is too small to hold the Limen mark; the mark sits to its right, outside the card. */
+:root[data-marks] .live-pin::before {
+	content: "◆";
+	position: absolute;
+	left: 14px;
+	top: -1px;
+	font-size: 11px;
+	line-height: 1;
+	color: var(--limen);
+}
 .live-pin.s-working {
 	animation: live-pulse 2.4s ease-in-out infinite;
 }

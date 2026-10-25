@@ -23,6 +23,8 @@
 			(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
 		);
 	const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+	/* Everything this layer draws comes from job folders: each part carries the Limen mark (viewer.js). */
+	const LM = '<i class="lm" aria-hidden="true">◆</i>';
 
 	/* Work as the reading column names it: tickets by id, and map features no ticket links, by their code. */
 	const model = JSON.parse(data.textContent);
@@ -244,6 +246,7 @@
 	/* Strip: under the atlas light line, above the map. */
 	const strip = document.createElement("section");
 	strip.className = "live";
+	strip.dataset.limen = "";
 	strip.setAttribute("aria-label", "Jobs running now");
 	document.getElementById("lightline").after(strip);
 	/* Only a served page can carry place marks and the quiet rule, so only it names them in the legend. */
@@ -251,8 +254,8 @@
 		.querySelector(".legend")
 		?.insertAdjacentHTML(
 			"beforeend",
-			'<span><i class="k-live" aria-hidden="true"></i>a job works here now</span>' +
-				"<span>quiet: no event for 5 min, or 15 min during a test or check</span>",
+			`<span data-limen>${LM}<i class="k-live" aria-hidden="true"></i>a job works here now</span>` +
+				`<span data-limen>${LM}quiet: no event for 5 min, or 15 min during a test or check</span>`,
 		);
 
 	/* Finished work folds into one line, so running work keeps the room; the line opens to show each one. */
@@ -283,7 +286,7 @@
 		const on = all.filter((u) => u.live);
 		strip.classList.toggle("stale", stale);
 		strip.innerHTML =
-			`<div class="live-head"><span class="live-feed is-${feed}" role="status"><i aria-hidden="true"></i>${word}</span>${sum}${lost}</div>` +
+			`<div class="live-head">${LM}<span class="live-feed is-${feed}" role="status"><i aria-hidden="true"></i>${word}</span>${sum}${lost}</div>` +
 			(on.length ? `<ul class="live-list">${on.map((u) => u.html).join("")}</ul>` : "") +
 			endedHtml(all.filter((u) => !u.live));
 	}
@@ -325,7 +328,7 @@
 		for (const [el, list] of at) {
 			el.insertAdjacentHTML(
 				"beforeend",
-				`<i class="live-pin s-${best(list)}${stale ? " stale" : ""}" data-jobs="${idsOf(list)}" aria-label="${esc(plural(list.length, "job"))} here now"></i>`,
+				`<i class="live-pin s-${best(list)}${stale ? " stale" : ""}" data-jobs="${idsOf(list)}" data-limen aria-label="${esc(plural(list.length, "job"))} here now"></i>`,
 			);
 		}
 	}
@@ -357,8 +360,8 @@
 	}
 	function entryHtml(j) {
 		const href = esc(baseOf(location.hash));
-		const row = `<a class="row" data-key="job:${esc(j.id)}" data-live-close href="${href}" aria-expanded="true" title="Close the job"><span class="kind">Job</span><span><span class="t">${esc(j.label || j.id)}</span><span class="pp">${STATE[j.state]?.word || esc(j.state)} · ${engineOf(j)}</span><span class="meta">This job names no feature, so the panel shows it here.</span></span><span class="ch" aria-hidden="true">−</span></a>`;
-		return `<div class="entry open live-entry">${row}<div class="mid">${cardHtml(j)}</div></div>`;
+		const row = `<a class="row" data-key="job:${esc(j.id)}" data-live-close href="${href}" aria-expanded="true" title="Close the job"><span class="kind">${LM}Job</span><span><span class="t">${esc(j.label || j.id)}</span><span class="pp">${STATE[j.state]?.word || esc(j.state)} · ${engineOf(j)}</span><span class="meta">This job names no feature, so the panel shows it here.</span></span><span class="ch" aria-hidden="true">−</span></a>`;
+		return `<div class="entry open live-entry" data-limen>${row}<div class="mid">${cardHtml(j)}</div></div>`;
 	}
 
 	/* Reading column: a mark on each work row with a live job, and the jobs at the top of an opened work. */

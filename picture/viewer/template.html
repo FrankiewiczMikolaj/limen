@@ -16,7 +16,10 @@
         <h1><a href="#plant" id="plantLink">Plant</a></h1>
         <p class="gloss" id="plantGloss"></p>
       </div>
-      <div class="facts" id="facts"></div>
+      <div class="atlas-side">
+        <div class="facts" id="facts"></div>
+        <button type="button" id="limenMarks" aria-pressed="false" title="Mark what comes from Limen work state">◆ Limen marks</button>
+      </div>
     </div>
     <div class="lightline" id="lightline" role="status"></div>
     <button type="button" id="wireOverview" aria-pressed="false">Show all module connections</button>
@@ -34,7 +37,8 @@
       <span><i class="k-lit"></i>lit: touched by the selection</span>
       <span><i class="k-focus"></i>place you opened</span>
       <span><i class="k-pd"></i>partly described</span>
-      <span><i class="k-n">3</i>work items on the place</span>
+      <span data-limen><i class="lm" aria-hidden="true">◆</i><i class="k-n">3</i>work items on the place</span>
+      <span class="limen-key"><b>◆ Limen:</b> from tickets, the board and jobs. No mark: the native map.</span>
     </div>
   </section>
   <section class="read" id="read" aria-label="Work, journeys, days, and places"></section>
