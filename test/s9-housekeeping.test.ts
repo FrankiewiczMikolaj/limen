@@ -36,12 +36,8 @@ function start(args: readonly string[], options: { cwd?: string; env?: Record<st
 		env: { ...p.env, ...options.env },
 	});
 	let output = "";
-	child.stdout?.on("data", (chunk) => {
-		output += chunk;
-	});
-	child.stderr?.on("data", (chunk) => {
-		output += chunk;
-	});
+	child.stdout?.on("data", (chunk) => (output += chunk));
+	child.stderr?.on("data", (chunk) => (output += chunk));
 	const done = new Promise<{ status: number; output: string }>((resolve) =>
 		child.on("close", (status) => resolve({ status: status ?? 1, output })),
 	);

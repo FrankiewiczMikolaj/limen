@@ -232,19 +232,20 @@ test("a rule set, change, end and end time ping each live coordinator pane once 
 	const heard = (rule: string, ...words: string[]) => words.map((word) => panes(rule, word).sort());
 	const rule = (...args: string[]) => limen(p, ["rule", ...args], { env }).stdout;
 	assert.match(rule("set", "week", "--until", "1h", "Hold reviews"), /^rule week set/);
-	assert.match(rule("set", "week", "--until", "3s", "--start-priority", "1", "Priority 1 only"), /^rule week changed/);
-	const board = limen(p, ["board"], { env }).stdout;
-	assert.match(board, /^## RULES .*\n- week until .*, start priority 1: Priority 1 only\n/);
-	await until(herdr, () => panes("week", " ended ").length >= 3);
+	assert.match(rule("set", "week", "--until", "1h", "--start-priority", "1", "Priority 1 only"), /^rule week changed/);
+	const board = limen(p, ["board"], { env }).stdout + rule("end", "week", "done"); // an hour before its end time
+	assert.match(board, /^## RULES .*\n- week until .*, start priority 1: Priority 1 only\n[\s\S]*\nrule week ended\n/);
 	const [set = "", , , change = ""] = said("week").map((args) => args[3] ?? ""); // three set pings, then the change
 	assert.match(set, /^Limen rule week for every coordinator, until \w+ \d+ \w+, \d\d:\d\d .*Hold reviews\. .*build/);
 	assert.match(change, /changed; it now holds until .*Priority 1 only\. Start priority: 1\./);
 	// The pane that runs a command is a live coordinator pane too, so it hears each set, change and end.
 	const live = [COORDINATOR, "w1:p1", "w1:p2"];
-	assert.deepEqual(heard("week", "coordinator, until", "changed", " ended "), [live, live, live]);
+	assert.deepEqual(heard("week", "coordinator, until", "changed", "(by limen rule end: done)"), [live, live, live]);
+	rule("set", "now", "--until", "1h", "Now");
+	assert.match(rule("set", "now", "--until", "2s", "Soon"), /^rule now changed/); // then only its timer can end it
+	await until(herdr, () => panes("now", " ended ").length >= 3);
+	assert.deepEqual(heard("now", "coordinator, until", "changed", "(its end time passed)"), [live, live, live]);
 	assert.deepEqual([rule(), limen(p, ["board"], { env }).stdout.includes("RULES")], ["no active rules\n", false]);
-	assert.match(rule("set", "now", "--until", "1h", "Now") + rule("end", "now", "done"), /\nrule now ended\n/);
-	assert.deepEqual(heard("now", "coordinator, until", "(by limen rule end: done)"), [live, live]);
 	// A rule whose timer died ends on the next command, once, though two commands race to end it.
 	rule("set", "late", "--until", "1h", "Late");
 	spawnSync("pkill", ["-f", join(p.parent, ".limen/rules/late")]);

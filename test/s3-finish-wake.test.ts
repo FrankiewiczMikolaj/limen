@@ -106,6 +106,7 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	assert.match(failed, /produced nothing/);
 	assert.doesNotMatch(done, /produced nothing/);
 	assert.ok(done.includes(`Final message:\n${handoff.replaceAll("\\n", "\n")}\n\n`));
+	assert.equal(jobFile(p, ids.provider, "result"), FINAL.text); // stdout cut it inside letters of 2, 3 and 4 bytes
 	assert.ok(provider.includes(`Final message:\n${FINAL.text}\n\n`));
 	// Its open note checks reach the wake, one line each, and it is not a plain done; `npm test` never ran.
 	assert.match(done, /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /);

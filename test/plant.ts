@@ -22,7 +22,7 @@ export type Run = { readonly stdout: string; readonly stderr: string; readonly s
 export type RunOptions = { readonly cwd?: string; readonly env?: Readonly<Record<string, string>> };
 
 export const TICKET = "spec/features/active/F001-demo/ticket.md";
-const report = `${"Done: one report line, long enough to count.\n".repeat(200)}Note check: not proven yet: none`;
+const report = `Done: ż € 🦀 stay whole.\n${"Done: one report line, long enough to count.\n".repeat(200)}Note check: not proven yet: none`;
 export const FINAL = { text: report, line: report.replaceAll("\n", "\\n") };
 const ticket = `---
 touches:

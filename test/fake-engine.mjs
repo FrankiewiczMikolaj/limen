@@ -87,12 +87,15 @@ async function turn(messages, reply, stopReason) {
 	await fire("turn_start", {});
 	// Pi hands the hooks the turn's messages in a context event before each model call.
 	await fire("context", { messages });
-	const assistant = {
-		role: "assistant",
-		content: [{ type: "text", text: reply }],
-		...(stopReason ? { stopReason } : {}),
-	};
-	emit({ type: "message_end", message: assistant });
+	const assistant = { role: "assistant", content: [{ type: "text", text: reply }], ...(stopReason && { stopReason }) };
+	// A pipe can cut a line anywhere: cut it inside its first letter of two, three and four bytes; let each piece be read.
+	const line = Buffer.from(`${JSON.stringify({ type: "message_end", message: assistant })}\n`);
+	const cuts = [0b110, 0b1110, 0b11110].map((lead, n) => line.findIndex((byte) => byte >> (5 - n) === lead) + 1);
+	let start = 0;
+	for (const end of [...cuts.filter((cut) => cut > 0).sort((a, b) => a - b), line.length]) {
+		await new Promise((resolve) => process.stdout.write(line.subarray(start, end), () => setTimeout(resolve, 20)));
+		start = end;
+	}
 	await fire("message_end", { message: assistant });
 	await fire("turn_end", {});
 	idle = true;

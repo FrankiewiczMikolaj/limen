@@ -80,9 +80,7 @@ function run(
 		stdout += chunk;
 		output += chunk;
 	});
-	child.stderr.on("data", (chunk) => {
-		output += chunk;
-	});
+	child.stderr.on("data", (chunk) => (output += chunk));
 	child.on("close", (status) => resolve({ status: status ?? 1, id: stdout.trim().split("\n").at(-1) ?? "", output }));
 	return promise;
 }
