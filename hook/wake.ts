@@ -21,12 +21,14 @@ import {
 	claimMarker,
 	claimSlots,
 	completionSlots,
+	completionStopped,
 	confirmClaim,
 	type DeliveryCallbacks,
 	deliveredSlots,
 	deliveryExists,
-	deliverySettled,
+	deliveryLeft,
 	enrollLegacyRunning,
+	fallbackDueAt,
 	oldEnoughForFallback,
 	receiptFamily,
 	recordUnconfirmed,
@@ -83,6 +85,9 @@ type PiApi = {
 };
 
 const CACHE_REFRESH_MS = 30_000;
+const SWEEP_MS = 500;
+// Each timer tick re-checks this share of settled records, so one refresh cycle takes CACHE_REFRESH_MS without a pause.
+const REFRESH_TICKS = CACHE_REFRESH_MS / SWEEP_MS;
 // Herdr drops pane metadata after its TTL; an unchanged label is re-sent well before then.
 const METADATA_TTL_MS = 180_000;
 const METADATA_REFRESH_MS = 60_000;
@@ -129,7 +134,14 @@ export default function limenWake(pi: PiApi): void {
 		| { readonly key: string; readonly until: number; readonly jobs: readonly FinishedJob[] }
 		| undefined;
 	const firstDead = new Map<string, number>();
+	// Records with nothing left to deliver here, oldest first. A watch event, a fallback due time, or the refresh reopens one.
 	const settled = new Set<string>();
+	const fallbackDue = new Map<string, number>();
+	// Fallbacks settled only because this session owns no job; a new subscription anywhere reopens them.
+	const unowned = new Set<string>();
+	let refreshTicks = 0;
+	// The sorted jobs listing. An event naming a record it lacks, a top-level event, or the cache timer reads it again.
+	let listing: { readonly ids: readonly string[]; readonly known: ReadonlySet<string> } | undefined;
 	// Jobs that had left the start queue before this session began; their start is old news here.
 	const startedEarlier = new Set<string>();
 	let ownsJobs: boolean | undefined;
@@ -286,6 +298,61 @@ export default function limenWake(pi: PiApi): void {
 		}
 		return ownsJobs;
 	};
+	const reopen = (id: string) => {
+		settled.delete(id);
+		fallbackDue.delete(id);
+		unowned.delete(id);
+	};
+	const reopenAll = () => {
+		settled.clear();
+		fallbackDue.clear();
+		unowned.clear();
+	};
+	const settle = (jobs: string, id: string, left: ReturnType<typeof deliveryLeft>) => {
+		const job = join(jobs, id);
+		if (left === "open") {
+			return;
+		}
+		if (left === "fallback" && !sessionOwns(jobs)) {
+			unowned.add(id);
+		} else if (left === "fallback") {
+			// A due fallback stays open while the session is busy or muted; one inside its grace waits for its due time.
+			const due = fallbackDueAt(job);
+			if (due <= Date.now()) {
+				return;
+			}
+			fallbackDue.set(id, due);
+		}
+		settled.add(id);
+	};
+	// The oldest share of settled records is checked again; one that still owes nothing moves to the back unobserved.
+	const refreshSettled = (jobs: string) => {
+		const now = Date.now();
+		for (const [id, due] of fallbackDue) {
+			if (due <= now) {
+				reopen(id);
+			}
+		}
+		let share = Math.min(settled.size, refreshTicks * Math.ceil(settled.size / REFRESH_TICKS));
+		refreshTicks = 0;
+		for (const id of settled) {
+			if (share <= 0) {
+				break;
+			}
+			share -= 1;
+			reopen(id);
+			if (deliveryLeft(join(jobs, id), sessionId) === "nothing") {
+				settled.add(id);
+			}
+		}
+	};
+	const jobIds = (jobs: string) => {
+		if (!listing || !watcher) {
+			const ids = readdirSync(jobs).sort();
+			listing = { ids, known: new Set(ids) };
+		}
+		return listing.ids;
+	};
 	// Limen owns the tab tail; the coordinator owns the stem. Rewriting only on a tail change keeps this to a spawn, a completion, a land, or an owner turn.
 	const updateTabTail = (jobs: string, running: readonly string[], finished: readonly FinishedJob[]) => {
 		const tab = process.env.HERDR_TAB_ID?.trim();
@@ -413,6 +480,10 @@ export default function limenWake(pi: PiApi): void {
 			fallback &&
 			(completionSlots(deliveredSlots(job)).length > 0 || session.isIdle() !== true || muted || !sessionOwns(jobs))
 		) {
+			return false;
+		}
+		// A stopped delivery sends nothing, so it never builds the wake text.
+		if (completionStopped(job)) {
 			return false;
 		}
 		const blocked = () => {
@@ -710,13 +781,14 @@ export default function limenWake(pi: PiApi): void {
 		refreshPendingClaims();
 		stampSweep();
 		try {
-			// Watch events invalidate individual records; a bounded refresh recovers missed events and manual wake repair.
+			// Watch events invalidate individual records; a rolling refresh recovers missed events and manual wake repair.
 			if (Date.now() >= cacheExpiresAt) {
-				settled.clear();
 				ownsJobs = undefined;
+				listing = undefined;
 				cacheExpiresAt = Date.now() + CACHE_REFRESH_MS;
 			}
-			const { observe: ids, running } = collectSweep(jobs, settled);
+			refreshSettled(jobs);
+			const { observe: ids, running } = collectSweep(jobs, jobIds(jobs), settled);
 			if (initialSweep) {
 				initialSweep = false;
 				for (const id of running) {
@@ -734,10 +806,13 @@ export default function limenWake(pi: PiApi): void {
 				if (stateOf(jobs, id) === "running" && !routable(job)) {
 					enrollLegacyRunning(job);
 				}
-				observe(jobs, id);
-				if (deliverySettled(job, sessionId)) {
+				if (deliveryLeft(job, sessionId) === "nothing") {
 					settled.add(id);
+					continue;
 				}
+				observe(jobs, id);
+				// Observing can claim or deliver, so the verdict is read again.
+				settle(jobs, id, deliveryLeft(job, sessionId));
 			}
 			await updateStatus(
 				jobs,
@@ -762,6 +837,32 @@ export default function limenWake(pi: PiApi): void {
 			sweep();
 		}, 50);
 		changeTimer.unref();
+	};
+	const jobsChanged = (filename: string | null) => {
+		if (progressFilename(filename)) {
+			return;
+		}
+		const path = filename?.replaceAll("\\", "/") ?? "";
+		const id = path.split("/")[0];
+		if (!filename) {
+			reopenAll();
+		} else if (id) {
+			reopen(id);
+		}
+		if (!(id && path.includes("/") && listing?.known.has(id))) {
+			listing = undefined;
+		}
+		// Claims do not schedule sweeps, but deleting a delivered slot must reopen a cached job on the next timer tick.
+		if (notifyBookkeeping(filename)) {
+			return;
+		}
+		if (!filename || !path.includes("/") || /^[^/]+\/notify(?:\/subscribers(?:\/|$)|$)/.test(path)) {
+			ownsJobs = undefined;
+			for (const unownedId of unowned) {
+				reopen(unownedId);
+			}
+		}
+		scheduleSweep();
 	};
 	pi.on("session_start", (_event, context) => {
 		if (process.env.LIMEN_JOB === "1" || process.env.LIMEN_WAKE === "0") {
@@ -800,7 +901,9 @@ export default function limenWake(pi: PiApi): void {
 		pendingDeliveries.clear();
 		activeDeliveries.clear();
 		firstDead.clear();
-		settled.clear();
+		reopenAll();
+		refreshTicks = 0;
+		listing = undefined;
 		startedEarlier.clear();
 		ownsJobs = undefined;
 		cacheExpiresAt = 0;
@@ -823,35 +926,19 @@ export default function limenWake(pi: PiApi): void {
 				startedEarlier.add(jobId);
 			}
 		}
-		watcher = watch(jobs, { recursive: true }, (_event, filename) => {
-			if (progressFilename(filename)) {
-				return;
-			}
-			const path = filename?.replaceAll("\\", "/") ?? "";
-			if (!filename) {
-				settled.clear();
-			} else {
-				const id = path.split("/")[0];
-				if (id) {
-					settled.delete(id);
-				}
-			}
-			// Claims do not schedule sweeps, but deleting a delivered slot must reopen a cached job on the next timer tick.
-			if (notifyBookkeeping(filename)) {
-				return;
-			}
-			if (!filename || !path.includes("/") || /^[^/]+\/notify(?:\/subscribers(?:\/|$)|$)/.test(path)) {
-				ownsJobs = undefined;
-			}
-			scheduleSweep();
-		});
+		watcher = watch(jobs, { recursive: true }, (_event, filename) => jobsChanged(filename));
 		watcher.unref();
 		watcher.on("error", () => {
 			watcher?.close();
+			// Without events the listing is read on every sweep again.
+			watcher = undefined;
 			cacheExpiresAt = 0;
 			clearStatus();
 		});
-		sweepTimer = setInterval(sweep, 500);
+		sweepTimer = setInterval(() => {
+			refreshTicks += 1;
+			sweep();
+		}, SWEEP_MS);
 		sweepTimer.unref();
 		sweep();
 	});
@@ -964,11 +1051,12 @@ export default function limenWake(pi: PiApi): void {
 
 function collectSweep(
 	jobs: string,
+	ids: readonly string[],
 	settled: ReadonlySet<string>,
 ): { readonly observe: string[]; readonly running: string[] } {
 	const observe: string[] = [];
 	const running: string[] = [];
-	for (const id of readdirSync(jobs).sort()) {
+	for (const id of ids) {
 		if (settled.has(id)) {
 			continue;
 		}
