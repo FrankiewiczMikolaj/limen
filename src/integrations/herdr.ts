@@ -1,9 +1,10 @@
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { execFile, spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { closedFeatures, closedJobFeatures } from "../job/job.ts";
+import { seatDir } from "../project/seat.ts";
 import { ENGINES, type EngineId, engineProfile } from "../runtime/engine.ts";
 
 export type HerdrPlace = {
@@ -13,6 +14,44 @@ export type HerdrPlace = {
 	readonly mode: "watch" | "log" | "hosted" | "diff";
 };
 export type HostedAgentStatus = "idle" | "working" | "blocked" | "done" | "unknown" | "missing";
+
+/** `limen highlight on` puts this mark in front of every string Limen writes into Herdr; unmarked text is native. */
+const LIMEN_MARK = "◆";
+export const HIGHLIGHT_LEGEND = `${LIMEN_MARK} Limen: text Limen wrote into Herdr. No mark: native Herdr or Pi.`;
+const highlightFile = () => join(seatDir(), "highlight");
+/** The seat-wide reading aid. It is off until `limen highlight on` saves it in the seat folder. */
+export function highlightOn(): boolean {
+	const file = highlightFile();
+	try {
+		// A coordinator asks every sweep; the switch is usually off, so the absent file costs no thrown error.
+		return existsSync(file) && readFileSync(file, "utf8").trim() === "on";
+	} catch {
+		return false;
+	}
+}
+export function saveHighlight(on: boolean): void {
+	if (on) {
+		mkdirSync(seatDir(), { recursive: true });
+		writeFileSync(highlightFile(), "on\n");
+	} else {
+		rmSync(highlightFile(), { force: true });
+	}
+}
+/** A string Limen writes into Herdr: unchanged while the switch is off, behind the mark while it is on. */
+export function limenText(text: string, on = highlightOn()): string {
+	return on && text ? `${LIMEN_MARK} ${text}` : text;
+}
+/** A Limen state label takes the place of Herdr's own state word, so the marked label keeps that word in front. */
+export function limenStateLabel(state: string, text: string, on = highlightOn()): string {
+	return `${state}=${on ? `${state} ${LIMEN_MARK} ${text}` : text}`;
+}
+/**
+ * A label Limen wrote, without the mark in front, for a lookup that compares it. The coordinator tab carries the mark
+ * inside, after its stem; `TAB_TAIL` in `hook/wake.ts` reads that tail with or without it.
+ */
+function unmarked(label: string): string {
+	return label.startsWith(`${LIMEN_MARK} `) ? label.slice(LIMEN_MARK.length + 1) : label;
+}
 
 export function herdrAvailable(): boolean {
 	return process.env.HERDR_ENV === "1" && Boolean(herdrBinary());
@@ -389,6 +428,7 @@ export function reportHostedStall(input: {
 		return;
 	}
 	const stalled = `⚠ stalled ${input.duration}`;
+	const on = highlightOn();
 	if (input.pane) {
 		advisoryCall(herdr, [
 			"pane",
@@ -397,20 +437,15 @@ export function reportHostedStall(input: {
 			"--source",
 			"limen",
 			"--display-agent",
-			stalled,
-			"--state-label",
-			`idle=${stalled}`,
-			"--state-label",
-			`done=${stalled}`,
-			"--state-label",
-			`blocked=${stalled}`,
+			limenText(stalled, on),
+			...["idle", "done", "blocked"].flatMap((state) => ["--state-label", limenStateLabel(state, stalled, on)]),
 		]);
 	}
 	if (input.notify) {
 		advisoryCall(herdr, [
 			"notification",
 			"show",
-			`limen: ${input.label} stalled`,
+			limenText(`limen: ${input.label} stalled`, on),
 			"--body",
 			stalled,
 			"--sound",
@@ -432,7 +467,7 @@ export function restoreHostedPane(pane: string, role: string): void {
 		"--source",
 		"limen",
 		"--display-agent",
-		`limen ${role}`,
+		limenText(`limen ${role}`),
 		"--clear-state-labels",
 	]);
 }
@@ -485,7 +520,78 @@ export async function closeJobTab(herdr: string, jobDir: string, tab: string): P
 	await note(`failed after one retry (${refusal})`);
 	// The tab stays open; its label must stop saying running.
 	const [label, state] = await Promise.all([text(`${jobDir}/label`), text(`${jobDir}/state`)]);
-	advisoryCall(herdr, ["tab", "rename", tab, `${label || basename(jobDir)} · ${state || "finished"}`]);
+	advisoryCall(herdr, ["tab", "rename", tab, limenText(`${label || basename(jobDir)} · ${state || "finished"}`)]);
+}
+
+/**
+ * Open job tabs follow the switch. A tab a job record names is renamed only while its label is one Limen wrote for
+ * that job (`<label> · …`), so a tab ID that Herdr gave to another tab later keeps its name. Returns the count.
+ */
+export async function followHighlight(roots: readonly string[], on = highlightOn()): Promise<number> {
+	const herdr = herdrBinary();
+	if (!herdr) {
+		return 0;
+	}
+	const listed = asRecord(call(herdr, ["tab", "list"], 5_000)).tabs;
+	const open = new Map<string, string>();
+	for (const row of Array.isArray(listed) ? listed.map(asRecord) : []) {
+		if (typeof row.tab_id === "string" && typeof row.label === "string") {
+			open.set(row.tab_id, row.label);
+		}
+	}
+	let renamed = 0;
+	for (const { tab, label } of await jobTabs(roots, open)) {
+		const current = unmarked(open.get(tab) ?? "");
+		const next = limenText(current, on);
+		if (current.startsWith(`${label} · `) && next !== open.get(tab)) {
+			advisoryCall(herdr, ["tab", "rename", tab, next]);
+			renamed += 1;
+		}
+	}
+	return renamed;
+}
+/** Each open tab that a job record of these roots names, with that job's label. */
+async function jobTabs(
+	roots: readonly string[],
+	open: ReadonlyMap<string, string>,
+): Promise<ReadonlyArray<{ readonly tab: string; readonly label: string }>> {
+	const found: Array<{ readonly tab: string; readonly label: string }> = [];
+	for (const root of roots) {
+		for (const id of await readdir(`${root}/.limen/jobs`).catch(() => [] as string[])) {
+			const jobDir = `${root}/.limen/jobs/${id}`;
+			const tabs = await Promise.all([text(`${jobDir}/herdr/tab`), text(`${jobDir}/herdr/diff/tab`)]);
+			const label = tabs.some((tab) => open.has(tab)) ? (await text(`${jobDir}/label`)) || id : "";
+			found.push(...tabs.filter((tab) => open.has(tab)).map((tab) => ({ tab, label })));
+		}
+	}
+	return found;
+}
+
+/** The seat's notice: a Herdr notification, or a macOS one when Herdr cannot show it. Only Herdr's copy carries the mark. */
+export async function showSeatNotification(title: string, body: string): Promise<boolean> {
+	const herdr = herdrBinary();
+	if (
+		herdr &&
+		(await notify(herdr, ["notification", "show", limenText(title), "--body", body, "--sound", "request"]))
+	) {
+		return true;
+	}
+	return notify("/usr/bin/osascript", [
+		"-e",
+		"on run argv",
+		"-e",
+		"display notification (item 2 of argv) with title (item 1 of argv)",
+		"-e",
+		"end run",
+		"--",
+		title,
+		body,
+	]);
+}
+function notify(command: string, args: readonly string[]): Promise<boolean> {
+	const requested = Number(process.env.LIMEN_SEAT_NOTIFY_TIMEOUT_MS);
+	const timeout = Number.isFinite(requested) && requested > 0 ? requested : 2_000;
+	return new Promise((done) => execFile(command, args, { timeout }, (error) => done(!error)));
 }
 
 export async function openDiffTab(input: {
@@ -635,7 +741,7 @@ async function createTab(input: {
 			"--workspace",
 			workspace,
 			"--label",
-			input.label,
+			limenText(input.label),
 			"--cwd",
 			input.cwd,
 			...envArgs,

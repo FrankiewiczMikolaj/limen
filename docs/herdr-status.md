@@ -98,6 +98,60 @@ refused close once. If the retry also fails, the log says
 `failed after one retry`, and the tab label changes to the final state, for
 example `· done`. `limen open <job>` opens a log view again.
 
+## See what Limen added
+
+`limen highlight on` marks every string that Limen writes into Herdr with `◆`.
+Text without the mark is native: Herdr's own or Pi's. The switch is a reading
+aid, not a status. It is seat-wide and off by default. It stays in the seat
+folder (`~/.limen/highlight`, or `$LIMEN_HOME/.limen/highlight`), so a new shell
+and a restarted coordinator keep it. `limen highlight off` turns it off, and
+`limen highlight` prints the state and the legend. In a coordinator's Pi session,
+`/limen highlight on` and `/limen highlight off` do the same.
+
+While it is on, these start with `◆ `:
+
+- the coordinator pane's display agent, pane title, and `limen` token
+- a hosted job pane's display agent and `limen` token
+- the stall overlay on a hosted pane
+- every job tab label: `◆ fix login · F012 · running`
+- the coordinator tab tail: `chat settings · ◆ 2 running · 1 finished`
+- the title of each Herdr notification that Limen shows
+- Limen's line in the coordinator's Pi footer
+
+A Limen state label takes the place of Herdr's state word, so the marked label
+keeps that word in front: `idle ◆ 2 RUNNING · 1 watched · …`. The state icon,
+the state word where Limen reports no label, the agent kind (`pi`, `omp`), the
+terminal title that Pi sets, tab numbers, workspace names you typed, and Pi's
+own footer stay native. Two Limen strings stay unmarked: role space labels
+(`repo workers · /path`), because Limen finds its role spaces by label, and agent
+names (`limen-f012-…`), because Herdr allows only `[a-z0-9_-]` in them. Wake
+messages are not marked either.
+
+A coordinator pane follows a change within about a second, and a hosted job pane
+within a second. The command renames each open job tab that a job record names,
+so already open tabs follow at once. While the switch is off, Limen writes the
+same text as before the switch existed.
+
+Herdr removes control characters from reported text, so the mark is a
+character, not a color. Only your own Herdr config can color it, and only in
+sidebar rows. Limen never writes that config. To color `◆` text in the Agent
+sidebar, you can add a style rule like this to `~/.config/herdr/config.toml`:
+
+```toml
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "machine", "workspace", "tab"],
+  [
+    { token = "agent", rules = [{ starts_with = "◆", fg = "#f5a524" }] },
+    { token = "state_text", rules = [{ contains = "◆", fg = "#f5a524" }] },
+  ],
+]
+```
+
+These rows replace Herdr's default Agent rows (the first row is Herdr 0.9.5's
+default), so start from your own rows if you changed them. `state_text` shows a
+reported state label. A rule cannot color the tab strip or the pane border.
+
 ## Activity is evidence, not a human blocker
 
 `think` is the last recorded thinking activity, not proof that tokens are arriving

@@ -4,6 +4,7 @@ import { continueCommand } from "./commands/continue.ts";
 import { diffCommand } from "./commands/diff.ts";
 import { githubCommand } from "./commands/github.ts";
 import { groupCommand } from "./commands/group.ts";
+import { highlightCommand } from "./commands/highlight.ts";
 import { initCommand, workspaceCommand } from "./commands/init.ts";
 import { jobsCommand } from "./commands/jobs.ts";
 import { keeperCommand } from "./commands/keeper.ts";
@@ -56,6 +57,7 @@ const COMMANDS = {
 	picture: pictureCommand,
 	close: closeCommand,
 	sweep: sweepCommand,
+	highlight: highlightCommand,
 	linear: linearCommand,
 	"ticket-author": ticketAuthorCommand,
 	ticket: ticketCommand,
@@ -86,6 +88,7 @@ const COMMANDS = {
 	| "picture"
 	| "close"
 	| "sweep"
+	| "highlight"
 	| "linear"
 	| "ticket-author"
 	| "ticket"
@@ -139,6 +142,7 @@ usage:
   limen ticket done FNNN [FNNN ...]             # landed without limen land: active ticket moves to done/ with a landed date
   limen board [--write]                          # the board with NOW and PROVEN from the lanes and each ticket's jobs; --write rewrites them in spec/build.md
   limen sweep [--install|--uninstall]
+  limen highlight [on|off]                       # seat-wide, off by default: ◆ marks every string Limen writes into Herdr
   limen webhook test                             # send one test ping to this plant's finish webhook targets
   limen webhook deliver <receipt-folder>         # internal: send one queued ping, retrying with backoff
   limen linear [on [--team T --project P]|off|status]   # Linear mirror toggle — renames spec/linear.md ↔ .off; --team/--project write a fresh config

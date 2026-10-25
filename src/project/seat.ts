@@ -1,9 +1,7 @@
-import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { herdrBinary } from "../integrations/herdr.ts";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const home = () => process.env.LIMEN_HOME || homedir();
@@ -38,23 +36,6 @@ export function updateRegisteredProjects(
 export async function registerProject(root: string): Promise<void> {
 	const project = resolve(root);
 	updateRegisteredProjects((projects) => (projects.includes(project) ? projects : [...projects, project]));
-}
-export async function showSeatNotification(title: string, body: string): Promise<boolean> {
-	const herdr = herdrBinary();
-	if (herdr && (await run(herdr, ["notification", "show", title, "--body", body, "--sound", "request"]))) {
-		return true;
-	}
-	return run("/usr/bin/osascript", [
-		"-e",
-		"on run argv",
-		"-e",
-		"display notification (item 2 of argv) with title (item 1 of argv)",
-		"-e",
-		"end run",
-		"--",
-		title,
-		body,
-	]);
 }
 export async function installSeatSweep(): Promise<void> {
 	const path = join(home(), "Library", "LaunchAgents", "limen-sweep.plist");
@@ -172,10 +153,5 @@ function removeAbandonedLock(lock: string, reclaimer: string): boolean {
 			fs.rmSync(claim, { force: true });
 		}
 	}
-}
-function run(command: string, args: readonly string[]): Promise<boolean> {
-	const requested = Number(process.env.LIMEN_SEAT_NOTIFY_TIMEOUT_MS);
-	const timeout = Number.isFinite(requested) && requested > 0 ? requested : 2_000;
-	return new Promise((done) => execFile(command, args, { timeout }, (error) => done(!error)));
 }
 const xml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");

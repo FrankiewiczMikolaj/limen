@@ -4,12 +4,15 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rename, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { after, before, test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { FINAL, jobDir, jobFile, LIMEN, limen, type Plant, plant, release, spawnJob, until, waitJob } from "./plant.ts";
+
+const WAKE = fileURLToPath(new URL("../hook/wake.ts", import.meta.url));
 
 const herdrSource = `#!/usr/bin/env node
 const fs = require("node:fs"), path = require("node:path"), { spawn } = require("node:child_process");
@@ -23,30 +26,24 @@ const fail = (code) => { console.log(JSON.stringify({ error: { code, message: co
 const flag = (name) => args[args.indexOf(name) + 1];
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const engine = (pane) => (state.procs[pane] && alive(state.procs[pane].pid) ? state.procs[pane] : undefined);
+const stop = (pane) => { const running = engine(pane); if (running) process.kill(running.pid, "SIGTERM"); };
 const [noun, verb, target] = args;
 switch (noun + " " + verb) {
 	case "workspace list": ok({ workspaces: state.workspaces });
-	case "workspace create":
-		state.workspaces.push({ workspace_id: "w" + (state.workspaces.length + 1), label: flag("--label") });
-		save();
-		ok({ workspace: state.workspaces.at(-1) });
+	case "workspace create": state.workspaces.push({ workspace_id: "w" + (state.workspaces.length + 1), label: flag("--label") });
+		save(); ok({ workspace: state.workspaces.at(-1) });
 	case "tab create": {
 		const n = Object.keys(state.tabs).length + 1, env = {};
 		args.forEach((value, index) => { if (value === "--env") { const [key, ...rest] = args[index + 1].split("="); env[key] = rest.join("="); } });
-		state.tabs["t" + n] = { pane: "p" + n, cwd: flag("--cwd"), env };
-		save();
-		ok({ tab: { tab_id: "t" + n }, root_pane: { pane_id: "p" + n } });
+		state.tabs["t" + n] = { pane: "p" + n, cwd: flag("--cwd"), env, label: flag("--label") };
+		save(); ok({ tab: { tab_id: "t" + n }, root_pane: { pane_id: "p" + n } });
 	}
-	case "tab get": ok({ tab: { tab_id: target, focused: true } });
-	case "tab close": {
-		const running = engine(state.tabs[target]?.pane);
-		if (running) process.kill(running.pid, "SIGTERM");
-		ok({});
-	}
-	case "pane process-info": {
-		const running = engine(flag("--pane"));
-		ok({ process_info: { foreground_processes: [running ? { name: running.kind, pid: running.pid } : { name: "zsh" }] } });
-	}
+	case "tab get": ok({ tab: { tab_id: target, focused: true, label: state.tabs[target]?.label } });
+	case "tab list": ok({ tabs: Object.entries(state.tabs).filter(([, row]) => !row.closed).map(([tab_id, row]) => ({ tab_id, label: row.label })) });
+	case "tab rename": (state.tabs[target] ??= {}).label = args[3]; save(); ok({});
+	case "tab close": stop(state.tabs[target]?.pane); (state.tabs[target] ??= {}).closed = true; save(); ok({});
+	case "pane process-info": { const running = engine(flag("--pane"));
+		ok({ process_info: { foreground_processes: [running ? { name: running.kind, pid: running.pid } : { name: "zsh" }] } }); }
 	case "agent start": {
 		const pane = flag("--pane"), kind = flag("--kind"), tab = Object.values(state.tabs).find((row) => row.pane === pane);
 		const base = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(HERDR_|LIMEN_(?!HOME|HERDR|HUNK))/.test(key)));
@@ -54,22 +51,13 @@ switch (noun + " " + verb) {
 		const binary = env.PATH.split(":").map((dir) => path.join(dir, kind)).find((candidate) => fs.existsSync(candidate));
 		const child = spawn(binary, args.slice(args.indexOf("--") + 1), { cwd: tab.cwd, env, detached: true, stdio: "ignore" });
 		child.unref();
-		state.procs[pane] = { pid: child.pid, kind };
-		state.agents[pane] = { name: target, status: "done" };
-		save();
+		state.procs[pane] = { pid: child.pid, kind }; state.agents[pane] = { name: target, status: "done" }; save();
 		ok({ agent: { pane_id: pane, name: target } });
 	}
-	case "agent get": {
-		const row = state.agents[target];
-		if (!row || !engine(target)) fail("agent_not_found");
-		ok({ agent: { pane_id: target, agent_status: row.status } });
-	}
+	case "agent get": if (!state.agents[target] || !engine(target)) fail("agent_not_found");
+		ok({ agent: { pane_id: target, agent_status: state.agents[target].status } });
 	case "agent list": ok({ agents: Object.entries(state.agents).filter(([pane]) => engine(pane)).map(([pane_id, row]) => ({ pane_id, name: row.name })) });
-	case "agent send-keys": {
-		const running = engine(target);
-		if (running) process.kill(running.pid, "SIGTERM");
-		ok({});
-	}
+	case "agent send-keys": stop(target); ok({});
 	case "agent prompt": fail("agent_prompt_stalled"); // Sent, but the busy coordinator pane started no turn.
 	case "status --json": console.log(JSON.stringify({ server: { running: true, socket: path.join(__dirname, "h.sock") } })); process.exit(0);
 	default: ok({});
@@ -100,8 +88,8 @@ const engineArgv = (pane: string): string[] => {
 };
 const pane = (id: string) => jobFile(p, id, "herdr/pane");
 const starts = (id: string) => jobFile(p, id, "log").match(/hosted supervisor started/g)?.length ?? 0;
-const state = () =>
-	JSON.parse(readFileSync(join(herdr, "state.json"), "utf8")) as { agents: Record<string, { status: string }> };
+type Fake = { agents: Record<string, { status: string }>; tabs: Record<string, { label?: string }> };
+const state = () => JSON.parse(readFileSync(join(herdr, "state.json"), "utf8")) as Fake;
 const saveState = async (next: unknown) => {
 	await writeFile(join(herdr, "state.tmp"), JSON.stringify(next));
 	await rename(join(herdr, "state.tmp"), join(herdr, "state.json"));
@@ -135,19 +123,10 @@ before(async () => {
 });
 after(() => p.cleanup().finally(() => socket.close()));
 
-let first = "";
-test("a hosted job's task never travels as argv, and it finishes done with its handoff when the session ends", async () => {
-	first = spawnJob(p, "say hi\nfinish\nfinish F001 handoff", ["--tab", "--label", "F001 hosted"], { env });
-	assert.deepEqual([waitJob(p, first, { env }), jobFile(p, first, "result")], ["done", "F001 handoff"]);
-	const leaked = engineArgv(pane(first)).filter((arg) => arg.includes("F001 handoff") || /[\r\n]/.test(arg));
-	assert.deepEqual(leaked, [], "no task text in argv");
-});
-
 let second = "";
 test("a live OMP job stays running while Herdr reports done, then after Herdr loses its agent row (88fd5ac)", async () => {
 	second = spawnJob(p, "block\nfinish\nfinish omp done", ["--tab", "--engine", "omp", "--label", "F001 omp"], { env });
-	const dir = jobDir(p, second);
-	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
+	await until(jobDir(p, second), () => existsSync(join(jobDir(p, second), "fake-blocked-1")));
 	const target = pane(second);
 	const start = named("agent", "start").find((args) => args.includes(target)) ?? [];
 	assert.equal(start[start.indexOf("--kind") + 1], "omp");
@@ -155,14 +134,9 @@ test("a live OMP job stays running while Herdr reports done, then after Herdr lo
 	await until(herdr, () => named("agent", "get").filter((args) => args[2] === target).length >= 2);
 	assert.equal(jobFile(p, second, "state"), "running", "Herdr done is not job completion");
 	const seen = named("pane", "process-info").length;
-	const next = state();
-	delete next.agents[target];
-	await saveState(next);
+	await saveState({ ...state(), agents: {} }); // Herdr loses the job's agent row; its engine runs on.
 	// Each missing sample probes the pane once; four probes is past the three-sample missing window.
-	const probes = () =>
-		named("pane", "process-info")
-			.slice(seen)
-			.filter((args) => args.includes(target)).length;
+	const probes = () => named("pane", "process-info").filter((args, at) => at >= seen && args.includes(target)).length;
 	await until(herdr, () => probes() >= 4 || jobFile(p, second, "state") !== "running");
 	assert.equal(jobFile(p, second, "state"), "running", `a lost agent row must not end the job on ${target}`);
 });
@@ -183,21 +157,7 @@ test("two competing sweeps start exactly one replacement for a killed hosted sup
 	assert.equal(jobFile(p, second, "state"), "running");
 	await release(dir);
 	assert.deepEqual([waitJob(p, second, { env }), jobFile(p, second, "result")], ["done", "omp done"]);
-	assert.equal(starts(second), 2, "one replacement supervisor, not two");
-	assert.ok(!jobFile(p, second, "log").includes("failed:"));
-});
-
-test("hosted Pi stop records stopped once and closes the job's tab", async () => {
-	const third = spawnJob(p, "block\nfinish never", ["--tab", "--engine", "pi", "--label", "F001 hosted pi"], { env });
-	const dir = jobDir(p, third);
-	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
-	const stopped = limen(p, ["stop", third, "enough"], { env });
-	assert.deepEqual([stopped.status, jobFile(p, third, "state")], [0, "stopped"], stopped.stderr);
-	const tab = jobFile(p, third, "herdr/tab");
-	await until(herdr, () => named("tab", "close").some((args) => args[2] === tab));
-	assert.equal(jobFile(p, third, "log").match(/\] stopped: enough/g)?.length, 1);
-	assert.equal(named("tab", "create").length, 3, "one tab per hosted job");
-	assert.equal(named("workspace", "create").length, 1, "one role space");
+	assert.deepEqual([starts(second), jobFile(p, second, "log").includes("failed:")], [2, false], "one replacement");
 });
 
 test("in Herdr a spawn with no mode flag runs detached under its --timeout; queued, it tells its pane once that it started", async () => {
@@ -254,4 +214,44 @@ test("a rule set, change, end and end time ping each live coordinator pane once 
 	assert.deepEqual(await Promise.all([limenAsync(["jobs"]), limenAsync(["rule"])]), [0, 0]);
 	await until(herdr, () => panes("late", " ended ").length >= 3);
 	assert.deepEqual(heard("late", " ended "), [live]);
+});
+
+let third = "";
+test("limen highlight marks what Limen writes into Herdr; live panes and open tabs follow it on and off", async () => {
+	const lead = { ...env, HERDR_PANE_ID: "lead:p1", HERDR_TAB_ID: "lead:t1", PI_SESSION_ID: "lead" };
+	await saveState({ ...state(), tabs: { ...state().tabs, "lead:t1": { label: "origin highlight" } } });
+	const dir = await mkdtemp(join(p.parent, "lead-"));
+	await writeFile(join(dir, "task.md"), "block\n/limen highlight off\nblock\n");
+	const args = ["--extension", WAKE, "--session-dir", join(dir, "session"), `@${join(dir, "task.md")}`];
+	spawn(join(p.bin, "pi"), args, { cwd: p.root, env: { ...p.env, ...lead }, stdio: "ignore" });
+	assert.match(limen(p, ["highlight"], { env }).stdout, /^off\n◆ Limen: .+\n$/, "off on a fresh seat");
+	third = spawnJob(p, "block\nfinish never", ["--tab", "--engine", "pi", "--label", "F001 lit"], { env: lead });
+	// The coordinator pane's and the job pane's last report past its sequence number, then the two tab labels.
+	const last = (at: string) => (named("pane", "report-metadata").findLast((a) => a[2] === at) ?? []).slice(7);
+	const tabs = () => [state().tabs["lead:t1"]?.label, state().tabs[jobFile(p, third, "herdr/tab")]?.label];
+	const shown = () => [last("lead:p1"), last(pane(third)), tabs()].flat().join(" ");
+	const label = (m: string, word: string) => `--state-label ${word}=${m && `${word} ${m}`}`;
+	const [job, ready] = ["1 RUNNING · 1 watched · 0 unwatched · lit · F001 think", "job RUNNING · pane ready"];
+	const want = (m: string) =>
+		`--title ${m}Limen · lit · F001 --display-agent ${m}Limen · waiting on 1 job --token limen=${m}${job} ` +
+		`${label(m, "idle")}${job} ${label(m, "done")}${job} --ttl-ms 180000 --display-agent ${m}limen worker ` +
+		`--token limen=${m}job RUNNING ${label(m, "idle")}${ready} ${label(m, "done")}${ready} --ttl-ms 180000 ` +
+		`origin highlight · ${m}1 running ${m}F001 lit · running`;
+	await until(herdr, () => shown() === want(""));
+	assert.match(limen(p, ["highlight", "on"], { env }).stdout, /^on\n.+\n1 open job tab renamed\n$/);
+	await until(herdr, () => shown() === want("◆ "));
+	await release(dir); // `/limen highlight off` in the coordinator: each label goes back to today's text
+	await until(herdr, () => shown() === want(""));
+	const leaked = engineArgv(pane(third)).filter((arg) => arg.includes("finish never") || /[\r\n]/.test(arg));
+	assert.deepEqual(leaked, [], "a hosted job's task never travels as argv");
+	await release(dir, 2); // The job blocks on: the stop below ends it.
+});
+
+test("hosted Pi stop records stopped once and closes the job's tab", async () => {
+	const stopped = limen(p, ["stop", third, "enough"], { env });
+	assert.deepEqual([stopped.status, jobFile(p, third, "state")], [0, "stopped"], stopped.stderr);
+	await until(herdr, () => named("tab", "close").some((args) => args[2] === jobFile(p, third, "herdr/tab")));
+	assert.equal(jobFile(p, third, "log").match(/\] stopped: enough/g)?.length, 1);
+	const made = [named("tab", "create").length, named("workspace", "create").length];
+	assert.deepEqual(made, [3, 1], "one tab per job, one role space");
 });

@@ -1,16 +1,12 @@
 import * as fs from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { sweepCoordinators } from "../integrations/coordinator-signal.ts";
+import { showSeatNotification } from "../integrations/herdr.ts";
 import { resendQueuedPings } from "../integrations/webhook-queue.ts";
 import { isTerminal } from "../job/job.ts";
 import { noteKind } from "../job/view.ts";
 import { receiptFamily } from "../job/wake-delivery.ts";
-import {
-	installSeatSweep,
-	showSeatNotification,
-	uninstallSeatSweep,
-	updateRegisteredProjects,
-} from "../project/seat.ts";
+import { installSeatSweep, uninstallSeatSweep, updateRegisteredProjects } from "../project/seat.ts";
 import { HOSTED_UNCERTAINTY_MS, readHostedUncertainty } from "../runtime/hosted-uncertainty.ts";
 import { confirmDeadJobs } from "../runtime/reap.ts";
 

@@ -11,7 +11,15 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { coordinatorSignals } from "../src/integrations/coordinator-signal.ts";
-import { herdrBinary } from "../src/integrations/herdr.ts";
+import {
+	followHighlight,
+	HIGHLIGHT_LEGEND,
+	herdrBinary,
+	highlightOn,
+	limenStateLabel,
+	limenText,
+	saveHighlight,
+} from "../src/integrations/herdr.ts";
 import { resendQueuedPings } from "../src/integrations/webhook-queue.ts";
 import { closedFeatures, closedJobFeatures, derivePulse, isTerminal, type Pulse, SESSION_ID } from "../src/job/job.ts";
 import { openChecks } from "../src/job/task-note.ts";
@@ -41,7 +49,7 @@ import {
 } from "../src/job/wake-delivery.ts";
 import { advisoryWake, completionWake } from "../src/job/wake-text.ts";
 import { unlandedBranches } from "../src/project/git.ts";
-import { registerProject } from "../src/project/seat.ts";
+import { registeredProjects, registerProject } from "../src/project/seat.ts";
 import {
 	HOSTED_UNCERTAINTY_MS,
 	hostedUncertaintyText,
@@ -93,7 +101,8 @@ const REFRESH_TICKS = CACHE_REFRESH_MS / SWEEP_MS;
 // Herdr drops pane metadata after its TTL; an unchanged label is re-sent well before then.
 const METADATA_TTL_MS = 180_000;
 const METADATA_REFRESH_MS = 60_000;
-const TAB_TAIL = /(?:\s*·\s*\d+\s+(?:running|finished))+$/;
+// The tail Limen keeps on the coordinator tab, with or without the highlight mark.
+const TAB_TAIL = /(?:\s*·\s*(?:◆\s+)?\d+\s+(?:running|finished))+$/;
 type FinishedJob = { readonly id: string; readonly label: string; readonly state: string; readonly finishedAt: number };
 type HerdrPane = { readonly binary: string; readonly pane: string };
 
@@ -181,7 +190,8 @@ export default function limenWake(pi: PiApi): void {
 		}
 		const jobs = `${pulses.length} RUNNING · ${watched} watched · ${pulses.length - watched} unwatched`;
 		const label = `${jobs} · ${body}`;
-		const agent = herdrDisplayAgent(pulses, session?.isIdle() === true);
+		const on = highlightOn();
+		const agent = limenText(herdrDisplayAgent(pulses, session?.isIdle() === true), on);
 		const signature = `${title}\0${label}\0${agent}`;
 		if (signature === herdrMetadata && Date.now() - herdrMetadataAt < METADATA_REFRESH_MS) {
 			return;
@@ -191,17 +201,17 @@ export default function limenWake(pi: PiApi): void {
 		const change = body
 			? [
 					"--title",
-					title,
+					limenText(title, on),
 					"--display-agent",
 					agent,
 					"--token",
-					`limen=${label}`,
+					`limen=${limenText(label, on)}`,
 					"--state-label",
-					`idle=${label}`,
+					limenStateLabel("idle", label, on),
 					"--state-label",
-					`done=${label}`,
+					limenStateLabel("done", label, on),
 				]
-			: ["--clear-title", "--display-agent", "Limen coordinator", "--clear-token", "limen", "--clear-state-labels"];
+			: ["--clear-title", "--display-agent", agent, "--clear-token", "limen", "--clear-state-labels"];
 		herdrSeq += 1;
 		herdrCall([
 			"pane",
@@ -367,7 +377,8 @@ export default function limenWake(pi: PiApi): void {
 		const fresh = finished.filter(
 			({ id, finishedAt }) => finishedAt >= ownerTurnAt && text(join(jobs, id, "origin-tab")) === tab,
 		).length;
-		const tail = `${count > 0 ? ` · ${count} running` : ""}${fresh > 0 ? ` · ${fresh} finished` : ""}`;
+		const counts = [count > 0 ? `${count} running` : "", fresh > 0 ? `${fresh} finished` : ""].filter(Boolean);
+		const tail = counts.length ? ` · ${limenText(counts.join(" · "))}` : "";
 		if (tail === tabTail) {
 			return;
 		}
@@ -407,7 +418,7 @@ export default function limenWake(pi: PiApi): void {
 			clearStatus();
 			return;
 		}
-		statusBody = next.status;
+		statusBody = limenText(next.status);
 		herdrReport(next.summary, next.title, next.pulses, next.watched);
 		drawStatus();
 	};
@@ -419,7 +430,7 @@ export default function limenWake(pi: PiApi): void {
 		herdrCall([
 			"notification",
 			"show",
-			state === "done" ? `limen: ${label} ${done.title}` : `limen: ${label} is ${state}`,
+			limenText(state === "done" ? `limen: ${label} ${done.title}` : `limen: ${label} is ${state}`),
 			"--body",
 			state === "done" ? `job ${id} · branch ${branch} · ${done.next}` : `job ${id} · branch ${branch}`,
 			"--sound",
@@ -1031,13 +1042,25 @@ export default function limenWake(pi: PiApi): void {
 		return;
 	}
 	pi.registerCommand?.("limen", {
-		description: "Mute or resume limen job display and wakes for this session",
+		description: "Mute or resume limen job display and wakes for this session; highlight on|off marks Limen's text",
 		getArgumentCompletions(prefix) {
-			const items = ["on", "off"].filter((value) => value.startsWith(prefix)).map((value) => ({ value, label: value }));
+			const items = ["on", "off", "highlight on", "highlight off"]
+				.filter((value) => value.startsWith(prefix))
+				.map((value) => ({ value, label: value }));
 			return items.length ? items : null;
 		},
 		handler(args, commandContext) {
 			const request = args.trim();
+			const highlight = /^highlight(?:\s+(on|off))?$/.exec(request);
+			if (highlight) {
+				// The seat-wide switch, as `limen highlight`: this pane follows on its next sweep, open job tabs follow now.
+				if (highlight[1]) {
+					saveHighlight(highlight[1] === "on");
+					void followHighlight(registeredProjects()).catch(() => {});
+				}
+				commandContext.ui.notify(`limen highlight ${highlightOn() ? "on" : "off"}\n${HIGHLIGHT_LEGEND}`, "info");
+				return;
+			}
 			if (request === "on") {
 				muted = false;
 			} else if (request === "off") {

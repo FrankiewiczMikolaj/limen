@@ -184,6 +184,16 @@ Run the seat sweep (see [Seat notifications](jobs.md#seat-notifications)), or in
 limen sweep [--install|--uninstall]
 ```
 
+### Herdr highlight
+
+Mark every string that Limen writes into Herdr with `◆`, seat-wide, or print the state and the legend. It is off by default. See [See what Limen added](herdr-status.md#see-what-limen-added).
+
+```text
+limen highlight [on|off]
+```
+
+In a coordinator's Pi session, `/limen highlight on` and `/limen highlight off` do the same.
+
 ### Finish webhook test
 
 Send one `webhook.test` event to this plant's finish webhook targets. The sender prints one line per target. It never prints a URL or a credential.

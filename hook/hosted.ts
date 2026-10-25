@@ -1,7 +1,13 @@
 import { execFile } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { herdrBinary, hostedForegroundPid } from "../src/integrations/herdr.ts";
+import {
+	herdrBinary,
+	highlightOn,
+	hostedForegroundPid,
+	limenStateLabel,
+	limenText,
+} from "../src/integrations/herdr.ts";
 import { readHostedBinding, registerHostedBinding } from "../src/runtime/hosted-binding.ts";
 
 type PiApi = {
@@ -61,22 +67,25 @@ export default function limenHosted(pi: PiApi): void {
 			const body = ["running", "done", "failed", "stopped"].includes(state)
 				? `job ${state.toUpperCase()}`
 				: "job state unknown";
-			if (!release && body === metadata && Date.now() - metadataAt < METADATA_REFRESH_MS) {
+			// A change of the highlight switch is a change of the labels, so this pane follows it within a second.
+			const on = highlightOn();
+			const signature = `${on}\0${body}`;
+			if (!release && signature === metadata && Date.now() - metadataAt < METADATA_REFRESH_MS) {
 				return;
 			}
-			metadata = body;
+			metadata = signature;
 			metadataAt = Date.now();
 			const change = release
 				? ["--clear-display-agent", "--clear-token", "limen", "--clear-state-labels"]
 				: [
 						"--display-agent",
-						`limen ${process.env.LIMEN_ROLE?.trim() || "worker"}`,
+						limenText(`limen ${process.env.LIMEN_ROLE?.trim() || "worker"}`, on),
 						"--token",
-						`limen=${body}`,
+						`limen=${limenText(body, on)}`,
 						"--state-label",
-						`idle=${body} · pane ready`,
+						limenStateLabel("idle", `${body} · pane ready`, on),
 						"--state-label",
-						`done=${body} · pane ready`,
+						limenStateLabel("done", `${body} · pane ready`, on),
 						"--ttl-ms",
 						String(METADATA_TTL_MS),
 					];
