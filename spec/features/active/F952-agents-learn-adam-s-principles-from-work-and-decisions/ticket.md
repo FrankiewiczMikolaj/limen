@@ -1,7 +1,7 @@
 ---
 opened: 2026-10-24
-needs-adam: Choose the global principle home, conversation access and refine schedules in ~/Downloads/limen-learning-system.html; no implementation or pilot is authorized.
-needs-adam-on: 2026-10-24
+needs-adam: Answer the seven open choices at the end of ~/Downloads/limen-learning-system.html (revision 2); no implementation or pilot is authorized.
+needs-adam-on: 2026-10-25
 ---
 
 # F952 · Agents learn Adam’s principles from work and decisions
