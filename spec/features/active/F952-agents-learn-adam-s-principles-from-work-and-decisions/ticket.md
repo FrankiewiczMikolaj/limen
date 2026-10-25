@@ -1,6 +1,6 @@
 ---
 opened: 2026-10-24
-needs-adam: Answer the seven open choices at the end of ~/Downloads/limen-learning-system.html (revision 2); no implementation or pilot is authorized.
+needs-adam: Answer choices 1 to 4 at the end of ~/Downloads/limen-learning-system.html (revision 3) before a pilot; no implementation or pilot is authorized.
 needs-adam-on: 2026-10-25
 ---
 

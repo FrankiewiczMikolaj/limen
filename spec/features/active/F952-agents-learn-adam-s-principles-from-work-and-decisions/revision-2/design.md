@@ -1,5 +1,7 @@
 # Learning-system design, revision 2
 
+Superseded the same day by revision 3, written by another coordinator session: the page now has SHA-256 `c3de32ae041bd4fc69a42cfc1cd4020f1168f7789cb6942187879e3092c83814` and nine open choices, of which choices 1 to 4 must be answered before a pilot. This note keeps the revision 2 record; the page is the current design.
+
 The page is `/Users/overment/Downloads/limen-learning-system.html` (SHA-256 `48ab34b0af21a3a5640590198f603b23b32818c28858db1b76a2e88e8a74070c`). It stays outside Git. Design only: no file, skill, hook change or timer is installed, and no pilot has run.
 
 ## Facts that shaped it
