@@ -100,8 +100,7 @@ test("a running worker gets each steer once and in order; an ended one refuses a
 	const dir = jobDir(p, parent);
 	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
 	for (const [index, text] of ["one", "two"].entries()) {
-		const steered = limen(p, ["steer", parent, text]);
-		assert.equal(steered.status, 0, steered.stderr);
+		assert.equal(limen(p, ["steer", parent, text]).status, 0);
 		// The hook has taken the file: a delivery (right or wrong) arrived, or the inbox emptied without one.
 		await until(dir, () => steers(dir).length > index || readdirSync(join(dir, "steer/inbox")).length === 0);
 	}

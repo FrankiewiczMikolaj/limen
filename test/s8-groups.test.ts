@@ -233,8 +233,7 @@ test("a second group runs two routes through draft, critique and final, and the 
 });
 
 test("close refuses a member with uncommitted work until it is clean; each lead step pings once", async () => {
-	const stopped = limen(p, ["group", "stop", group], { env: LEAD });
-	assert.equal(stopped.status, 0, stopped.stderr);
+	assert.equal(limen(p, ["group", "stop", group], { env: LEAD }).status, 0);
 	const dirty = join(jobFile(p, roster.coordinator2, "worktree"), "recovery.txt");
 	await writeFile(dirty, "keep me\n");
 	assert.equal(limen(p, ["group", "close", group], { env: LEAD }).status, 1);

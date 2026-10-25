@@ -86,6 +86,8 @@ type PiApi = {
 
 const CACHE_REFRESH_MS = 30_000;
 const SWEEP_MS = 500;
+// A busy job writes many files a second; their watch events start at most one sweep a second, the first at once.
+const EVENT_SWEEP_MS = 1_000;
 // Each timer tick re-checks this share of settled records, so one refresh cycle takes CACHE_REFRESH_MS without a pause.
 const REFRESH_TICKS = CACHE_REFRESH_MS / SWEEP_MS;
 // Herdr drops pane metadata after its TTL; an unchanged label is re-sent well before then.
@@ -112,6 +114,7 @@ export default function limenWake(pi: PiApi): void {
 	let watcher: FSWatcher | undefined;
 	let sweepTimer: NodeJS.Timeout | undefined;
 	let changeTimer: NodeJS.Timeout | undefined;
+	let eventSweepAt = 0;
 	let statusBody = "";
 	let active = false;
 	let muted = false;
@@ -832,10 +835,15 @@ export default function limenWake(pi: PiApi): void {
 		if (!active || changeTimer) {
 			return;
 		}
-		changeTimer = setTimeout(() => {
-			changeTimer = undefined;
-			sweep();
-		}, 50);
+		// Events inside the second after the last event sweep fold into one trailing sweep; the timer still sweeps meanwhile.
+		changeTimer = setTimeout(
+			() => {
+				changeTimer = undefined;
+				eventSweepAt = Date.now();
+				sweep();
+			},
+			Math.max(50, eventSweepAt + EVENT_SWEEP_MS - Date.now()),
+		);
 		changeTimer.unref();
 	};
 	const jobsChanged = (filename: string | null) => {
