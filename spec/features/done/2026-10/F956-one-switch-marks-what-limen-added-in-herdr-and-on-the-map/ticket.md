@@ -5,6 +5,7 @@ touches:
   - limen.runtime.hosted
   - limen.picture.viewer
 opened: 2026-10-25
+landed: 2026-10-25
 ---
 
 # F956 · One switch marks what Limen added in Herdr and on the map

@@ -34,7 +34,6 @@
 
 <!-- Generated from spec/features/active/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
-- `F956-one-switch-marks-what-limen-added-in-herdr-and-on-the-map` (🟠 ACTIVE): One switch marks what Limen added in Herdr and on the map
 - `F954-a-private-assessment-combines-verified-collaboration-counts-from-both-session-stores` (🟠 ACTIVE): A private assessment combines verified collaboration counts from both session stores
 - `F952-agents-learn-adam-s-principles-from-work-and-decisions` (🟠 ACTIVE): Agents learn Adam’s principles from work and decisions; needs Adam since 2026-10-25: Answer choices 1 to 4 at the end of ~/Downloads/limen-learning-system.html (revision 3) before a pilot; no implementation or pilot is authorized.
 - `F936-haiku-helpers-do-the-narrow-chores-for-coordinators-workers-and-groups` (🟠 ACTIVE): Haiku helpers do the narrow chores for coordinators, workers and groups
@@ -64,6 +63,7 @@
 
 <!-- Generated from spec/features/done/ by limen land, limen ticket done and limen board --write. Edit the tickets, not these lines. -->
 
+- `F956-one-switch-marks-what-limen-added-in-herdr-and-on-the-map` (🟢 PROVEN): One switch marks what Limen added in Herdr and on the map; landed 2026-10-25
 - `F955-coordinators-receive-every-agent-s-full-final-message` (🟢 PROVEN): Coordinators receive every agent’s full final message; landed 2026-10-25
 - `F953-a-done-job-with-open-note-checks-tells-the-coordinator-and-is-not-a-plain-done` (🟢 PROVEN): A done job with open note checks tells the coordinator and is not a plain done; landed 2026-10-24
 - `F951-limen-starts-queued-jobs-by-priority-and-tells-every-coordinator-each-rule` (🟢 PROVEN): Limen starts queued jobs by priority and tells every coordinator each rule; landed 2026-10-23
@@ -73,7 +73,6 @@
 - `F947-a-coordinator-s-end-of-turn-always-sends-one-ping` (🟢 PROVEN): A coordinator's end of turn always sends one ping; landed 2026-10-17
 - `F946-a-finish-stall-or-ask-ping-is-never-lost-under-load` (🟢 PROVEN): A finish, stall or Ask ping is never lost under load; landed 2026-10-16
 - `F945-short-pi-claude-model-form-starts-the-job-instead-of-killing-it` (🟢 PROVEN): Short pi-claude model form starts the job instead of killing it; landed 2026-10-13
-- `F943-the-coordinator-sweep-does-not-start-a-process-for-each-running-job-every-half-second` (🟢 PROVEN): The coordinator sweep does not start a process for each running job every half second; landed 2026-10-13
-- 2026-10: 57 landed. spec/features/done/2026-10/
+- 2026-10: 58 landed. spec/features/done/2026-10/
 - 2026-09: 70 landed. spec/features/done/2026-09/
 - 2026-08: 43 landed. spec/features/done/2026-08/
