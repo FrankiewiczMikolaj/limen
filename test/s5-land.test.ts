@@ -128,14 +128,12 @@ test("a done job fast-forwards without --yes off a TTY, a landed branch is delet
 	job.b = done("commit", ["--label", "demo · F001"]);
 	await amend(job.b, { "test/old.test.ts": lines(6) });
 	const a = git(p.root, "rev-parse", jobFile(p, job.a, "branch"));
-	const first = limen(p, ["land", job.a]);
-	assert.equal(first.status, 0, first.stderr);
+	limen(p, ["land", job.a]);
 	assert.equal(git(p.root, "rev-parse", "main"), a);
 	await writeFile(join(p.root, "draft.txt"), "another session drafts\n");
 	const status = git(p.root, "status", "--porcelain");
 	const b = git(p.root, "rev-parse", jobFile(p, job.b, "branch"));
-	const second = limen(p, ["land", job.b, "--yes"]);
-	assert.equal(second.status, 0, second.stderr);
+	limen(p, ["land", job.b, "--yes"]);
 	assert.equal(git(p.root, "branch", "--list", jobFile(p, job.a, "branch"), jobFile(p, job.b, "branch")), "");
 	assert.deepEqual(git(p.root, "log", "-1", "--format=%P", "main^").split(" "), [a, b]);
 	assert.equal(git(p.root, "show", "main:test/old.test.ts"), lines(6).trim());

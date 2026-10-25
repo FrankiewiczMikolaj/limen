@@ -16,21 +16,34 @@ import { isTerminal } from "./job.ts";
 const DEFAULT_FALLBACK_GRACE_MS = 5 * 60_000;
 export const CLAIM_STALE_MS = 30_000;
 const WAKE_ATTEMPTS = 2;
-export function deliverySettled(job: string, session: string): boolean {
+// What a job's completion still asks of this session. A group member reports through its group, never by wake.
+export function deliveryLeft(job: string, session: string): "nothing" | "open" | "fallback" {
 	if (!isTerminal(text(join(job, "state")))) {
-		return false;
+		return "open";
 	}
-	if (claimSlots(job).length > 0) {
-		return false;
-	}
-	if (!routable(job)) {
-		return true;
+	if (existsSync(join(job, "group")) || !routable(job)) {
+		return "nothing";
 	}
 	const delivered = deliveredSlots(job);
-	if (subscribed(job, session)) {
-		return delivered.includes(session) || delivered.includes("_fallback");
+	const own = subscribed(job, session);
+	if (own ? delivered.includes(session) || delivered.includes("_fallback") : completionSlots(delivered).length > 0) {
+		return "nothing";
 	}
-	return completionSlots(delivered).length > 0;
+	const claims = completionSlots(claimSlots(job));
+	if (completionStopped(job, claims)) {
+		return "nothing";
+	}
+	if (claims.length > 0) {
+		return "open";
+	}
+	return own ? "open" : "fallback";
+}
+// Used-up attempts, or a claim kept blocked for a human, stop automatic completion delivery in every session.
+export function completionStopped(job: string, claims = completionSlots(claimSlots(job))): boolean {
+	return (
+		claims.some((slot) => existsSync(join(job, "notify", "claims", slot, "blocked"))) ||
+		attemptCount(join(job, "notify", "unconfirmed", "_completion")) >= WAKE_ATTEMPTS
+	);
 }
 export type DeliveryCallbacks = {
 	readonly blocked: () => void;
@@ -155,7 +168,10 @@ function attemptsPath(claim: string): string {
 	return join(dirname(dirname(claim)), "unconfirmed", receiptFamily(claim.slice(claim.lastIndexOf("/") + 1)));
 }
 function unsuccessfulAttempts(claim: string): number {
-	return text(attemptsPath(claim))
+	return attemptCount(attemptsPath(claim));
+}
+function attemptCount(file: string): number {
+	return text(file)
 		.split("\n")
 		.reduce((sum, line) => sum + Number(line), 0);
 }
@@ -274,9 +290,12 @@ export function subscribeSession(job: string, session: string): void {
 	}
 }
 export function oldEnoughForFallback(job: string, stamp = join(job, "finished-at")): boolean {
+	return Date.now() >= fallbackDueAt(job, stamp);
+}
+export function fallbackDueAt(job: string, stamp = join(job, "finished-at")): number {
 	const finished = Date.parse(text(stamp));
 	const since = Number.isFinite(finished) ? finished : statSync(existsSync(stamp) ? stamp : join(job, "state")).mtimeMs;
-	return Date.now() - since >= fallbackGraceMs();
+	return since + fallbackGraceMs();
 }
 function fallbackGraceMs(): number {
 	const raw = Number(process.env.LIMEN_WAKE_FALLBACK_MS);

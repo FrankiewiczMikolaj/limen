@@ -131,8 +131,7 @@ test("S10: only an authorized request rings the doorbell, the App replies once e
 		LIMEN_GITHUB_LIMEN_BIN: LIMEN,
 	};
 	const poll = () => {
-		const run = limen(p, ["github", "poll"], { env });
-		assert.equal(run.status, 0, run.stderr);
+		assert.equal(limen(p, ["github", "poll"], { env }).status, 0);
 	};
 	// Every write to the repository; the App's token exchange is a POST outside it.
 	const posts = () =>

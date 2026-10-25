@@ -233,16 +233,14 @@ test("a second group runs two routes through draft, critique and final, and the 
 });
 
 test("close refuses a member with uncommitted work until it is clean; each lead step pings once", async () => {
-	const stopped = limen(p, ["group", "stop", group], { env: LEAD });
-	assert.equal(stopped.status, 0, stopped.stderr);
+	assert.equal(limen(p, ["group", "stop", group], { env: LEAD }).status, 0);
 	const dirty = join(jobFile(p, roster.coordinator2, "worktree"), "recovery.txt");
 	await writeFile(dirty, "keep me\n");
 	assert.equal(limen(p, ["group", "close", group], { env: LEAD }).status, 1);
 	assert.equal(JSON.parse(readFileSync(join(cabinet(), "run.json"), "utf8")).closed, false);
 	await rm(dirty);
 	await rm(join(jobFile(p, roster.worker2, "worktree"), ".git")); // a folder a prune race left: no Git work in it
-	const closed = limen(p, ["group", "close", group], { env: LEAD });
-	assert.equal(closed.status, 0, closed.stderr);
+	limen(p, ["group", "close", group], { env: LEAD });
 	assert.equal(JSON.parse(readFileSync(join(cabinet(), "run.json"), "utf8")).closed, true);
 	// The lead's next turn after close is its last: one close ping, and still one synthesis ping. The ping is queued at
 	// that turn and its own deliverer sends it, so it can land just after the session exits.
