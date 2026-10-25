@@ -10,8 +10,7 @@ test("malformed lines are reported at their own line and never overwrite the fir
 	const parsed = parseFrontmatter(
 		'\uFEFF---\r\nid: first\r\ntitle: "open\r\nlist: [a, [b]]\r\nid: second\r\nsources:\r\n  - good\r\n   - misplaced\r\nlast: kept\r\n---\r\nBody\r\n',
 	);
-	assert.equal(parsed.ok, true);
-	assert.deepEqual(parsed.data, { id: "first", sources: ["good"], last: "kept" });
+	assert.deepEqual([parsed.ok, parsed.data], [true, { id: "first", sources: ["good"], last: "kept" }]);
 	assert.equal(parsed.errors.map((error) => error.line).join(), "3,4,5,8");
 	assert.deepEqual([parsed.body, parsed.bodyLine], ["Body\n", 11]);
 });
@@ -20,8 +19,7 @@ test("quoted lists keep their commas and quotes; prototype keys are ordinary dat
 	const parsed = parseFrontmatter(
 		"---\n__proto__: literal\nsources: [\"a, b\", 'it''s a path']\nitems:\n  - __proto__: item\n    title: \"A: B\"\n---\n",
 	);
-	assert.deepEqual(parsed.errors, []);
-	assert.deepEqual(parsed.data.sources, ["a, b", "it's a path"]);
+	assert.deepEqual([parsed.errors, parsed.data.sources], [[], ["a, b", "it's a path"]]);
 	assert.equal(Object.getPrototypeOf(parsed.data), Object.prototype);
 	assert.equal(Object.hasOwn(parsed.data, "__proto__"), true);
 	assert.deepEqual(parsed.data.items, [JSON.parse('{"__proto__":"item","title":"A: B"}')]);

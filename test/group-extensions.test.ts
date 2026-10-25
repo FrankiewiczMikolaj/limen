@@ -128,8 +128,7 @@ for (const hosted of [false, true]) {
 			const continuedId = lastLine(continued.stdout);
 			await f.checkJob(continuedId, expected);
 			const entry = (await readRun(f.root, run.id)).members.find((entry) => entry.id === continuedId);
-			assert.equal(entry?.parent, id);
-			assert.equal(entry?.team, coordinator.team);
+			assert.deepEqual([entry?.parent, entry?.team], [id, coordinator.team]);
 			assert.ok(entry && entry.deadline <= run.deadline - run.reserveMs);
 			const branch = readFileSync(join(jobDir(f, id), "branch"), "utf8").trim();
 			assert.equal(f.launch(run, coordinator.team, "--review", "--branch", "main").status, 1);

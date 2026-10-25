@@ -1,7 +1,7 @@
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import { herdrPrompt } from "../integrations/coordinator-wake.ts";
 import { herdrBinary } from "../integrations/herdr.ts";
 import {
 	type GroupMember,
@@ -21,7 +21,6 @@ import { textFile } from "../job/record.ts";
 import { processInfo } from "../runtime/contain.ts";
 import { continueCommand } from "./continue.ts";
 
-const EXCERPT_CHARACTERS = 2_000;
 const PROMPT_MS = 15_000;
 
 /** `F1048 team-1 gpt-6.1-sol · draft`: the feature, the team, its model and the round. */
@@ -215,16 +214,17 @@ async function groupResult(run: GroupRun): Promise<string> {
 	const lines = [
 		`Group ${run.feature} (${run.id}) finished round ${last + 1} of ${run.rounds.length} (${run.rounds.join(" → ")}).`,
 	];
+	// The lead decides from the teams' own words: each final message of the last round goes whole, never cut.
 	const finalJob = run.rounds[last] === "final" ? roundJobs(run, last)[0] : undefined;
-	if (finalJob) {
-		const path = `${roundFolder(run, last)}/${finalJob.team}.md`;
-		const result = await jobText(run, finalJob, "result");
-		lines.push(
-			`Final result (${finalJob.team}, ${routeName(teamRoute(run, finalJob.team))}): ${path}`,
-			result.length > EXCERPT_CHARACTERS ? `${result.slice(0, EXCERPT_CHARACTERS)}\n… (full text in ${path})` : result,
-		);
-	} else {
+	if (!finalJob) {
 		lines.push(`Results of round ${last + 1} (${run.rounds[last]}), one file per team: ${roundFolder(run, last)}/`);
+	}
+	const ended = finalJob ? [finalJob] : run.teams.flatMap((team) => lastJob(run, last, team) ?? []);
+	for (const job of ended) {
+		const path = `${roundFolder(run, last)}/${job.team}.md`;
+		const result = await jobText(run, job, "result");
+		const route = routeName(teamRoute(run, job.team));
+		lines.push(`${finalJob ? "Final result" : "Result"} (${job.team}, ${route}): ${path}`, ...(result ? [result] : []));
 	}
 	lines.push("Teams:");
 	for (const team of run.teams) {
@@ -252,12 +252,12 @@ async function promptLeadPane(run: GroupRun, text: string): Promise<void> {
 	}
 	const lines: string[] = [];
 	for (let attempt = 1; attempt <= 2; attempt += 1) {
-		const args = ["agent", "prompt", run.leadPane, text, "--wait", "--until", "working", "--until", "blocked"];
-		const error = await new Promise<Error | null>((resolve) => {
-			execFile(herdr, [...args, "--timeout", String(PROMPT_MS - 2_000)], { timeout: PROMPT_MS }, resolve);
-		});
-		lines.push(`attempt ${attempt}: ${error ? `failed on ${run.leadPane}` : `turn observed on ${run.leadPane}`}`);
-		if (!error) {
+		// The same transport as a job's wake: a long result goes whole over Herdr's socket, not as one argument.
+		const outcome = await herdrPrompt(herdr, run.leadPane, text, PROMPT_MS);
+		lines.push(
+			`attempt ${attempt}: ${outcome.ok ? `turn observed on ${run.leadPane}` : `failed on ${run.leadPane} (${outcome.detail})`}`,
+		);
+		if (outcome.ok) {
 			break;
 		}
 	}

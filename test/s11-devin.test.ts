@@ -53,8 +53,7 @@ test("a devin job pushes its branch, follows its session and fast-forwards the w
 	assert.equal(git(origin, "rev-parse", branch), git(p.root, "rev-parse", "HEAD"));
 	const pushed = sessionPushes(branch, false);
 	await session("a", "running", "finished", ["Working on it.", "Done: one commit."]);
-	assert.equal(waitJob(p, id), "done");
-	assert.equal(git(jobFile(p, id, "worktree"), "rev-parse", "HEAD"), pushed);
+	assert.deepEqual([waitJob(p, id), git(jobFile(p, id, "worktree"), "rev-parse", "HEAD")], ["done", pushed]);
 	assert.equal(jobFile(p, id, "result"), "Done: one commit.");
 	assert.match(jobFile(p, id, "log"), /devin session a https:\/\/app\.devin\.ai\/sessions\/a\n[\s\S]*Working on it\./);
 	assert.doesNotMatch(jobFile(p, id, "log"), /the prompt/);

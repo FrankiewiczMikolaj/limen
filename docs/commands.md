@@ -229,4 +229,4 @@ limen picture watch [off | on --engine E --provider P --model M --thinking T [--
 limen wait <id|suffix|label>
 ```
 
-Because it blocks, `wait` refuses a running job under `LIMEN_COORDINATOR=1`. The refusal names the commands for that job: `limen jobs <id>` to read it now, and `limen watch <id>` when the coordinator did not spawn it and so gets no completion wake. For a job that already ended, `wait` prints the result in a coordinator too.
+Because it blocks, `wait` refuses a running job under `LIMEN_COORDINATOR=1`. The refusal names the commands for that job: `limen jobs <id>` to read it now, and `limen watch <id>` when the coordinator did not spawn it and so gets no completion wake. The first line is the state, label and id (`DONE label · id …`). The job's ending follows, as a completion wake carries it: stop reason, at most ten commits, the whole final message, and undelivered steers. For a job that already ended, `wait` prints the same in a coordinator too.

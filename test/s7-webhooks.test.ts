@@ -8,7 +8,8 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { coordinatorSignals, sweepCoordinators } from "../src/integrations/coordinator-signal.ts";
-import { git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
+import { SENDER } from "../src/integrations/webhook-queue.ts";
+import { FINAL, git, jobDir, jobFile, limen, plant, type Run, requests, respond, until } from "./plant.ts";
 
 const p = await plant();
 after(p.cleanup);
@@ -33,7 +34,6 @@ const wait = (id: string) => {
 	return result.stdout.split(" ")[0]?.toLowerCase();
 };
 const payloads = () => requests(p).map((request) => ({ url: request.url, body: JSON.parse(request.body) }));
-// The finish path writes its final result line after the sender exits; every request it made is recorded by then.
 const settled = (id: string) =>
 	until(p.parent, () => /^(accepted|failed|skipped)/.test(jobFile(p, id, "finish-webhook")));
 
@@ -61,14 +61,19 @@ await writeFile(
 	`LIMEN_FINISH_WEBHOOK_TARGETS='${JSON.stringify(URLS.map((url, index) => ({ url, auth: SECRETS[index] })))}'\nLIMEN_FINISH_WEBHOOK_AUTHOR_TARGETS='{"@alice":[1],"@bob":[2]}'\n`,
 );
 
-test("a done job pings only the target its ticket author maps to, with its unanswered note check", async () => {
-	const id = spawn(`Ticket: ${alice}\ncommit\nfinish\nfinish no note check`, "S7 alice");
+test("a done job pings only its author's target, with open checks and its whole final message in the handoff and wait", async () => {
+	const message = FINAL.text.repeat(20).replaceAll("Note check:", "Report:"); // past Linux's 128 KiB env-value limit
+	const task = join(p.parent, "long-task");
+	await writeFile(task, `Ticket: ${alice}\ncommit\nfinish\nfinish ${message.replaceAll("\n", "\\n")}`);
+	const id = run(["spawn", "--label", "S7 alice", "--task-file", task]);
+	ids.push(id);
 	assert.equal(wait(id), "done");
+	assert.ok(runs.at(-1)?.stdout.endsWith(`Final message:\n${message}\n`), "wait prints the whole message");
 	await settled(id);
 	const [ping, ...rest] = payloads();
-	assert.deepEqual(rest, []);
-	assert.deepEqual([ping?.url, ping?.body.event, ping?.body.jobId], [URLS[0], "job.done", id]);
-	assert.match(ping?.body.handoff, /^Job done with open checks\. .*\n- Note check: missing from the final message$/);
+	assert.deepEqual([rest, ping?.url, ping?.body.event, ping?.body.jobId], [[], URLS[0], "job.done", id]);
+	assert.ok(ping?.body.handoff.endsWith(`\n\nFinal message:\n${message}`), "the handoff carries it whole");
+	assert.match(ping?.body.handoff, /^Job done with open checks\. .*\n- Note check: missing from the final message\n\n/);
 	assert.equal(requests(p)[0]?.headers.authorization, SECRETS[0]);
 	assert.equal(jobFile(p, id, "finish-webhook-route"), "mapped @alice -> 1");
 });
@@ -96,11 +101,12 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 		{ match: "/busy", status: 503, upTo: 2, body: { error: "busy" } },
 		{ match: "/gone", status: 401, body: { error: `no automation for s7-secret-one at ${urls[2]}` } },
 	]);
-	const id = spawn(`Ticket: ${bob}\nsay\nfail 3`, "S7 bob");
+	const id = spawn(`Ticket: ${bob}\nfinish\nfinish ${FINAL.line}\nfail 3`, "S7 bob");
 	assert.equal(wait(id), "failed");
 	await settled(id);
 	const ping = payloads().find((sent) => sent.body.jobId === id)?.body;
 	assert.deepEqual([ping?.event, ping?.plant, Boolean(ping?.reason)], ["job.failed", "repo", true]);
+	assert.ok(ping?.handoff.endsWith(`Final message:\n${FINAL.text}`));
 	assert.match(jobFile(p, id, "finish-webhook"), /^failed: target 3 HTTP 401 .*; not retried/);
 	const receipts = jobFile(p, id, "finish-webhook-targets")
 		.split("\n")
@@ -114,6 +120,13 @@ test("a failed job's ping reaches each target until it answers for good, and nev
 	run(["webhook", "deliver", jobDir(p, id)]);
 	const counts = urls.map((url) => requests(p).filter((request) => request.url === url).length);
 	assert.deepEqual(counts, [1, 3, 1]);
+	// A send by hand, run as the receipt's manual line says, carries the final message too.
+	assert.match(jobFile(p, id, "finish-webhook"), /its result file \(when it has one\) as LIMEN_FINISH_MESSAGE_FILE,/);
+	const config = jobFile(p, id, "finish-webhook-env");
+	const env = { ...p.env, LIMEN_FINISH_WEBHOOK_ENV: config, LIMEN_FINISH_MESSAGE_FILE: "result" };
+	spawnSync(SENDER, ["S7 bob", "failed", "limen/b"], { cwd: jobDir(p, id), env });
+	const last = payloads().slice(-3);
+	assert.ok(last.every((sent) => sent.body.handoff.endsWith(`\n\nFinal message:\n${FINAL.text}`)));
 });
 
 test("a ping whose deliverer was killed mid-send goes out with the next limen command", async () => {
@@ -136,12 +149,10 @@ test("a ping whose deliverer was killed mid-send goes out with the next limen co
 });
 
 test("no secret or target URL leaves the request header, and nothing names the quiet job", () => {
-	assert.equal(wait(quiet), "done");
-	assert.equal(requests(p).length, 9);
+	assert.deepEqual([wait(quiet), requests(p).length], ["done", 12]);
 	const sealed = (request: ReturnType<typeof requests>[number]) =>
 		request.url.startsWith("https://hooks.s7.test/") && SECRETS.includes(request.headers.authorization ?? "");
-	assert.ok(requests(p).every(sealed));
-	assert.ok(payloads().every((ping) => ping.body.jobId !== quiet));
+	assert.ok(requests(p).every(sealed) && payloads().every((ping) => ping.body.jobId !== quiet));
 	const leaks = (text: string) =>
 		[...SECRETS.map((secret) => secret.slice(7)), "hooks.s7.test"].filter((value) => text.includes(value));
 	const rest = requests(p).map((request) => ({

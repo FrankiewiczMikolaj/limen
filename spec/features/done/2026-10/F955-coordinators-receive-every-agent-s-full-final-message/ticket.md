@@ -2,6 +2,7 @@
 touches:
   - limen.sessions.wake
 opened: 2026-10-24
+landed: 2026-10-25
 ---
 
 # F955 · Coordinators receive every agent’s full final message

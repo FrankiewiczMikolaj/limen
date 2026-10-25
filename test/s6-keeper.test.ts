@@ -39,8 +39,7 @@ test("keeper refuses a running job, then starts on a new branch at the candidate
 	const refused = limen(p, ["keeper", TICKET, "--job", worker, ...ROUTE]);
 	assert.equal(refused.status, 1);
 	assert.match(refused.stderr, new RegExp(worker));
-	assert.equal(git(p.root, "branch", "--list", "limen/keeper-*"), "");
-	assert.equal(jobFile(p, worker, "state"), "running");
+	assert.deepEqual([git(p.root, "branch", "--list", "limen/keeper-*"), jobFile(p, worker, "state")], ["", "running"]);
 
 	await release(jobDir(p, worker));
 	assert.equal(waitJob(p, worker), "done");

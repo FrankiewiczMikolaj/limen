@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
+import { connect } from "node:net";
 import { jobMembership } from "../job/group-cabinet.ts";
 import { appendLimenLog, atomicWrite, textFile } from "../job/record.ts";
 import { completionWake, keeperHint } from "../job/wake-text.ts";
@@ -7,8 +8,16 @@ import { herdrBinary } from "./herdr.ts";
 
 const PROMPT_MS = 15_000;
 const ATTEMPTS = 2;
-// Herdr refuses these before it sends any input; every other failure may follow a submission.
-const UNSENT = /\b(agent_blocked|agent_not_found|target_not_found|pane_not_found)\b/;
+// Up to this size a prompt goes as a `herdr agent prompt` argument, under Linux's 128 KiB limit for one argument.
+// A longer prompt goes as one request on Herdr's socket API. Herdr 0.9.5 reads at most 1 MiB in one request line
+// (src/api/server.rs), and only while the line arrives within 5 s; no Herdr request can carry more.
+const ARGUMENT_BYTES = 96 * 1024;
+const REQUEST_BYTES = 1024 * 1024;
+// Herdr refuses these before it sends any input; a Herdr the OS did not start, a socket that took no connection, a
+// prompt too large for one request and a request Herdr closed before its end sent nothing. Every other failure may
+// follow a submission.
+const UNSENT =
+	/\b(agent_blocked|agent_not_found|target_not_found|pane_not_found|herdr not started|socket unavailable|prompt_too_large|request not taken)\b/;
 
 /**
  * Start a turn on the Herdr pane that spawned this job. Only jobs whose coordinator had no Pi session record
@@ -79,12 +88,7 @@ export async function promptPane(
 			lines.push("no time left for another attempt; deliver this text to the pane deliberately");
 			break;
 		}
-		const wait = String(Math.max(budget - 2_000, 1_000));
-		const outcome = await run(
-			herdr,
-			["agent", "prompt", pane, message, "--wait", "--until", "working", "--until", "blocked", "--timeout", wait],
-			budget,
-		);
+		const outcome = await herdrPrompt(herdr, pane, message, budget);
 		const result = outcome.ok
 			? `turn observed on ${pane}`
 			: /agent_prompt_stalled/.test(outcome.detail)
@@ -131,19 +135,119 @@ async function wakeMessage(jobDir: string): Promise<string | undefined> {
 	return;
 }
 
-function run(
-	binary: string,
-	args: readonly string[],
-	timeout: number,
-): Promise<{ readonly ok: boolean; readonly detail: string }> {
-	const { promise, resolve } = Promise.withResolvers<{ readonly ok: boolean; readonly detail: string }>();
-	execFile(binary, args, { encoding: "utf8", timeout }, (error, stdout, stderr) => {
-		// error.message repeats the full argv, wake text included; the receipt keeps Herdr's own first line instead.
-		const said = `${stderr || ""}${stdout || ""}`.trim().split("\n")[0] ?? "";
-		const detail = error?.killed
-			? `herdr exceeded ${timeout}ms`
-			: said || (error ? `herdr exited ${error.code ?? "abnormally"}` : "");
-		resolve({ ok: !error, detail });
+type Outcome = { readonly ok: boolean; readonly detail: string };
+
+/**
+ * Submit `text` to the agent on `pane` once, and wait until Herdr sees it working or blocked, within `budget` ms. A short
+ * text goes as a `herdr agent prompt` argument. A longer one goes whole as the same `agent.prompt` request on the socket
+ * `herdr status` names, as the OS limits one argument. `detail` keeps Herdr's own reply line, which names its code.
+ */
+export async function herdrPrompt(herdr: string, pane: string, text: string, budget: number): Promise<Outcome> {
+	const wait = (ms: number) => Math.max(ms - 2_000, 1_000);
+	if (Buffer.byteLength(text) <= ARGUMENT_BYTES) {
+		const args = ["agent", "prompt", pane, text, "--wait", "--until", "working", "--until", "blocked"];
+		return run(herdr, [...args, "--timeout", String(wait(budget))], budget);
+	}
+	const request = (ms: number) =>
+		JSON.stringify({
+			id: "limen:agent.prompt",
+			method: "agent.prompt",
+			params: { target: pane, text, wait: { until: ["working", "blocked"], timeout_ms: wait(ms) } },
+		});
+	const bytes = Buffer.byteLength(request(budget));
+	if (bytes > REQUEST_BYTES) {
+		return {
+			ok: false,
+			detail: `prompt_too_large: ${bytes} bytes; Herdr takes at most ${REQUEST_BYTES} in one request`,
+		};
+	}
+	const started = Date.now();
+	const socket = await serverSocket(herdr, Math.min(5_000, budget));
+	const left = budget - (Date.now() - started);
+	if (!socket || left < 1_000) {
+		return {
+			ok: false,
+			detail: `socket unavailable: ${socket ? "no time left" : "herdr status names no running server"}`,
+		};
+	}
+	return send(socket, request(left), left);
+}
+
+/** The socket of the running Herdr server this binary talks to, as `herdr status` resolves it (session, environment). */
+function serverSocket(herdr: string, timeout: number): Promise<string | undefined> {
+	const { promise, resolve } = Promise.withResolvers<string | undefined>();
+	execFile(herdr, ["status", "--json"], { encoding: "utf8", timeout }, (error, stdout) => {
+		const server = error ? undefined : parsed(stdout)?.server;
+		resolve(server?.running && typeof server.socket === "string" ? server.socket : undefined);
 	});
+	return promise;
+}
+
+/** One request line on Herdr's socket, and its one reply line. */
+function send(socket: string, request: string, timeout: number): Promise<Outcome> {
+	const { promise, resolve } = Promise.withResolvers<Outcome>();
+	const conn = connect(socket);
+	let connected = false;
+	let written = false;
+	let reply = "";
+	const end = (outcome: Outcome) => {
+		clearTimeout(timer);
+		conn.destroy();
+		resolve(outcome);
+	};
+	const timer = setTimeout(() => end({ ok: false, detail: `herdr exceeded ${timeout}ms` }), timeout);
+	conn.setEncoding("utf8");
+	conn.on("connect", () => {
+		connected = true;
+		// Herdr acts only on a whole line, so a socket closed before the write ended took no request.
+		conn.write(`${request}\n`, (error) => {
+			written = !error;
+		});
+	});
+	conn.on("data", (chunk: string) => {
+		reply += chunk;
+		if (reply.includes("\n")) {
+			const line = reply.slice(0, reply.indexOf("\n"));
+			end({ ok: parsed(line)?.result !== undefined, detail: line });
+		}
+	});
+	conn.on("error", (error: NodeJS.ErrnoException) => {
+		if (!connected) {
+			end({ ok: false, detail: `socket unavailable: ${error.code ?? error.message}` });
+		}
+	});
+	conn.on("close", () => {
+		const detail = written
+			? "herdr closed the socket without a reply"
+			: "request not taken: Herdr closed the socket before the prompt's end arrived";
+		end({ ok: false, detail });
+	});
+	return promise;
+}
+
+type Reply = { readonly result?: unknown; readonly server?: { readonly running?: boolean; readonly socket?: unknown } };
+function parsed(line: string): Reply | undefined {
+	try {
+		return JSON.parse(line);
+	} catch {
+		return;
+	}
+}
+
+function run(binary: string, args: readonly string[], timeout: number): Promise<Outcome> {
+	const { promise, resolve } = Promise.withResolvers<Outcome>();
+	try {
+		execFile(binary, args, { encoding: "utf8", timeout }, (error, stdout, stderr) => {
+			// error.message repeats the full argv, wake text included; the receipt keeps Herdr's own first line instead.
+			const said = `${stderr || ""}${stdout || ""}`.trim().split("\n")[0] ?? "";
+			const detail = error?.killed
+				? `herdr exceeded ${timeout}ms`
+				: said || (error ? `herdr exited ${error.code ?? "abnormally"}` : "");
+			resolve({ ok: !error, detail });
+		});
+	} catch (error) {
+		// The spawn throws when the OS refuses the argv, as E2BIG for an argument past its limit.
+		resolve({ ok: false, detail: `herdr not started: ${(error as NodeJS.ErrnoException).code ?? "spawn failed"}` });
+	}
 	return promise;
 }

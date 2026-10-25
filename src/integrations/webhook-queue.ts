@@ -23,8 +23,9 @@ const TRY_MS = 30_000;
 const WAIT_MS = 2 * 60_000;
 const MAX_BACKOFF_MS = 10 * 60_000;
 const GIVE_UP_MS = 24 * 60 * 60_000;
+// The queue snapshot is gone after a final failure, so the job's result file carries the final message.
 const MANUAL =
-	"Manual finish-ping send: only after a final failure. Run bin/tony-finish-ping.sh with this job's finish-webhook-env as LIMEN_FINISH_WEBHOOK_ENV, and its label, state and branch.";
+	"Manual finish-ping send: only after a final failure. Run bin/tony-finish-ping.sh with this job's finish-webhook-env as LIMEN_FINISH_WEBHOOK_ENV, its result file (when it has one) as LIMEN_FINISH_MESSAGE_FILE, and its label, state and branch.";
 
 /** One queued ping. `limen` is the plant's `.limen` folder; `log` is the job folder whose log names each try, or "". */
 type Queued = {
@@ -234,14 +235,16 @@ function startDeliverer(dir: string): void {
 	child.once("error", () => {});
 	child.unref();
 }
-export function senderEnvironment(config: string, event: PlantEvent): NodeJS.ProcessEnv {
+export function senderEnvironment(config: string, event: PlantEvent, queue?: string): NodeJS.ProcessEnv {
 	return {
 		...process.env,
 		PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`,
 		LIMEN_FINISH_WEBHOOK_ENV: config,
 		LIMEN_FINISH_WEBHOOK_AUTHOR: event.author ?? "",
-		// Undefined drops any inherited override, so a terminal job always sends the job handoff.
-		LIMEN_FINISH_HANDOFF: event.handoff,
+		// Queued reports stay in the file: argv and environment values have OS size limits.
+		LIMEN_FINISH_HANDOFF: queue ? undefined : event.handoff,
+		LIMEN_FINISH_QUEUE: queue,
+		LIMEN_FINISH_MESSAGE_FILE: undefined,
 		LIMEN_FINISH_KIND: event.kind,
 		LIMEN_FINISH_PLANT: event.plant,
 		LIMEN_FINISH_ID: event.id,
@@ -268,7 +271,7 @@ function send(dir: string, queued: Queued, skip: readonly number[]): Promise<Sen
 	const { promise, resolve } = Promise.withResolvers<Sent>();
 	const child = spawn(SENDER, [queued.event.title, queued.event.status, queued.event.branch], {
 		env: {
-			...senderEnvironment(queued.config, queued.event),
+			...senderEnvironment(queued.config, queued.event, `${dir}/finish-webhook-queue`),
 			LIMEN_FINISH_EVENT: queued.id,
 			LIMEN_FINISH_WEBHOOK_SKIP: skip.join(","),
 		},

@@ -44,7 +44,7 @@ A hosted team job ends when its turn ends: once its session has been idle for th
 
 Each team job that ends starts `limen group advance GROUP-ID` in its own process. The advance waits for that job's process to exit, takes the launch lock, and does nothing until the round is complete, so the finishes of several teams start a round once. `limen group status GROUP-ID` starts one too, which moves on a round whose last finish could not.
 
-When the group finishes, Limen writes `.limen/groups/GROUP-ID/result.md` and tells the lead once: the final result or the last round's folder, each team's route, state and branch, and the next step. With a live lead hook it is one group event that starts a lead turn. Without one it is a Herdr prompt to the pane the lead started the group from; `result-delivery` in the cabinet records which. Team jobs never send ordinary completion wakes, and the lead does not hear their starts and ends.
+When the group finishes, Limen writes `.limen/groups/GROUP-ID/result.md` and tells the lead once: the final team's whole final message, or without a final round each team's whole final message from the last round, with the result paths; each team's route, state and branch; and the next step. With a live lead hook it is one group event that starts a lead turn. Without one it is a Herdr prompt to the pane the lead started the group from; `result-delivery` in the cabinet records which. A long result travels whole as a job wake does, over the Herdr socket ([Herdr wakes](jobs.md#wakes)). A result past the 1 MiB that Herdr reads in one request cannot travel as a Herdr prompt: `result-delivery` records the failed attempts with `prompt_too_large`, and `result.md` keeps the whole text. Team jobs never send ordinary completion wakes, and the lead does not hear their starts and ends.
 
 ## Work and publish
 
@@ -78,7 +78,7 @@ The group has one wall-clock deadline. Each worker's deadline is the group deadl
 
 Each event has one receipt per recipient. A receipt moves from queued to accepted, observed and processed. None of these states proves that a member agreed with or acted on the event. A receipt marked `uncertain` means a delivery was interrupted, so the event may or may not have reached its recipient. Inspect it before you act on it. Limen tries each recipient and event at most twice automatically.
 
-One message carries at most eight events and 8,000 characters of published text. Omitted detail stays in the cabinet, and the message names its location. Processed events are not delivered again. A finished member keeps its unread events for a deliberate continuation; Limen does not respawn it.
+One message carries at most eight events and 8,000 characters of published text. A single longer event, such as a group result, goes alone and whole. Omitted detail stays in the cabinet, and the message names its location. Processed events are not delivered again. A finished member keeps its unread events for a deliberate continuation; Limen does not respawn it.
 
 When the cabinet is busy, routine sweeps skip it instead of failing the member. A later sweep publishes the updates. Group spawn and continue wait for a launch in progress to finish. They have no timeout, so a launch that never finishes needs inspection.
 

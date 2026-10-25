@@ -89,8 +89,7 @@ test("a detached job runs in its own worktree from the base with the exact task 
 	assert.deepEqual(readFileSync(index), bytes);
 
 	await release(dir);
-	assert.equal(waitJob(p, id), "done");
-	assert.equal(readFileSync(join(dir, "task.md"), "utf8"), task);
+	assert.deepEqual([waitJob(p, id), readFileSync(join(dir, "task.md"), "utf8")], ["done", task]);
 	assert.equal(readFileSync(join(dir, "fake-task.txt"), "utf8"), task);
 	const argv: string[] = json(join(dir, "fake-argv.json"));
 	assert.ok(!argv.some((value) => value.includes("say all done")), "the task stays out of argv");

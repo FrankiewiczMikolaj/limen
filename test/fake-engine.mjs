@@ -87,12 +87,15 @@ async function turn(messages, reply, stopReason) {
 	await fire("turn_start", {});
 	// Pi hands the hooks the turn's messages in a context event before each model call.
 	await fire("context", { messages });
-	const assistant = {
-		role: "assistant",
-		content: [{ type: "text", text: reply }],
-		...(stopReason ? { stopReason } : {}),
-	};
-	emit({ type: "message_end", message: assistant });
+	const assistant = { role: "assistant", content: [{ type: "text", text: reply }], ...(stopReason && { stopReason }) };
+	// A pipe can cut a line anywhere: cut it inside its first letter of two, three and four bytes; let each piece be read.
+	const line = Buffer.from(`${JSON.stringify({ type: "message_end", message: assistant })}\n`);
+	const cuts = [0b110, 0b1110, 0b11110].map((lead, n) => line.findIndex((byte) => byte >> (5 - n) === lead) + 1);
+	let start = 0;
+	for (const end of [...cuts.filter((cut) => cut > 0).sort((a, b) => a - b), line.length]) {
+		await new Promise((resolve) => process.stdout.write(line.subarray(start, end), () => setTimeout(resolve, 20)));
+		start = end;
+	}
 	await fire("message_end", { message: assistant });
 	await fire("turn_end", {});
 	idle = true;
@@ -123,7 +126,7 @@ let stopReason;
 let code = 0;
 for (const line of task.split("\n")) {
 	const [word = "", ...rest] = line.trim().split(" ");
-	const value = rest.join(" ");
+	const value = rest.join(" ").replaceAll("\\n", "\n"); // a `\n` in say or finish text is a line break
 	if (word === "commit") {
 		writeFileSync(`fake-${process.pid}-${blocks}-${Date.now()}.txt`, `${task}\n`);
 		execFileSync("git", ["add", "."]);
@@ -149,8 +152,7 @@ for (const line of task.split("\n")) {
 		child.unref();
 		writeFileSync(join(dir, "fake-orphan"), String(child.pid));
 	} else if (word === "finish") {
-		const handoff = value.replaceAll("\\n", "\n");
-		await tools.get("finish")?.execute("fake", { handoff }, undefined, undefined, context);
+		await tools.get("finish")?.execute("fake", { handoff: value }, undefined, undefined, context);
 	} else if (word.startsWith("/")) {
 		await commands.get(word.slice(1))?.handler(value, context);
 	}
@@ -159,4 +161,4 @@ turns = turns.then(() => turn([{ role: "user", content: [{ type: "text", text: t
 await turns;
 await fire("session_shutdown", {});
 record({ event: "exit", code });
-process.exit(code);
+process.stdout.write("", () => process.exit(code)); // a stdio pipe takes 8 KiB at once; exit after the rest

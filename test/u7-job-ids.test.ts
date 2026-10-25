@@ -31,8 +31,7 @@ test("a job resolves by full id, id suffix, exact label or label prefix, and onl
 test("a job id hoists the feature number, keeps a bounded slug, and ends in a random suffix", () => {
 	const shape = /^\d{4}-\d{2}-\d{2}-([a-z0-9-]+)-[0-9a-f]{8}$/;
 	const slug = (label: string) => shape.exec(makeJobId(label))?.[1];
-	assert.equal(slug("Review F927 candidate"), "f927-review-candidate");
-	assert.equal(slug("!!!"), "job");
+	assert.deepEqual([slug("Review F927 candidate"), slug("!!!")], ["f927-review-candidate", "job"]);
 	const long = slug("an extremely long label that keeps going well past the slug bound");
 	assert.ok(long && long.length <= 32 && !long.endsWith("-"), long);
 	assert.notEqual(makeJobId("same"), makeJobId("same"));
