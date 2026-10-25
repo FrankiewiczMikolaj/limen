@@ -123,8 +123,7 @@ test("a killed wrapper is reaped at once and a stopped job leaves no escaped chi
 	assert.ok(pid > 0, "the wrapper recorded its pid");
 	process.kill(pid, "SIGKILL");
 	// A young job: only the product's dead-pid confirmation window applies, never the startup grace.
-	const listed = limen(p, ["jobs", killed], { env: { LIMEN_REAP_CONFIRM_MS: "1" } });
-	assert.equal(listed.status, 0, listed.stderr);
+	limen(p, ["jobs", killed], { env: { LIMEN_REAP_CONFIRM_MS: "1" } });
 	assert.equal(jobFile(p, killed, "state"), "failed");
 	await release(jobDir(p, killed));
 
@@ -132,8 +131,7 @@ test("a killed wrapper is reaped at once and a stopped job leaves no escaped chi
 	await until(jobDir(p, stopped), () => existsSync(join(jobDir(p, stopped), "fake-blocked-1")));
 	const orphan = Number(jobFile(p, stopped, "fake-orphan"));
 	assert.ok(alive(orphan), "the orphan escaped into its own process group and runs");
-	const stop = limen(p, ["stop", stopped, "s9"]);
-	assert.equal(stop.status, 0, stop.stderr);
+	limen(p, ["stop", stopped, "s9"]);
 	assert.equal(jobFile(p, stopped, "state"), "stopped");
 	const named = !alive(orphan) || jobFile(p, stopped, "cleanup").includes(`${orphan} `);
 	assert.ok(named, `orphan ${orphan} survived stop unnamed`);

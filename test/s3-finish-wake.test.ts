@@ -31,14 +31,13 @@ let coord = "";
 const sessions: ChildProcess[] = [];
 
 /** A coordinator session: the fake engine with the real wake hook, running `script` as PI_SESSION_ID `session`. */
-function coordinator(name: string, session: string, script: string): string {
+function coordinator(name: string, session: string, script: string, env: Record<string, string> = {}): string {
 	const dir = join(p.parent, name);
 	mkdirSync(dir);
 	writeFileSync(join(dir, "task.md"), script);
 	const args = ["--session-dir", join(dir, "session"), "--extension", WAKE_HOOK, `@${join(dir, "task.md")}`];
-	sessions.push(
-		spawn(join(p.bin, "pi"), args, { cwd: p.root, env: { ...p.env, PI_SESSION_ID: session }, stdio: "ignore" }),
-	);
+	const options = { cwd: p.root, env: { ...p.env, ...env, PI_SESSION_ID: session }, stdio: "ignore" } as const;
+	sessions.push(spawn(join(p.bin, "pi"), args, options));
 	return dir;
 }
 /** A detached job running the fake-engine `script`, spawned from the `coord` session unless `env` says otherwise. */
@@ -216,4 +215,12 @@ test("a held gate queues jobs by priority and a rule's start priority holds the 
 	// The start notice is its own receipt and comes first; a job that ended before it carries its line in the finish wake.
 	const heard = [later, urgent, timed].map((id) => wakes(coord, id).map((w) => w.text?.includes(") started after ")));
 	assert.deepEqual(heard.flat(), [true, false, true, false, true]);
+});
+
+test("an idle owner hears a job whose session is gone through one fallback wake once its grace passes", async () => {
+	const owner = coordinator("owner", "owner", "block\n", { LIMEN_WAKE_FALLBACK_MS: "1500" });
+	await delivered([job("say mine", "f owned", [], { PI_SESSION_ID: "owner" })], "owner");
+	const orphan = job("say gone", "f orphan", [], { PI_SESSION_ID: "gone" });
+	await delivered([orphan], "_fallback");
+	wokeOnce({ orphan }, [owner]);
 });

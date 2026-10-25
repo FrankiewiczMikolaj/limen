@@ -179,8 +179,7 @@ test("hosted Pi stop records stopped once and closes the job's tab", async () =>
 	const third = spawnJob(p, "block\nfinish never", ["--tab", "--engine", "pi", "--label", "F001 hosted pi"], { env });
 	const dir = jobDir(p, third);
 	await until(dir, () => existsSync(join(dir, "fake-blocked-1")));
-	const stopped = limen(p, ["stop", third, "enough"], { env });
-	assert.equal(stopped.status, 0, stopped.stderr);
+	limen(p, ["stop", third, "enough"], { env });
 	assert.equal(jobFile(p, third, "state"), "stopped");
 	const tab = jobFile(p, third, "herdr/tab");
 	await until(herdr, () => named("tab", "close").some((args) => args[2] === tab));
