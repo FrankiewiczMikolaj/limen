@@ -16,11 +16,9 @@ test("worktreeState reads a tree with stale stat data without rewriting its inde
 	const index = join(root, ".git/index");
 	const before = await readFile(index);
 	await utimes(join(root, "README.md"), new Date(0), new Date(0));
-	assert.equal(worktreeState(root), "clean");
-	assert.deepEqual(await readFile(index), before);
+	assert.deepEqual([worktreeState(root), await readFile(index)], ["clean", before]);
 	await writeFile(join(root, "README.md"), "changed\n");
-	assert.equal(worktreeState(root), "dirty");
-	assert.deepEqual(await readFile(index), before);
+	assert.deepEqual([worktreeState(root), await readFile(index)], ["dirty", before]);
 });
 
 test("an idle group member closes after its turn in a tree that is no checkout (F1083); a lone job stays open", async (t) => {

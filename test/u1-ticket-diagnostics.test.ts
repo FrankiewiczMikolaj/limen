@@ -81,7 +81,6 @@ test("each ticket fault is reported at its own file and line with a fix, and the
 	assert.equal(byId.get("f780")?.purpose, "Adam reads one page.");
 	assert.deepEqual(byId.get("f780")?.touches, ["plant.viewer", "plant.misspelled"]);
 	assert.deepEqual(byId.get("f781")?.wrong, { problem: "This is wrong.", on: "2026-10-06" });
-	assert.equal(byId.get("f781")?.needsAdam, null);
-	assert.equal(byId.get("f783")?.title, "Legacy ticket");
+	assert.deepEqual([byId.get("f781")?.needsAdam, byId.get("f783")?.title], [null, "Legacy ticket"]);
 	assert.deepEqual(byId.get("f785")?.needsAdam, { ask: "Keep the atlas?", on: "2026-10-05" });
 });

@@ -2,6 +2,7 @@ import { type FSWatcher, watch } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { isTerminal } from "../job/job.ts";
 import { resolveJob } from "../job/lookup.ts";
+import { jobEnding } from "../job/wake-text.ts";
 export async function waitCommand(args: readonly string[], cwd: string): Promise<void> {
 	const query = args[0];
 	if (!query || args.length !== 1) {
@@ -21,7 +22,9 @@ export async function waitCommand(args: readonly string[], cwd: string): Promise
 		throw new Error(`job ${id} has unknown state ${JSON.stringify(state)}`);
 	}
 	const label = (await text(`${jobDir}/label`)) || id;
-	console.log(`${state.toUpperCase()} ${label} · id ${id}`);
+	// The first line stays the state for scripts; the ending follows whole, as a completion wake carries it.
+	const ending = jobEnding(jobDir);
+	console.log(`${state.toUpperCase()} ${label} · id ${id}${ending ? `\n\n${ending}` : ""}`);
 }
 function waitForTerminal(jobDir: string): Promise<string> {
 	return new Promise((resolve, reject) => {

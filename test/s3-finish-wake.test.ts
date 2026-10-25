@@ -12,6 +12,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
 	engineEvents,
+	FINAL,
 	git,
 	jobDir,
 	jobFile,
@@ -83,11 +84,11 @@ after(async () => {
 
 test("a job that ends done, failed or on a provider error wakes its session once, with two listeners on that session", async () => {
 	const second = coordinator("second", "coord", "block\n");
-	const handoff = "a done handoff\\n## Note check\\n- Hold: not proven. No run.\\n- Cap: proven. `npm test`";
+	const handoff = `${FINAL.line.replace("Note check:", "Report:")}\\n## Note check\\n- Hold: not proven. No run.\\n- Cap: proven. \`npm test\``;
 	const ids = {
 		done: job(`commit\nfinish\nfinish ${handoff}`, "a done"),
 		failed: job("fail 7", "a failed"),
-		provider: job("commit\nerror", "a provider error"),
+		provider: job(`say ${FINAL.line}\ncommit\nerror`, "a provider error"),
 	};
 	const states = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, waitJob(p, id)]));
 	await delivered(Object.values(ids));
@@ -95,18 +96,18 @@ test("a job that ends done, failed or on a provider error wakes its session once
 	await release(second);
 	await until(second, () => engineEvents(second).some((event) => event.event === "exit"));
 	assert.deepEqual(states, { done: "done", failed: "failed", provider: "failed" });
-	// A detached job resumed from a hosted session calls finish too: once for the note check, then with the result.
-	assert.equal(jobFile(p, ids.done, "result"), handoff.replaceAll("\\n", "\n"));
 	assert.equal(jobFile(p, ids.done, "log").split("note check sent").length, 2);
 	// A provider error after a commit fails the job (967ab4b recorded it as done) and keeps the commit on its branch.
 	assert.equal(git(p.root, "rev-list", "--count", `main..${jobFile(p, ids.provider, "branch")}`), "1");
 	wokeOnce(ids, [coord, second]);
-	// A job with no tool calls and no commits says so; a job that committed does not.
-	const [failed = "", done = ""] = [ids.failed, ids.done].map(
+	const [failed = "", done = "", provider = ""] = [ids.failed, ids.done, ids.provider].map(
 		(id) => [coord, second].flatMap((dir) => wakes(dir, id))[0]?.text,
 	);
 	assert.match(failed, /produced nothing/);
 	assert.doesNotMatch(done, /produced nothing/);
+	assert.ok(done.includes(`Final message:\n${handoff.replaceAll("\\n", "\n")}\n\n`));
+	assert.equal(jobFile(p, ids.provider, "result"), FINAL.text); // stdout cut it inside letters of 2, 3 and 4 bytes
+	assert.ok(provider.includes(`Final message:\n${FINAL.text}\n\n`));
 	// Its open note checks reach the wake, one line each, and it is not a plain done; `npm test` never ran.
 	assert.match(done, /is done with open checks \(.+\n\nOpen checks:\n- Hold: not proven\. No run\.\n- Cap: /);
 	assert.match(done, /\n- Cap: not proven\. Limen: no proof that `npm test` ran \(no shell call names it .+\n\n/);

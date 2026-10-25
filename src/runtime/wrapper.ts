@@ -237,7 +237,9 @@ export async function runInternalJob(): Promise<void> {
 		stdio: ["ignore", "pipe", "pipe"],
 		env: childEnvironment,
 	});
-	child.stdout?.on("data", (chunk: Buffer | string) => apply(parser.push(chunk.toString())));
+	// A pipe can cut a multi-byte UTF-8 letter between two chunks; the stream's decoder keeps the cut bytes for the next one.
+	child.stdout?.setEncoding("utf8");
+	child.stdout?.on("data", (chunk: string) => apply(parser.push(chunk)));
 	child.stderr?.on("data", (chunk: Buffer | string) => {
 		seen.progress += 1;
 		pending = pending.then(() => appendFile(`${jobDir}/log`, chunk.toString())).catch(failLog);

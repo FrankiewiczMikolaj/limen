@@ -257,7 +257,8 @@ export async function acceptBatch(
 			omitted = 0;
 		await mkdir(`${groupPath(identity.run)}/receipts/${identity.recipient}`, { recursive: true });
 		for (const { event, recorded } of eligible) {
-			if (selected.length >= 8 || characters + event.text.length > 8_000) {
+			// The first event always goes, so a group result longer than the bound still reaches the lead whole.
+			if (selected.length >= 8 || (selected.length > 0 && characters + event.text.length > 8_000)) {
 				omitted++;
 				continue;
 			}

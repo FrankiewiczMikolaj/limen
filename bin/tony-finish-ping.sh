@@ -136,6 +136,23 @@ const fields = Object.entries({
   event: kind, plant: oneLine(process.env.LIMEN_FINISH_PLANT, 120), title: oneLine(args[0], 200),
   jobId: oneLine(process.env.LIMEN_FINISH_ID, 160), reason: oneLine(process.env.LIMEN_FINISH_REASON, 300),
 }).filter(([, value]) => value !== undefined);
+// Read the queued snapshot, not a potentially changed job result; a manual retry may supply a result file.
+let report = {};
+try {
+  if (process.env.LIMEN_FINISH_QUEUE) report = JSON.parse(readFileSync(process.env.LIMEN_FINISH_QUEUE, 'utf8')).event;
+  else if (process.env.LIMEN_FINISH_MESSAGE_FILE) report.message = readFileSync(process.env.LIMEN_FINISH_MESSAGE_FILE, 'utf8').trim();
+} catch {
+  fail('cannot read the final report');
+}
+// A lead step, a non-terminal event, or a done job with open note checks names its own next step.
+const next = (report.handoff ?? process.env.LIMEN_FINISH_HANDOFF)?.trim() || (args[1] === 'done'
+  ? 'Job done. Next step: land it, or name the check that still blocks landing.'
+  : ['failed', 'stopped'].includes(args[1])
+    ? 'Job failed or stopped; inspect the job record before proceeding'
+    : 'Unrecognized job status; inspect the job record before proceeding');
+// An ended job's final message follows whole: the coordinator a receiver wakes decides the next step from it.
+const message = report.message;
+const handoff = message ? `${next}\n\nFinal message:\n${message}` : next;
 function send(target, index) {
   return new Promise(resolve => {
     const controller = new AbortController();
@@ -158,12 +175,7 @@ function send(target, index) {
         job: args[0], status: args[1] === 'done' ? 'waiting' : args[1], branch: args[2],
         ...(args[1] === 'done' ? { jobState: 'done' } : {}),
         ...(event ? { finishEvent: event } : {}),
-        // A lead step, a non-terminal event, or a done job with open note checks names its own next step.
-        handoff: process.env.LIMEN_FINISH_HANDOFF?.trim() || (args[1] === 'done'
-          ? 'Job done. Next step: land it, or name the check that still blocks landing.'
-          : ['failed', 'stopped'].includes(args[1])
-            ? 'Job failed or stopped; inspect the job record before proceeding'
-            : 'Unrecognized job status; inspect the job record before proceeding'),
+        handoff,
         ...Object.fromEntries(fields),
       }),
     }).then(async response => {

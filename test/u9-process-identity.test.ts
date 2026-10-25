@@ -7,28 +7,27 @@ import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import { containEscapedDescendants, processInfo } from "../src/runtime/contain.ts";
 import { ownerAlive, reapDeadJobs } from "../src/runtime/reap.ts";
 
 // The real identity query, with a deadline that load cannot miss (the product's one-second default can, and then
 // counts the process as unknown).
 const query = (pid: number) => processInfo(pid, Date.now() + 60_000);
+/** A sleeping child, its exit and its recorded identity; the test kills it when it ends. */
+async function sleeper(t: TestContext, detached: boolean) {
+	const code = "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0)";
+	const child = spawn(process.execPath, ["-e", code], { detached, stdio: "ignore" });
+	t.after(() => child.kill("SIGKILL"));
+	const [exited, info] = [once(child, "exit"), await query(child.pid ?? 0)];
+	assert.ok(info.kind === "present", "the child is present");
+	return { child, exited, info };
+}
 
 test("a recycled pid with another birth is never signaled and is named for cleanup; the recorded birth is signaled", async (t) => {
 	const job = await mkdtemp(join(tmpdir(), "u9-"));
-	const child = spawn(process.execPath, ["-e", "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0)"], {
-		detached: true,
-		stdio: "ignore",
-	});
 	t.after(() => rm(job, { recursive: true, force: true }));
-	t.after(() => child.kill("SIGKILL"));
-	const exited = once(child, "exit");
-	const info = await query(child.pid ?? 0);
-	assert.equal(info.kind, "present");
-	if (info.kind !== "present") {
-		return;
-	}
+	const { child, exited, info } = await sleeper(t, true);
 	await containEscapedDescendants(job, [{ ...info.process, born: "0.000000" }], "u9", { query });
 	assert.deepEqual([child.exitCode, child.signalCode], [null, null], "the stranger is still running");
 	assert.match(await readFile(join(job, "cleanup"), "utf8"), new RegExp(`^${info.process.pid} 0\\.000000 `, "m"));
@@ -39,16 +38,7 @@ test("a recycled pid with another birth is never signaled and is named for clean
 test("the reaper keeps a live owner and finalizes a dead owner and a stranger at its pid", async (t) => {
 	const jobs = await mkdtemp(join(tmpdir(), "u9-jobs-"));
 	t.after(() => rm(jobs, { recursive: true, force: true }));
-	const child = spawn(process.execPath, ["-e", "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0)"], {
-		stdio: "ignore",
-	});
-	t.after(() => child.kill("SIGKILL"));
-	const exited = once(child, "exit");
-	const info = await query(child.pid ?? 0);
-	assert.equal(info.kind, "present");
-	if (info.kind !== "present") {
-		return;
-	}
+	const { child, exited, info } = await sleeper(t, false);
 	const record = async (id: string, pid: number, born: string) => {
 		await mkdir(join(jobs, id));
 		await writeFile(join(jobs, id, "state"), "running\n");
